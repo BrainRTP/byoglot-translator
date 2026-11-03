@@ -1,0 +1,154 @@
+[
+  {
+    "id": "spring-resources",
+    "kind": "dev",
+    "url": "https://docs.spring.io/spring-framework/reference/core/resources.html",
+    "scope": "article.doc",
+    "sourceLang": "en",
+    "selections": [
+      {
+        "id": "sp-phrase",
+        "find": "fully qualified file name"
+      },
+      {
+        "id": "sp-sentence",
+        "find": "It is the responsibility of the caller to close the stream."
+      },
+      {
+        "id": "sp-paragraph",
+        "find": "While the Resource interface is used a lot with Spring and by Spring, it is actually very convenient to use as a general utility class by itself in your own code, for access to resources, even when your code does not know or care about any other parts of Spring. While this couples your code to Spring, it really only couples it to this small set of utility classes, which serves as a more capable replacement for URL and can be considered equivalent to any other library you would use for this purpose."
+      },
+      {
+        "id": "sp-term",
+        "find": "thread context class loader"
+      },
+      {
+        "id": "sp-phrase2",
+        "find": "low-level resources"
+      },
+      {
+        "id": "sp-sentence2",
+        "find": "It wraps it where possible."
+      }
+    ]
+  },
+  {
+    "id": "fowler-techdebt",
+    "kind": "holdout",
+    "url": "https://martinfowler.com/bliki/TechnicalDebt.html",
+    "scope": "main",
+    "sourceLang": "en",
+    "selections": [
+      {
+        "id": "fw-term",
+        "find": "cruft"
+      },
+      {
+        "id": "fw-sentence",
+        "find": "The two day difference is the interest on the debt."
+      },
+      {
+        "id": "fw-paragraph",
+        "find": "There are regular debates whether different kinds of cruft should be considered as debt or not. I found it useful to think about whether the debt is acquired deliberately and whether it is prudent or reckless - leading me to the TechnicalDebtQuadrant."
+      },
+      {
+        "id": "fw-phrase",
+        "find": "metaphorically paying off the principal"
+      },
+      {
+        "id": "fw-paragraph2",
+        "find": "What most appeals to me about the debt metaphor is how it frames how I think about how to deal with this cruft. I could take five days to clean up the modular structure, removing that cruft, metaphorically paying off the principal. If I only do it for this one feature, that's no gain, as I'd take nine days instead of six. But if I have two more similar features coming up, then I'll end up faster by removing the cruft first."
+      }
+    ]
+  },
+  {
+    "id": "mdn-fetch",
+    "kind": "holdout",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch",
+    "scope": "main#content",
+    "sourceLang": "en",
+    "selections": [
+      {
+        "id": "mdn-term",
+        "find": "preflighted request"
+      },
+      {
+        "id": "mdn-sentence",
+        "find": "The fetch() function will reject the promise on some errors, but not if the server responds with an error status like 404: so we also check the response status and throw if it is not OK."
+      },
+      {
+        "id": "mdn-term2",
+        "find": "opaque"
+      },
+      {
+        "id": "mdn-phrase",
+        "find": "a simple request"
+      },
+      {
+        "id": "mdn-paragraph",
+        "find": "Setting mode to no-cors disables CORS for cross-origin requests. This restricts the headers that may be set, and restricts methods to GET, HEAD, and POST. The response is opaque, meaning that its headers and body are not available to JavaScript. Most of the time a website should not use no-cors: the main application of it is for certain service worker use cases."
+      }
+    ]
+  },
+  {
+    "id": "github-bat",
+    "kind": "holdout",
+    "url": "https://github.com/sharkdp/bat",
+    "scope": "article.markdown-body",
+    "sourceLang": "en",
+    "selections": [
+      {
+        "id": "bat-phrase",
+        "find": "drop-in replacement for cat"
+      },
+      {
+        "id": "bat-sentence",
+        "find": "Note that we have to switch off paging in order for this to work."
+      },
+      {
+        "id": "bat-term",
+        "find": "pager"
+      },
+      {
+        "id": "bat-paragraph",
+        "find": "By default, bat pipes its own output to a pager (e.g. less) if the output is too large for one screen. If you would rather bat work like cat all the time (never page output), you can set --paging=never as an option, either on the command line or in your configuration file."
+      }
+    ],
+    "limitChars": 12000
+  },
+  {
+    "id": "wiki-sourdough",
+    "kind": "holdout",
+    "url": "https://en.wikipedia.org/wiki/Sourdough",
+    "scope": "#mw-content-text .mw-parser-output",
+    "sourceLang": "en",
+    "selections": [
+      {
+        "id": "wiki-term",
+        "find": "refreshment ratio"
+      },
+      {
+        "id": "wiki-sentence",
+        "find": "pH levels below 4.0 inhibit lactobacilli and favor acid-tolerant yeasts."
+      },
+      {
+        "id": "wiki-phrase",
+        "find": "a leavening agent containing naturally occurring yeast and lactobacillus bacteria"
+      },
+      {
+        "id": "wiki-paragraph",
+        "find": "Bakers have devised several ways of encouraging a stable culture of microorganisms in the starter. Unbleached, unbromated flour contains more microorganisms than more processed flours."
+      }
+    ],
+    "limitChars": 15000
+  },
+  {
+    "id": "ruwiki-zakvaska",
+    "kind": "lang",
+    "url": "https://ru.wikipedia.org/wiki/%D0%97%D0%B0%D0%BA%D0%B2%D0%B0%D1%81%D0%BA%D0%B0",
+    "scope": "#mw-content-text .mw-parser-output",
+    "sourceLang": "ru",
+    "limitChars": 8000,
+    "selections": []
+  }
+]

@@ -19,7 +19,10 @@
     "e2e": "playwright test --project=mock",
     "e2e:live": "OCT_LIVE=1 playwright test --project=live",
     "icons": "node scripts/render-icons.mjs",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "quality:snapshot": "node tests/quality/snapshot.ts",
+    "quality:translate": "node tests/quality/translate.ts",
+    "quality:lint": "node tests/quality/lint-run.ts"
   },
   "dependencies": {
     "@webext-core/messaging": "4.0.1",

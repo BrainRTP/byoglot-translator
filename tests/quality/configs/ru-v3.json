@@ -1,0 +1,13 @@
+{
+  "snapshot": "spring-resources",
+  "mode": "page",
+  "frame": "frame/page-v0.txt",
+  "languagePrompt": "lang/ru-v3.md",
+  "template": "templates/plain.txt",
+  "effort": "none",
+  "targetLang": "ru",
+  "codeMode": "hidden",
+  "glossary": null,
+  "maxBlocks": 25,
+  "maxChars": 4000
+}

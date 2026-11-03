@@ -11,17 +11,16 @@ export default defineContentScript({
   runAt: "document_idle",
   main() {
     // background resolves tab and hostname from the sender
-    const loadView = shareInFlight(() =>
-      sendMessage("tabView", { tabId: -1 }).then((v) => v.settings),
-    );
+    const loadView = shareInFlight(() => sendMessage("tabView", { tabId: -1 }));
 
     const isTop = window === window.top;
 
     const translator = createPageTranslator({
       doc: document,
       connect: () => browser.runtime.connect({ name: PAGE_PORT_NAME }),
-      getDisplayMode: async () => (await loadView()).displayMode,
-      targetLang: async () => (await loadView()).targetLang,
+      getDisplayMode: async () => (await loadView()).settings.displayMode,
+      getAnimation: async () => (await loadView()).animation,
+      targetLang: async () => (await loadView()).settings.targetLang,
       detectLanguage: async (text) => {
         const result = await browser.i18n.detectLanguage(text);
         return { lang: result.languages[0]?.language ?? "und", reliable: result.isReliable };
@@ -68,7 +67,7 @@ export default defineContentScript({
       cancel: cancelAll,
       listTemplates: () => sendMessage("templates", undefined),
       openSettings: () => void sendMessage("openOptions", undefined).catch(() => {}),
-      currentTemplateId: async () => (await loadView()).templateId,
+      currentTemplateId: async () => (await loadView()).settings.templateId,
     });
 
     // every frame registers; only the one holding a selection answers

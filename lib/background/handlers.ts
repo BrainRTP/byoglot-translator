@@ -163,6 +163,7 @@ export function createHandlers(deps: HandlerDeps) {
     const models = await loadModels();
     return {
       settings,
+      animation: g.animation,
       template,
       modified: isModified(settings, template, g),
       rule,

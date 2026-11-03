@@ -10,7 +10,7 @@
     value: V;
     options: Option[];
     label: string;
-    size?: "md" | "sm";
+    size?: "md" | "sm" | "fit";
     onchange: (value: V) => void;
   } = $props();
 </script>
@@ -59,6 +59,16 @@
     min-width: 0;
     min-height: 30px;
     padding: 0 4px;
+  }
+  .fit {
+    display: inline-flex;
+    flex: none;
+  }
+  .fit button {
+    flex: none;
+    white-space: nowrap;
+    min-height: 30px;
+    padding: 0 14px;
   }
   .sm button {
     font-size: 12px;

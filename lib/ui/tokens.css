@@ -157,3 +157,97 @@ body {
   color: var(--mu);
   margin-bottom: 6px;
 }
+
+/* Customizable select: the list opens right under the field instead of the OS menu, the arrow gets its own gap. */
+@supports (appearance: base-select) {
+  select.sel,
+  select.fld,
+  select.sel::picker(select),
+  select.fld::picker(select) {
+    appearance: base-select;
+  }
+
+  select.sel,
+  select.fld {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-right: 10px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  select.sel:disabled,
+  select.fld:disabled {
+    cursor: default;
+  }
+
+  select.sel::picker-icon,
+  select.fld::picker-icon {
+    content: "";
+    flex: none;
+    width: 10px;
+    height: 6px;
+    margin-left: auto;
+    background: currentColor;
+    clip-path: polygon(0 0, 50% 100%, 100% 0, 85% 0, 50% 70%, 15% 0);
+    color: var(--mu);
+    transition: rotate 0.15s;
+  }
+
+  select.sel:open::picker-icon,
+  select.fld:open::picker-icon {
+    rotate: 180deg;
+  }
+
+  select.sel::picker(select),
+  select.fld::picker(select) {
+    margin-block: 4px;
+    padding: 4px;
+    border: 1px solid var(--bd2);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--tx);
+    box-shadow: var(--sh);
+    position-try-order: normal;
+    max-block-size: min(320px, 100dvh - 16px);
+    overflow-y: auto;
+  }
+
+  select.sel option,
+  select.fld option {
+    padding: 6px 8px;
+    border-radius: 4px;
+    gap: 6px;
+  }
+
+  select.sel option:hover,
+  select.sel option:focus-visible,
+  select.fld option:hover,
+  select.fld option:focus-visible {
+    background: var(--sf);
+    outline: none;
+  }
+
+  select.sel option:checked,
+  select.fld option:checked {
+    font-weight: 600;
+  }
+
+  select.sel option::checkmark,
+  select.fld option::checkmark {
+    color: var(--ac);
+  }
+
+  select.sel optgroup,
+  select.fld optgroup {
+    font-size: 12px;
+    color: var(--mu);
+  }
+
+  select.sel optgroup option,
+  select.fld optgroup option {
+    font-size: 13px;
+    color: var(--tx);
+  }
+}

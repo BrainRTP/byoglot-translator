@@ -269,6 +269,13 @@ describe("journal", () => {
 });
 
 describe("applyBilingual", () => {
+  it("returns the inserted marked span", () => {
+    const block = firstBlock(DOCS);
+    const span = applyBilingual(block, DOCS_RU, createJournal());
+    expect(span).toBe(block.element.querySelector(`[${MARK_ATTR}]`));
+    expect(span?.hasAttribute(MARK_ATTR)).toBe(true);
+  });
+
   it("adds one marked block element and leaves the original untouched", () => {
     const block = firstBlock(DOCS);
     const original = block.element.innerHTML;

@@ -1,3 +1,4 @@
+import type { AnimationKind } from "../dom/effects/types";
 import type { ModelRef } from "../opencode/types";
 
 export type DisplayMode = "replace" | "bilingual";
@@ -21,6 +22,7 @@ export type GlobalSettings = {
   sourceLang: "auto" | string;
   targetLang: string;
   displayMode: DisplayMode;
+  animation: AnimationKind;
   pageModel: ModelRef | null;
   selectionModel: ModelRef | null;
   defaultTemplateId: string;

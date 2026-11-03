@@ -392,7 +392,7 @@ function lastTopLevelNode(ctx: Ctx): Node | null {
   return last;
 }
 
-export function applyBilingual(block: Block, translated: string, journal: Journal): void {
+export function applyBilingual(block: Block, translated: string, journal: Journal): Element {
   const { state, undos } = begin(journal, block);
   const { parents, byNode } = parentMap(block);
   const ctx = newCtx(block, state, undos, byNode);
@@ -420,4 +420,5 @@ export function applyBilingual(block: Block, translated: string, journal: Journa
   undos.push(() => {
     for (const n of added) n.parentNode?.removeChild(n);
   });
+  return el;
 }

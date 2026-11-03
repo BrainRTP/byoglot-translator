@@ -560,6 +560,7 @@
 
 <style>
   .pop {
+    --side-col: 104px;
     width: 360px;
     padding: 12px 16px 16px;
     display: flex;
@@ -746,7 +747,7 @@
   }
   .modes {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 104px;
+    grid-template-columns: minmax(0, 1fr) var(--side-col);
     gap: 8px;
     align-items: end;
   }

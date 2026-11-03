@@ -22,6 +22,37 @@ describe("i18n", () => {
       expect(v).not.toMatch(/[\u2014\u2013]/);
   });
 
+  it("has animation keys in both languages", () => {
+    for (const k of [
+      "opt.nav.animation",
+      "opt.anim.lead",
+      "opt.anim.reduced",
+      "opt.anim.group",
+      "opt.anim.mode",
+      "opt.anim.repeat",
+      "opt.anim.scene",
+      "anim.none",
+      "anim.fade",
+      "anim.scramble",
+      "anim.flap",
+      "anim.typewriter",
+      "anim.pen",
+      "anim.wave",
+      "anim.meteor",
+      "anim.none.desc",
+      "anim.fade.desc",
+      "anim.scramble.desc",
+      "anim.flap.desc",
+      "anim.typewriter.desc",
+      "anim.pen.desc",
+      "anim.wave.desc",
+      "anim.meteor.desc",
+    ]) {
+      expect(en).toHaveProperty(k);
+      expect(ru).toHaveProperty(k);
+    }
+  });
+
   it("includes all error keys", () => {
     for (const k of [
       "offline",

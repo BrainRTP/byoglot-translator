@@ -9,7 +9,9 @@
     type TemplateOp,
   } from "../../lib/messaging/protocol";
   import type { ModelInfo, ModelRef } from "../../lib/opencode/types";
+  import { DEFAULT_GLOBALS } from "../../lib/settings/defaults";
   import type { GlobalSettings, SiteRule, Template } from "../../lib/settings/types";
+  import AnimationSection from "../../lib/ui/AnimationSection.svelte";
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
   import { languageOptions } from "../../lib/ui/languages";
   import ModelSelect from "../../lib/ui/ModelSelect.svelte";
@@ -21,18 +23,35 @@
   import { createSerialQueue } from "../../lib/ui/serial-queue";
   import TemplateEditor from "../../lib/ui/TemplateEditor.svelte";
 
-  type Section = "connection" | "language" | "models" | "templates" | "rules" | "cache";
+  type Section =
+    | "connection"
+    | "language"
+    | "models"
+    | "templates"
+    | "rules"
+    | "animation"
+    | "cache";
   type Flag = "saved" | "failed" | null;
   type Shortcut = { name: string; description: string; shortcut: string };
 
   const FLAG_MS = 2500;
-  const SECTIONS = ["connection", "language", "models", "templates", "rules", "cache", "hotkeys"] as const;
+  const SECTIONS = [
+    "connection",
+    "language",
+    "models",
+    "templates",
+    "rules",
+    "animation",
+    "cache",
+    "hotkeys",
+  ] as const;
   const NAV_KEYS = {
     connection: "opt.nav.connection",
     language: "opt.nav.language",
     models: "opt.nav.models",
     templates: "opt.nav.templates",
     rules: "opt.nav.rules",
+    animation: "opt.nav.animation",
     cache: "opt.nav.cache",
     hotkeys: "opt.nav.hotkeys",
   } as const;
@@ -52,9 +71,11 @@
     models: null,
     templates: null,
     rules: null,
+    animation: null,
     cache: null,
   });
   let active = $state<string>("connection");
+  const animation = $derived(globals?.animation ?? DEFAULT_GLOBALS.animation);
 
   const timers: Partial<Record<Section, ReturnType<typeof setTimeout>>> = {};
   const globalsQueue = createSerialQueue();
@@ -463,6 +484,15 @@
               {templates}
               defaultTemplateId={globals.defaultTemplateId}
               onop={ruleOp}
+            />
+          </section>
+
+          <section class="sec" id="animation">
+            {@render heading("animation", flags.animation)}
+            <p class="lead mu">{tr("opt.anim.lead")}</p>
+            <AnimationSection
+              value={animation}
+              onpick={(picked) => patchGlobals("animation", { animation: picked })}
             />
           </section>
 

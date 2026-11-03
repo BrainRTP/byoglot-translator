@@ -99,7 +99,7 @@
 <style>
   .row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 92px;
+    grid-template-columns: minmax(0, 1fr) var(--side-col, 104px);
     gap: 8px;
   }
   .cell {

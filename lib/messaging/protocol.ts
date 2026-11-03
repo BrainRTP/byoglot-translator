@@ -1,4 +1,5 @@
 import { defineExtensionMessaging } from "@webext-core/messaging";
+import type { AnimationKind } from "../dom/effects/types";
 import type { BackendErrorKind, Connection, ModelInfo, ModelRef } from "../opencode/types";
 import type {
   EffectiveSettings,
@@ -17,6 +18,7 @@ export type ResolvedModel = { model: ModelRef | null; missing: boolean };
 
 export type TabView = {
   settings: EffectiveSettings;
+  animation: AnimationKind;
   template: Template;
   modified: boolean;
   rule: SiteRule | undefined;

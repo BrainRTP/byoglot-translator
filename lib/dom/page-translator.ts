@@ -3,6 +3,8 @@ import type { PageState } from "../messaging/protocol";
 import type { DisplayMode } from "../settings/types";
 import { applyBilingual, applyReplace, createJournal, parseTranslated } from "./apply";
 import { BLOCK_ID_ATTR, BLOCK_SELECTOR, BLOCK_TAGS } from "./constants";
+import { type Animator, createAnimator } from "./effects/animator";
+import type { AnimationKind } from "./effects/types";
 import { type Block, extractBlocks } from "./extract";
 import { createLanes, type Lane } from "./lanes";
 import { findMainRoot, laneOf, orderByPosition } from "./layout";
@@ -28,6 +30,7 @@ export type PageTranslatorDeps = {
   doc: Document;
   connect(): PortLike;
   getDisplayMode(): Promise<DisplayMode>;
+  getAnimation(): Promise<AnimationKind>;
   detectLanguage(text: string): Promise<{ lang: string; reliable: boolean }>;
   targetLang(): Promise<string>;
   onState(s: PageState): void;
@@ -54,6 +57,15 @@ const PLACEHOLDER = /<\/?x\d+\/?>/g;
 type Status = "queued" | "inflight" | "applied" | "failed";
 type Job = { blocks: Map<string, Block>; lane: Lane };
 
+const NO_ANIMATOR: Animator = {
+  prepare: () => null,
+  inView: () => new Set(),
+  play() {},
+  finishAll() {},
+  finishWithin() {},
+  busy: () => false,
+};
+
 const primary = (lang: string) => (lang.split(/[-_]/)[0] ?? "").toLowerCase();
 const rectOf = (el: Element) => el.getBoundingClientRect();
 
@@ -75,6 +87,7 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
   let phase: PageState["state"] = "idle";
   let failure: PageState["error"];
   let displayMode: DisplayMode = "replace";
+  let animation: AnimationKind = "none";
   let target = "";
   let gen = 0;
   let preparing = 0;
@@ -133,6 +146,9 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
     fn();
     watcher?.takeRecords();
   }
+
+  const win = deps.doc.defaultView;
+  const animator = win ? createAnimator({ win, quiet, kind: () => animation }) : NO_ANIMATOR;
 
   function schedule() {
     clearTimeout(timer);
@@ -262,6 +278,16 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
 
   function applyResults(job: Job, results: Extract<PortToContent, { type: "results" }>["results"]) {
     quiet(() => {
+      const fresh: Element[] = [];
+      for (const r of results) {
+        const block = job.blocks.get(r.id);
+        if (block && status.get(block) === "inflight" && r.text.trim() !== "") {
+          fresh.push(block.element);
+        }
+      }
+      // rects of the whole batch are read before the first apply dirties the layout
+      const onScreen = animator.inView(fresh);
+      const bilingual = displayMode === "bilingual";
       for (const result of results) {
         const block = job.blocks.get(result.id);
         if (!block || status.get(block) !== "inflight") continue;
@@ -270,8 +296,17 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
           continue;
         }
         try {
-          if (displayMode === "bilingual") applyBilingual(block, result.text, journal);
-          else applyReplace(block, result.text, journal);
+          const token = animator.prepare(block.element, {
+            bilingual,
+            visible: onScreen.has(block.element),
+          });
+          if (bilingual) {
+            const span = applyBilingual(block, result.text, journal);
+            if (token) animator.play(token, span);
+          } else {
+            applyReplace(block, result.text, journal);
+            if (token) animator.play(token, block.element);
+          }
           status.set(block, "applied");
           remember(block, result.text);
         } catch {
@@ -356,6 +391,12 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
 
   function release(container: Element): boolean {
     let had = false;
+    for (const block of status.keys()) {
+      if (block.element === container && journal.hasBlock(block)) {
+        animator.finishWithin(container);
+        break;
+      }
+    }
     quiet(() => {
       for (const block of [...status.keys()]) {
         if (block.element !== container) continue;
@@ -369,6 +410,9 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
   }
 
   function forgetDetached() {
+    for (const block of status.keys()) {
+      if (!block.element.isConnected) animator.finishWithin(block.element);
+    }
     const gone: Element[] = [];
     for (const block of [...status.keys()]) {
       if (block.element.isConnected) continue;
@@ -470,6 +514,7 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
   }
 
   function teardown() {
+    animator.finishAll();
     abandon();
     journal.restoreAll();
     for (const el of deps.doc.querySelectorAll(`[${BLOCK_ID_ATTR}]`)) {
@@ -489,9 +534,14 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
     preparing++;
     publish();
     try {
-      const [mode, lang] = await Promise.all([deps.getDisplayMode(), deps.targetLang()]);
+      const [mode, lang, kind] = await Promise.all([
+        deps.getDisplayMode(),
+        deps.targetLang(),
+        deps.getAnimation().catch((): AnimationKind => "none"),
+      ]);
       if (myGen !== gen) return;
       displayMode = mode;
+      animation = kind;
       target = lang;
       const blocks: Block[] = [];
       extract(deps.doc, blocks);
@@ -518,6 +568,7 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
 
   function stop() {
     if (phase === "idle") return;
+    animator.finishAll();
     abandon();
     phase = appliedCount() > 0 ? "translated" : "idle";
     failure = undefined;

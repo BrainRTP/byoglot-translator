@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { MARK_ATTR } from "../../../lib/dom/constants";
+import { registry } from "../../../lib/dom/effects/registry";
+import type { AnimationKind, Effect } from "../../../lib/dom/effects/types";
 import {
   createPageTranslator,
   type PortLike,
@@ -108,7 +110,12 @@ const texts = (m: Translate | undefined) => m?.segments.map((s) => s.text);
 
 function setup(
   html: string,
-  opts: { auto?: boolean; mode?: DisplayMode; detect?: (t: string) => string } = {},
+  opts: {
+    auto?: boolean;
+    mode?: DisplayMode;
+    detect?: (t: string) => string;
+    animation?: AnimationKind;
+  } = {},
 ) {
   document.body.innerHTML = html;
   const fp = fakePort(opts.auto ?? true);
@@ -118,16 +125,18 @@ function setup(
     lang: opts.detect?.(text) ?? "en",
     reliable: true,
   }));
+  const getAnimation = vi.fn(async () => opts.animation ?? "none");
   const translator = createPageTranslator({
     doc: document,
     connect,
     getDisplayMode: async () => opts.mode ?? "replace",
+    getAnimation,
     detectLanguage,
     targetLang: async () => "ru-RU",
     onState: (s) => states.push(s),
   });
   live.push(translator);
-  return { ...fp, states, connect, detectLanguage, translator };
+  return { ...fp, states, connect, detectLanguage, getAnimation, translator };
 }
 
 const settle = () => vi.advanceTimersByTimeAsync(0);
@@ -764,5 +773,243 @@ describe("stop, restore, fatal", () => {
     await settle();
     expect(t.translates()).toHaveLength(2);
     expect(t.translator.state()).toMatchObject({ state: "translating", total: 4 });
+  });
+});
+
+describe("animation", () => {
+  const MID = "~mid~";
+  const FRAMES = 3;
+  let saved: Effect | undefined;
+  let queue: FrameRequestCallback[] = [];
+  let started = 0;
+  let finished = 0;
+
+  const effect: Effect = {
+    kind: "fade",
+    heavy: false,
+    start(ctx) {
+      started++;
+      for (const c of ctx.changes) ctx.write(c.node, MID);
+      let n = 0;
+      return () => {
+        if (++n < FRAMES) return true;
+        for (const c of ctx.changes) ctx.write(c.node, c.to);
+        return false;
+      };
+    },
+    finish(ctx) {
+      finished++;
+      for (const c of ctx.changes) ctx.write(c.node, c.to);
+    },
+  };
+
+  const tick = () => {
+    const run = queue;
+    queue = [];
+    for (const cb of run) cb(0);
+  };
+
+  const inViewport = () => mockGeometry(() => ({ left: 0, top: 10, width: 300, height: 20 }));
+
+  beforeEach(() => {
+    saved = registry.fade;
+    registry.fade = effect;
+    queue = [];
+    started = 0;
+    finished = 0;
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => queue.push(cb));
+  });
+
+  afterEach(() => {
+    registry.fade = saved;
+    vi.restoreAllMocks();
+  });
+
+  it("asks for the animation kind on start", async () => {
+    const t = setup(FOUR, { animation: "fade" });
+    expect(t.getAnimation).not.toHaveBeenCalled();
+    await t.translator.start();
+    await settle();
+    expect(t.getAnimation).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the DOM exactly as before when the animation is none", async () => {
+    inViewport();
+    const t = setup(FOUR, { animation: "none" });
+    await t.translator.start();
+    await settle();
+    expect(started).toBe(0);
+    expect(queue).toHaveLength(0);
+    expect(text("#a")).toBe("[ru] Alpha one");
+    expect(text("#d")).toBe("[ru] Delta four");
+  });
+
+  it("starts the effect synchronously on apply and settles on the final text", async () => {
+    inViewport();
+    const t = setup(FOUR, { animation: "fade" });
+    await t.translator.start();
+    await settle();
+    expect(started).toBe(4);
+    expect(text("#a")).toBe(MID);
+    expect(queue.length).toBeGreaterThan(0);
+
+    for (let i = 0; i < FRAMES + 1; i++) tick();
+    expect(text("#a")).toBe("[ru] Alpha one");
+    expect(text("#d")).toBe("[ru] Delta four");
+    expect(t.translator.state()).toMatchObject({ state: "translated", done: 4, total: 4 });
+  });
+
+  it("changes blocks instantly when they are outside the viewport", async () => {
+    const t = setup(FOUR, { animation: "fade" });
+    await t.translator.start();
+    await settle();
+    expect(started).toBe(0);
+    expect(queue).toHaveLength(0);
+    expect(text("#a")).toBe("[ru] Alpha one");
+  });
+
+  it("animates only the inserted span in bilingual mode", async () => {
+    inViewport();
+    const t = setup(FOUR, { animation: "fade", mode: "bilingual" });
+    await t.translator.start();
+    await settle();
+    expect(started).toBe(4);
+    const a = document.getElementById("a") as HTMLElement;
+    expect(a.firstChild?.textContent).toBe("Alpha one");
+    expect(a.querySelector(`[${MARK_ATTR}]`)?.textContent).toBe(MID);
+    for (let i = 0; i < FRAMES + 1; i++) tick();
+    expect(a.querySelector(`[${MARK_ATTR}]`)?.textContent).toBe("[ru] Alpha one");
+    expect(a.firstChild?.textContent).toBe("Alpha one");
+  });
+
+  it.each<DisplayMode>(["replace", "bilingual"])(
+    "restore during an animation brings back the original, not a frame (%s)",
+    async (mode) => {
+      inViewport();
+      const t = setup(FOUR, { animation: "fade", mode });
+      await t.translator.start();
+      await settle();
+      expect(started).toBe(4);
+      expect(document.body.textContent).toContain(MID);
+
+      t.translator.restore();
+      expect(document.body.innerHTML).toBe(FOUR);
+      expect(finished).toBe(4);
+    },
+  );
+
+  it("stop during an animation keeps the final translation", async () => {
+    inViewport();
+    const t = setup(FOUR, { animation: "fade" });
+    await t.translator.start();
+    await settle();
+    expect(text("#a")).toBe(MID);
+
+    t.translator.stop();
+    expect(text("#a")).toBe("[ru] Alpha one");
+    expect(text("#d")).toBe("[ru] Delta four");
+    expect(finished).toBe(4);
+  });
+
+  it("reads every block rect of a batch before the first apply", async () => {
+    let applied = false;
+    const reads: boolean[] = [];
+    mockGeometry(() => {
+      reads.push(applied);
+      return { left: 0, top: 10, width: 300, height: 20 };
+    });
+    const t = setup(FOUR, { animation: "fade", auto: false });
+    await t.translator.start();
+    await settle();
+    const job = t.translates()[0] as Translate;
+    reads.length = 0;
+    const original = Object.getOwnPropertyDescriptor(CharacterData.prototype, "data");
+    const spy = vi.spyOn(Text.prototype, "data", "set").mockImplementation(function (
+      this: Text,
+      v: string,
+    ) {
+      applied = true;
+      original?.set?.call(this, v);
+    });
+    const results = job.segments.map((s) => ({ id: s.id, text: "Ru", cached: false }));
+    t.emit({ type: "results", jobId: job.jobId, results });
+    spy.mockRestore();
+    expect(started).toBe(4);
+    expect(applied).toBe(true);
+    expect(reads.length).toBeGreaterThan(0);
+    expect(reads.every((r) => !r)).toBe(true);
+  });
+
+  it("releasing one block leaves the animation of another running", async () => {
+    inViewport();
+    const t = setup(FOUR, { animation: "fade" });
+    await t.translator.start();
+    await settle();
+    expect(started).toBe(4);
+
+    document.getElementById("a")?.append(" more");
+    await vi.advanceTimersByTimeAsync(300);
+    expect(finished).toBe(1);
+    expect(text("#b")).toBe(MID);
+    expect(text("#d")).toBe(MID);
+  });
+
+  it("removing one block finishes only its own animation", async () => {
+    inViewport();
+    const t = setup(FOUR, { animation: "fade" });
+    await t.translator.start();
+    await settle();
+    expect(started).toBe(4);
+
+    document.getElementById("a")?.remove();
+    await vi.advanceTimersByTimeAsync(300);
+    expect(finished).toBe(1);
+    expect(text("#b")).toBe(MID);
+    expect(text("#d")).toBe(MID);
+  });
+
+  it("frames do not wake the watcher into a new translation", async () => {
+    inViewport();
+    const t = setup(FOUR, { animation: "fade" });
+    await t.translator.start();
+    await settle();
+    for (let i = 0; i < FRAMES + 1; i++) {
+      tick();
+      await vi.advanceTimersByTimeAsync(400);
+    }
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(t.translates()).toHaveLength(1);
+    expect(t.translator.state()).toMatchObject({ state: "translated", done: 4, total: 4 });
+  });
+
+  it("finishes the old animation before a block is translated again", async () => {
+    inViewport();
+    const t = setup(FOUR, { animation: "fade", auto: false });
+    await t.translator.start();
+    await settle();
+    const job = t.translates()[0] as Translate;
+    const idA = job.segments.find((s) => s.text === "Alpha one")?.id ?? "";
+    t.emit({
+      type: "results",
+      jobId: job.jobId,
+      results: [{ id: idA, text: "Альфа", cached: false }],
+    });
+    expect(text("#a")).toBe(MID);
+
+    document.getElementById("a")?.append(" more");
+    await vi.advanceTimersByTimeAsync(300);
+    await settle();
+    expect(finished).toBe(1);
+    expect(text("#a")).toBe("Alpha one more");
+    const second = t.translates()[1] as Translate;
+    expect(second.segments.map((s) => s.text)).toEqual(["Alpha one more"]);
+
+    t.emit({
+      type: "results",
+      jobId: second.jobId,
+      results: [{ id: second.segments[0]?.id ?? "", text: "Альфа еще", cached: false }],
+    });
+    for (let i = 0; i < FRAMES + 1; i++) tick();
+    expect(text("#a")).toBe("Альфа еще");
   });
 });

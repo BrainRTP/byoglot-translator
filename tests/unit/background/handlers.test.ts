@@ -95,6 +95,13 @@ describe("background handlers", () => {
     expect(other.rule).toBeUndefined();
   });
 
+  it("tabView carries the global animation setting", async () => {
+    const { handlers } = setup();
+    expect((await handlers.tabView({ tabId: 1, hostname: "example.com" })).animation).toBe("fade");
+    await handlers.setGlobals({ ...(await handlers.globals()), animation: "none" });
+    expect((await handlers.tabView({ tabId: 1, hostname: "example.com" })).animation).toBe("none");
+  });
+
   it("setTabSettings keeps the stored template unchanged and marks the view modified", async () => {
     const { handlers } = setup();
     const before = await handlers.templates();

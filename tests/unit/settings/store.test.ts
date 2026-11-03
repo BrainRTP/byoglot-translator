@@ -26,6 +26,26 @@ describe("settings store", () => {
     expect(await tabSettings(7).getValue()).toBeNull();
   });
 
+  describe("animation", () => {
+    it("defaults to fade when nothing is stored", async () => {
+      expect((await globalsItem.getValue()).animation).toBe("fade");
+      expect(DEFAULT_GLOBALS.animation).toBe("fade");
+    });
+
+    it("keeps a stored none after rereading", async () => {
+      await globalsItem.setValue({ ...DEFAULT_GLOBALS, animation: "none" });
+      expect((await globalsItem.getValue()).animation).toBe("none");
+    });
+  });
+
+  it("fills fields missing from stored globals with defaults", async () => {
+    const { animation: _omit, ...old } = DEFAULT_GLOBALS;
+    await fakeBrowser.storage.local.set({ globals: { ...old, targetLang: "fr" } });
+    const g = await globalsItem.getValue();
+    expect(g.animation).toBe("fade");
+    expect(g.targetLang).toBe("fr");
+  });
+
   describe("default target language", () => {
     afterEach(() => vi.unstubAllGlobals());
 

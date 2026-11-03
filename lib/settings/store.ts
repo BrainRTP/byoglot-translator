@@ -1,15 +1,23 @@
 import { storage } from "wxt/utils/storage";
 import type { Connection } from "../opencode/types";
-import { builtinTemplate, initialGlobals } from "./defaults";
+import { builtinTemplate, DEFAULT_GLOBALS, initialGlobals } from "./defaults";
 import type { EffectiveSettings, GlobalSettings, SiteRule, Template } from "./types";
 
 export const connectionItem = storage.defineItem<Connection | null>("local:connection", {
   fallback: null,
 });
 
-export const globalsItem = storage.defineItem<GlobalSettings>("local:globals", {
+const rawGlobals = storage.defineItem<GlobalSettings>("local:globals", {
   fallback: initialGlobals(globalThis.navigator?.language),
 });
+
+// Stored globals from older versions may miss newer fields: fill them from defaults.
+export const globalsItem = {
+  async getValue(): Promise<GlobalSettings> {
+    return { ...DEFAULT_GLOBALS, ...(await rawGlobals.getValue()) };
+  },
+  setValue: (value: GlobalSettings): Promise<void> => rawGlobals.setValue(value),
+};
 
 export const templatesItem = storage.defineItem<Template[]>("local:templates", {
   fallback: [builtinTemplate()],

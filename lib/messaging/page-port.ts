@@ -1,7 +1,7 @@
 import type { BackendErrorKind } from "../opencode/types";
 import type { Segment, SegmentResult } from "../translate/service";
 
-export const PAGE_PORT_NAME = "oct-page";
+export const PAGE_PORT_NAME = "byoglot-page";
 
 export type PortToBackground =
   | {

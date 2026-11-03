@@ -5,7 +5,7 @@ import { openPopup } from "../extension";
 import { expect, test } from "../fixtures";
 import { queryClosedShadow } from "../shadow";
 
-const SHOTS = "/tmp/oct-live";
+const SHOTS = "/tmp/byoglot-live";
 const CYRILLIC = /\p{Script=Cyrillic}/u;
 const FIRST_PARAGRAPH = "#mw-content-text .mw-parser-output p:not(.mw-empty-elt)";
 
@@ -24,7 +24,10 @@ async function firstParagraphText(page: Page): Promise<string> {
   return (await page.locator(FIRST_PARAGRAPH).first().textContent()) ?? "";
 }
 
-test.skip(!process.env.OCT_LIVE, "set OCT_LIVE=1 (pnpm e2e:live) to run against a real opencode");
+test.skip(
+  !process.env.BYOGLOT_LIVE,
+  "set BYOGLOT_LIVE=1 (pnpm e2e:live) to run against a real opencode",
+);
 
 test("translates a real article through the local opencode", async ({ ext }) => {
   mkdirSync(SHOTS, { recursive: true });

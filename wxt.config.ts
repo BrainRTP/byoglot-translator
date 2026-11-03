@@ -30,7 +30,7 @@ export default defineConfig({
     },
     browser_specific_settings: {
       gecko: {
-        id: "opencode-translator@local",
+        id: "byoglot-translator@local",
         data_collection_permissions: { required: ["websiteContent", "browsingActivity"] },
       },
     },

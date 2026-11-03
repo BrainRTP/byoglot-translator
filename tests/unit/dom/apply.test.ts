@@ -221,7 +221,7 @@ describe("applyReplace", () => {
     const second = blocks.find((b) => b.source.startsWith("Second")) as Block;
     applyReplace(second, "Второй <x1>запуск</x1>", createJournal());
     expect(document.getElementById("c")?.innerHTML).toBe(
-      'First <b>run</b><p data-oct-id="x">mid</p>Второй <i>запуск</i>',
+      'First <b>run</b><p data-byoglot-id="x">mid</p>Второй <i>запуск</i>',
     );
   });
 

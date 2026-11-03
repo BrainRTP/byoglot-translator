@@ -104,7 +104,7 @@
   .scene:global([data-mode="bilingual"]) :global(li) {
     color: var(--mu);
   }
-  .scene :global([data-oct]) {
+  .scene :global([data-byoglot]) {
     margin-top: 6px;
     color: var(--tx);
   }

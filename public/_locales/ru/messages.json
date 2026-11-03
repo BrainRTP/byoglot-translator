@@ -1,5 +1,5 @@
 {
-  "extName": { "message": "opencode Переводчик" },
+  "extName": { "message": "ByoGlot Переводчик" },
   "extDescription": { "message": "Перевод веб-страниц через ваш локальный сервер opencode." },
   "cmdTranslatePage": { "message": "Перевести страницу" },
   "cmdTranslateSelection": { "message": "Перевести выделенный текст" },

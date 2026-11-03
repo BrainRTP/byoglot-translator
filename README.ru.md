@@ -1,10 +1,17 @@
-# opencode Translator
+# ByoGlot Translator
 
 [English](README.md) | Русский
 
-Расширение для Chrome и Firefox (Manifest V3), которое переводит веб-страницы и выделенный текст через ваш локальный opencode. Ключей и аккаунтов в самом расширении нет: перевод делает модель, которую вы выбрали в opencode.
+Расширение для Chrome и Firefox (Manifest V3), которое переводит веб-страницы и выделенный текст через ваш локальный opencode. Ключей и аккаунтов в самом расширении нет: перевод делает модель, которую вы выбрали в opencode. ByoGlot значит "bring your own" плюс "-glot": модель и инструкции для перевода ваши.
 
-Лицензия MIT. Бесплатно, без рекламы и телеметрии.
+Лицензия MIT. Бесплатно, без рекламы и телеметрии. Независимый проект, с командой opencode не связан.
+
+<p>
+  <img src="docs/screenshots/popup-ru.png" width="300" alt="Окно расширения с кнопкой перевода страницы, шаблоном, моделью, effort и режимом отображения">
+  <img src="docs/screenshots/selection-ru.png" width="304" alt="Карточка перевода выделения со словарной статьей в темной теме">
+</p>
+
+<img src="docs/screenshots/settings-ru.png" width="620" alt="Страница настроек: подключение, язык и языковой промпт">
 
 ## Требования
 
@@ -109,7 +116,7 @@ pnpm build && pnpm e2e   # e2e с поддельным opencode, без сети
 pnpm build && pnpm e2e:live   # живой тест с реальным opencode и Википедией
 ```
 
-`pnpm e2e:live` не входит в `pnpm e2e`. Он подключается к локальному opencode через `opencode api POST /api/pair`, использует модель `deepseek/deepseek-flash` и стоит немного. Скриншоты сохраняются в `/tmp/oct-live/`.
+`pnpm e2e:live` не входит в `pnpm e2e`. Он подключается к локальному opencode через `opencode api POST /api/pair`, использует модель `deepseek/deepseek-flash` и стоит немного. Скриншоты сохраняются в `/tmp/byoglot-live/`.
 
 Линт Firefox-сборки: `npx web-ext lint --source-dir dist/firefox-mv3`.
 

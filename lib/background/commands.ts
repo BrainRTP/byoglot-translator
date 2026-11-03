@@ -1,7 +1,7 @@
 import { browser } from "wxt/browser";
 import { sendTabMessage } from "../messaging/protocol";
 
-export const SELECTION_MENU_ID = "oct-translate-selection";
+export const SELECTION_MENU_ID = "byoglot-translate-selection";
 
 export function registerCommands(): void {
   browser.commands.onCommand.addListener(async (command) => {

@@ -488,6 +488,6 @@ describe("with the animator", () => {
     expect(seen[1]).toBe("old text");
     expect(queue).toHaveLength(0);
     expect(el.textContent).toBe("new text");
-    expect(document.querySelector("[data-oct]")).toBeNull();
+    expect(document.querySelector("[data-byoglot]")).toBeNull();
   });
 });

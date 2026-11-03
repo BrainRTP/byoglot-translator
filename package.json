@@ -1,10 +1,18 @@
 {
-  "name": "opencode-translator",
+  "name": "byoglot-translator",
   "description": "Translate web pages through your local opencode server",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "private": true,
   "type": "module",
   "license": "MIT",
+  "homepage": "https://github.com/BrainRTP/byoglot-translator#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BrainRTP/byoglot-translator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BrainRTP/byoglot-translator/issues"
+  },
   "engines": {
     "node": ">=24"
   },
@@ -17,7 +25,7 @@
     "test": "vitest run",
     "check": "tsc --noEmit && svelte-check && biome check .",
     "e2e": "playwright test --project=mock",
-    "e2e:live": "OCT_LIVE=1 playwright test --project=live",
+    "e2e:live": "BYOGLOT_LIVE=1 playwright test --project=live",
     "icons": "node scripts/render-icons.mjs",
     "postinstall": "wxt prepare",
     "quality:snapshot": "node tests/quality/snapshot.ts",

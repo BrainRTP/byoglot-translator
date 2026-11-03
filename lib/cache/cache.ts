@@ -46,7 +46,7 @@ export async function openTranslationCache(
   opts: { maxEntries?: number; dbName?: string } = {},
 ): Promise<TranslationCache> {
   const maxEntries = opts.maxEntries ?? 50000;
-  const db: IDBPDatabase<CacheDB> = await openDB<CacheDB>(opts.dbName ?? "oct-cache", 1, {
+  const db: IDBPDatabase<CacheDB> = await openDB<CacheDB>(opts.dbName ?? "byoglot-cache", 1, {
     upgrade(d) {
       const store = d.createObjectStore("entries", { keyPath: "key" });
       store.createIndex("at", "at");

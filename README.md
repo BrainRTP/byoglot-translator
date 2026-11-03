@@ -1,10 +1,17 @@
-# opencode Translator
+# ByoGlot Translator
 
 English | [Русский](README.ru.md)
 
-A Chrome and Firefox extension (Manifest V3) that translates web pages and selected text with the model you already use in [opencode](https://opencode.ai). The extension has no API keys, accounts or servers of its own. It talks to opencode on your computer, and opencode calls the model provider you configured there.
+A Chrome and Firefox extension (Manifest V3) that translates web pages and selected text with the model you already use in [opencode](https://opencode.ai). ByoGlot stands for "bring your own" plus "-glot": the model and the translation instructions are yours. The extension has no API keys, accounts or servers of its own. It talks to opencode on your computer, and opencode calls the model provider you configured there.
 
-MIT license. Free, no subscription, no ads, no telemetry.
+MIT license. Free, no subscription, no ads, no telemetry. An independent project, not affiliated with the opencode team.
+
+<p>
+  <img src="docs/screenshots/popup-en.png" width="300" alt="Popup with the Translate page button, template, model, effort and display mode">
+  <img src="docs/screenshots/selection-en.png" width="304" alt="Selection card with a dictionary-style translation in the dark theme">
+</p>
+
+<img src="docs/screenshots/settings-en.png" width="620" alt="Settings page with connection, language and language prompt sections">
 
 ## Why
 
@@ -122,11 +129,11 @@ pnpm build && pnpm e2e       # e2e against a mock opencode, no network
 pnpm build && pnpm e2e:live  # live test with your opencode on Wikipedia
 ```
 
-`pnpm e2e:live` is never part of `pnpm e2e`. It pairs with your local opencode, translates https://wikipedia.org/wiki/Node.js with `deepseek/deepseek-flash` and has a small cost. Screenshots go to `/tmp/oct-live/`.
+`pnpm e2e:live` is never part of `pnpm e2e`. It pairs with your local opencode, translates https://wikipedia.org/wiki/Node.js with `deepseek/deepseek-flash` and has a small cost. Screenshots go to `/tmp/byoglot-live/`.
 
 Lint the Firefox build with `npx web-ext lint --source-dir dist/firefox-mv3`.
 
-The stack: WXT, Svelte 5, TypeScript 7 (svelte-check runs on TypeScript 6 through `.pnpmfile.cjs`, because it does not support 7 yet), Zod, idb, Vitest, Playwright, Biome. The design spec and implementation plan are in `docs/superpowers/`, the UI design in `docs/design/`.
+The stack: WXT, Svelte 5, TypeScript 7 (svelte-check runs on TypeScript 6 through `.pnpmfile.cjs`, because it does not support 7 yet), Zod, idb, Vitest, Playwright, Biome. The translation quality stand that tunes the prompts lives in `tests/quality/`, see [CONTRIBUTING.md](CONTRIBUTING.md#checking-a-profile-with-the-quality-stand).
 
 ## Known limitations
 

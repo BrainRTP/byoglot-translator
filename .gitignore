@@ -1,7 +1,11 @@
 .superpowers/
+.claude/
 node_modules/
-.output/
 dist/
+coverage/
+.env*
+*.log
+.vscode/
 .wxt/
 test-results/
 playwright-report/

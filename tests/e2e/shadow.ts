@@ -11,7 +11,7 @@ type CdpNode = {
 function findHost(node: CdpNode, mark: string): CdpNode | undefined {
   const attrs = node.attributes ?? [];
   for (let i = 0; i < attrs.length; i += 2) {
-    if (attrs[i] === "data-oct" && attrs[i + 1] === mark) return node;
+    if (attrs[i] === "data-byoglot" && attrs[i + 1] === mark) return node;
   }
   for (const child of [
     ...(node.children ?? []),

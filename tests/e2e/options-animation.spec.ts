@@ -50,9 +50,9 @@ test("arrow keys move the selection and the focus", async ({ paired }) => {
 test("the stage mode is local and does not touch the display mode", async ({ paired }) => {
   const page = await openAnimation(paired);
   await page.getByRole("button", { name: "Bilingual" }).click();
-  await expect(page.locator("#animation article [data-oct]")).toHaveCount(4);
+  await expect(page.locator("#animation article [data-byoglot]")).toHaveCount(4);
   await page.getByRole("button", { name: "Replace" }).click();
-  await expect(page.locator("#animation article [data-oct]")).toHaveCount(0);
+  await expect(page.locator("#animation article [data-byoglot]")).toHaveCount(0);
   expect((await stored(paired)).displayMode).toBe("replace");
 });
 

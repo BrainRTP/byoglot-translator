@@ -1,5 +1,5 @@
-export const MARK_ATTR = "data-oct";
-export const BLOCK_ID_ATTR = "data-oct-id";
+export const MARK_ATTR = "data-byoglot";
+export const BLOCK_ID_ATTR = "data-byoglot-id";
 
 export const BLOCK_TAGS: ReadonlySet<string> = new Set([
   "p",

@@ -12,6 +12,7 @@ export type PageJob = {
   segments: Segment[];
   settings: EffectiveSettings;
   model: ModelRef;
+  languagePrompt: string;
   page: { title: string; hostname: string };
 };
 
@@ -81,7 +82,7 @@ export function createTranslationService(deps: {
     const stopped = () => controller.signal.aborted;
 
     try {
-      const { segments, settings, model, page } = job;
+      const { segments, settings, model, languagePrompt, page } = job;
       const keyOf = new Map<string, string>();
       await Promise.all(
         segments.map(async (s) => {
@@ -93,6 +94,7 @@ export function createTranslationService(deps: {
               targetLang: settings.targetLang,
               model,
               prePrompt: settings.prePrompt,
+              languagePrompt,
             }),
           );
         }),
@@ -122,6 +124,7 @@ export function createTranslationService(deps: {
         const input = Object.fromEntries(batch.map((s) => [s.id, s.text]));
         const prompt = buildPagePrompt({
           prePrompt: settings.prePrompt,
+          languagePrompt,
           sourceLang: settings.sourceLang,
           targetLang: settings.targetLang,
           pageTitle: page.title,
@@ -183,11 +186,13 @@ export function createTranslationService(deps: {
       settings: EffectiveSettings;
       model: ModelRef;
       hostname: string;
+      languagePrompt: string;
     },
     signal: AbortSignal,
   ): Promise<string> {
     const prompt = buildSelectionPrompt({
       prePrompt: i.settings.prePrompt,
+      languagePrompt: i.languagePrompt,
       sourceLang: i.settings.sourceLang,
       targetLang: i.settings.targetLang,
       text: i.text,

@@ -1,7 +1,13 @@
 import { storage } from "wxt/utils/storage";
 import type { Connection } from "../opencode/types";
 import { builtinTemplate, DEFAULT_GLOBALS, initialGlobals } from "./defaults";
-import type { EffectiveSettings, GlobalSettings, SiteRule, Template } from "./types";
+import type {
+  EffectiveSettings,
+  GlobalSettings,
+  ProfileOverrides,
+  SiteRule,
+  Template,
+} from "./types";
 
 export const connectionItem = storage.defineItem<Connection | null>("local:connection", {
   fallback: null,
@@ -25,6 +31,10 @@ export const templatesItem = storage.defineItem<Template[]>("local:templates", {
 
 export const siteRulesItem = storage.defineItem<SiteRule[]>("local:siteRules", {
   fallback: [],
+});
+
+export const profileOverridesItem = storage.defineItem<ProfileOverrides>("local:languageProfiles", {
+  fallback: {},
 });
 
 export function tabSettings(tabId: number) {

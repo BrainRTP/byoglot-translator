@@ -65,6 +65,8 @@ export function registerBackground(deps: BackgroundDeps): void {
   handle("templateOp", (op) => handlers.templateOp(op));
   handle("rules", () => handlers.rules());
   handle("ruleOp", (op) => handlers.ruleOp(op));
+  handle("languageProfiles", () => handlers.languageProfiles());
+  handle("languageProfileOp", (op) => handlers.languageProfileOp(op));
   handle("translateSelection", (i, sender) => handlers.translateSelection(i, sender));
   handle("cancelSelection", (requestId, sender) => handlers.cancelSelection(requestId, sender));
   handle("pageBadge", (state, sender) => handlers.pageBadge(state, sender));

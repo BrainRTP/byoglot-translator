@@ -5,7 +5,11 @@ import type { PortToBackground, PortToContent } from "../../../lib/messaging/pag
 import { BackendError } from "../../../lib/opencode/errors";
 import type { PageCallbacks, PageJob } from "../../../lib/translate/service";
 
-const job = { segments: [], page: { title: "T", hostname: "h" } } as unknown as PageJob;
+const job = {
+  segments: [],
+  languagePrompt: "",
+  page: { title: "T", hostname: "h" },
+} as unknown as PageJob;
 const translate: PortToBackground = {
   type: "translate",
   jobId: "j1",

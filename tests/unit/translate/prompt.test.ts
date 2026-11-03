@@ -3,6 +3,7 @@ import { buildPagePrompt, buildSelectionPrompt } from "../../../lib/translate/pr
 
 const page = {
   prePrompt: "explain academic words with examples and etymology",
+  languagePrompt: "",
   sourceLang: "en",
   targetLang: "ru",
   pageTitle: "Docs - Agile",
@@ -38,6 +39,25 @@ describe("buildPagePrompt", () => {
     );
   });
 
+  it("requires every tag of a segment in its translation, also a single wrapping tag", () => {
+    expect(buildPagePrompt(page)).toContain(
+      'Every tag of a segment must appear in its translation, also when one tag wraps the whole segment: "<x1>Getting started</x1>" becomes "<x1>Начало работы</x1>", never "Начало работы".',
+    );
+  });
+
+  it("puts the trimmed language block between the rules and the user instructions", () => {
+    const p = buildPagePrompt({ ...page, languagePrompt: "  rules \n" });
+    expect(p).toContain(
+      "never the output format.\n\nLANGUAGE STYLE (the user instructions below override it):\nrules\n\nUSER INSTRUCTIONS:",
+    );
+  });
+
+  it("adds no block for an empty or blank language prompt", () => {
+    const base = buildPagePrompt(page);
+    expect(base).not.toContain("LANGUAGE STYLE");
+    expect(buildPagePrompt({ ...page, languagePrompt: "   " })).toBe(base);
+  });
+
   it("renders auto as detect-the-language", () => {
     expect(buildPagePrompt({ ...page, sourceLang: "auto" })).toContain(
       "Translate from the source language (detect it) to Russian.",
@@ -56,6 +76,7 @@ describe("buildPagePrompt", () => {
 describe("buildSelectionPrompt", () => {
   const sel = {
     prePrompt: "explain academic words",
+    languagePrompt: "",
     sourceLang: "auto",
     targetLang: "ru",
     text: "ubiquitous",
@@ -73,5 +94,18 @@ describe("buildSelectionPrompt", () => {
     expect(p).toContain("to Russian");
     expect(p).toContain("the source language (detect it)");
     expect(p).toContain("example.com");
+  });
+
+  it("puts the trimmed language block between the rules and the user instructions", () => {
+    const p = buildSelectionPrompt({ ...sel, languagePrompt: "  rules \n" });
+    expect(p).toContain(
+      "any extra explanations.\n\nLANGUAGE STYLE (the user instructions below override it):\nrules\n\nUSER INSTRUCTIONS:",
+    );
+  });
+
+  it("adds no block for an empty or blank language prompt", () => {
+    const base = buildSelectionPrompt(sel);
+    expect(base).not.toContain("LANGUAGE STYLE");
+    expect(buildSelectionPrompt({ ...sel, languagePrompt: "   " })).toBe(base);
   });
 });

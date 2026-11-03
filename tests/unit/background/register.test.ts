@@ -96,6 +96,31 @@ describe("registerBackground", () => {
     }
   });
 
+  it("keeps language profile messages away from content scripts", async () => {
+    for (const [type, data] of [
+      ["languageProfiles", undefined],
+      ["languageProfileOp", { type: "reset", id: "ru" }],
+    ] as const) {
+      const res = await dispatch(type, data, contentScript());
+      expect(res.err?.message, type).toMatch(/not allowed/);
+    }
+  });
+
+  it("serves language profiles to an extension page", async () => {
+    const list = await dispatch("languageProfiles", undefined, extPage());
+    expect(list.err).toBeUndefined();
+    expect((list.res as { id: string }[]).at(-1)?.id).toBe("generic");
+    const next = await dispatch(
+      "languageProfileOp",
+      { type: "save", id: "ru", text: "x" },
+      extPage(),
+    );
+    expect(next.err).toBeUndefined();
+    expect(
+      (next.res as { id: string; modified: boolean }[]).find((p) => p.id === "ru")?.modified,
+    ).toBe(true);
+  });
+
   it("lets a content script call tabView and templates", async () => {
     const view = await dispatch("tabView", { tabId: 3, hostname: "example.com" }, contentScript());
     expect(view.err).toBeUndefined();

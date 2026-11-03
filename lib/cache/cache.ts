@@ -24,8 +24,9 @@ export async function cacheKey(i: {
   targetLang: string;
   model: ModelRef;
   prePrompt: string;
+  languagePrompt: string;
 }): Promise<string> {
-  const data = JSON.stringify([
+  const parts = [
     i.text,
     i.sourceLang,
     i.targetLang,
@@ -33,7 +34,10 @@ export async function cacheKey(i: {
     i.model.id,
     i.model.variant ?? "",
     i.prePrompt,
-  ]);
+  ];
+  const lang = i.languagePrompt.trim();
+  if (lang) parts.push(lang);
+  const data = JSON.stringify(parts);
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data));
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }

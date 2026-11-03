@@ -3,6 +3,8 @@
   import { browser } from "wxt/browser";
   import { resolveLang, type UiLang } from "../../lib/i18n";
   import {
+    type LanguageProfileView,
+    type ProfileOp,
     type RuleOp,
     type Status,
     sendMessage,
@@ -13,6 +15,7 @@
   import type { GlobalSettings, SiteRule, Template } from "../../lib/settings/types";
   import AnimationSection from "../../lib/ui/AnimationSection.svelte";
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
+  import LanguagePrompt from "../../lib/ui/LanguagePrompt.svelte";
   import { languageOptions } from "../../lib/ui/languages";
   import ModelSelect from "../../lib/ui/ModelSelect.svelte";
   import { isFirefoxAgent, type ModelId } from "../../lib/ui/options-logic";
@@ -26,6 +29,7 @@
   type Section =
     | "connection"
     | "language"
+    | "langprompt"
     | "models"
     | "templates"
     | "rules"
@@ -38,6 +42,7 @@
   const SECTIONS = [
     "connection",
     "language",
+    "langprompt",
     "models",
     "templates",
     "rules",
@@ -48,6 +53,7 @@
   const NAV_KEYS = {
     connection: "opt.nav.connection",
     language: "opt.nav.language",
+    langprompt: "opt.nav.langprompt",
     models: "opt.nav.models",
     templates: "opt.nav.templates",
     rules: "opt.nav.rules",
@@ -62,12 +68,14 @@
   let globals = $state<GlobalSettings | null>(null);
   let templates = $state<Template[]>([]);
   let rules = $state<SiteRule[]>([]);
+  let profiles = $state<LanguageProfileView[]>([]);
   let models = $state<ModelInfo[]>([]);
   let cacheEntries = $state(0);
   let shortcuts = $state<Shortcut[]>([]);
   let flags = $state<Record<Section, Flag>>({
     connection: null,
     language: null,
+    langprompt: null,
     models: null,
     templates: null,
     rules: null,
@@ -81,6 +89,7 @@
   const globalsQueue = createSerialQueue();
   const templatesQueue = createSerialQueue();
   const rulesQueue = createSerialQueue();
+  const profilesQueue = createSerialQueue();
   const firefox = isFirefoxAgent(navigator.userAgent);
 
   const connected = $derived(status?.state === "connected");
@@ -131,16 +140,18 @@
   async function load() {
     loadFailed = false;
     try {
-      const [g, tpl, rl, st, cache] = await Promise.all([
+      const [g, tpl, rl, st, cache, prof] = await Promise.all([
         sendMessage("globals", undefined),
         sendMessage("templates", undefined),
         sendMessage("rules", undefined),
         sendMessage("status", undefined),
         sendMessage("cacheStats", undefined),
+        sendMessage("languageProfiles", undefined),
       ]);
       globals = g;
       templates = tpl;
       rules = rl;
+      profiles = prof;
       status = st;
       cacheEntries = cache.entries;
       applyLang(g.uiLang);
@@ -245,6 +256,25 @@
         ),
       ]).catch(() => {});
     }
+    return result;
+  }
+
+  async function profileOp(op: ProfileOp): Promise<LanguageProfileView[] | null> {
+    let result: LanguageProfileView[] | null = null;
+    try {
+      await profilesQueue.enqueue(
+        async () => {
+          result = await sendMessage("languageProfileOp", op);
+          return result;
+        },
+        (list) => (profiles = list),
+      );
+    } catch {
+      mark("langprompt", false);
+      profiles = await sendMessage("languageProfiles", undefined).catch(() => profiles);
+      return null;
+    }
+    mark("langprompt", true);
     return result;
   }
 
@@ -445,6 +475,16 @@
               </label>
             </div>
             <p class="mu small hintline">{tr("opt.lang.hint")}</p>
+          </section>
+
+          <section class="sec" id="langprompt">
+            {@render heading("langprompt", flags.langprompt)}
+            <LanguagePrompt
+              {profiles}
+              {globals}
+              onop={profileOp}
+              onpatch={(patch) => patchGlobals("langprompt", patch)}
+            />
           </section>
 
           <section class="sec" id="models">

@@ -24,6 +24,8 @@ export const DEFAULT_GLOBALS: GlobalSettings = {
   selectionModel: null,
   defaultTemplateId: BUILTIN_TEMPLATE_ID,
   uiLang: "auto",
+  languagePromptEnabled: true,
+  languageProfile: "auto",
 };
 
 export function initialGlobals(browserLanguage: string | undefined): GlobalSettings {

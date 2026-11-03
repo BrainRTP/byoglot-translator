@@ -3,7 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cacheKey, openTranslationCache } from "../../../lib/cache/cache";
 
 const model = { providerID: "anthropic", id: "claude-haiku" };
-const base = { text: "Hello", sourceLang: "auto", targetLang: "ru", model, prePrompt: "" };
+const base = {
+  text: "Hello",
+  sourceLang: "auto",
+  targetLang: "ru",
+  model,
+  prePrompt: "",
+  languagePrompt: "",
+};
 
 let n = 0;
 const open = (maxEntries?: number) => openTranslationCache({ dbName: `test-${n++}`, maxEntries });
@@ -31,6 +38,37 @@ describe("cacheKey", () => {
     expect(await cacheKey({ ...base, sourceLang: "en" })).not.toBe(a);
     expect(await cacheKey({ ...base, targetLang: "de" })).not.toBe(a);
     expect(await cacheKey({ ...base, prePrompt: "explain" })).not.toBe(a);
+  });
+});
+
+describe("cacheKey language prompt", () => {
+  const sha256 = async (data: string) => {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data));
+    return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+  };
+
+  it("keeps the 7-field key when the language prompt is empty", async () => {
+    const legacy = await sha256(
+      JSON.stringify(["Hello", "auto", "ru", "anthropic", "claude-haiku", "", ""]),
+    );
+    expect(await cacheKey(base)).toBe(legacy);
+  });
+
+  it("differs for different language prompts", async () => {
+    const a = await cacheKey({ ...base, languagePrompt: "a" });
+    const b = await cacheKey({ ...base, languagePrompt: "b" });
+    expect(a).not.toBe(b);
+    expect(a).not.toBe(await cacheKey(base));
+  });
+
+  it("ignores surrounding whitespace in the language prompt", async () => {
+    expect(await cacheKey({ ...base, languagePrompt: " a " })).toBe(
+      await cacheKey({ ...base, languagePrompt: "a" }),
+    );
+  });
+
+  it("treats a whitespace-only language prompt as empty", async () => {
+    expect(await cacheKey({ ...base, languagePrompt: "   " })).toBe(await cacheKey(base));
   });
 });
 

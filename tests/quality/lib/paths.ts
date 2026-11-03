@@ -6,8 +6,12 @@ export const ROOT = process.cwd();
 export const QUALITY = join(ROOT, "tests/quality");
 export const DATA = join(QUALITY, ".data");
 export const PROMPTS = join(QUALITY, "prompts");
+const PROFILES = join(ROOT, "lib/translate/profiles");
 
-export const readPrompt = (path: string) => readFileSync(join(PROMPTS, path), "utf8");
+export const readPrompt = (path: string) =>
+  path.startsWith("profile:")
+    ? readFileSync(join(PROFILES, `${path.slice("profile:".length)}.md`), "utf8")
+    : readFileSync(join(PROMPTS, path), "utf8");
 export const loadSnapshot = (id: string): Snapshot =>
   JSON.parse(readFileSync(join(DATA, "corpus", `${id}.json`), "utf8")) as Snapshot;
 export const loadRun = (runId: string): RunResult =>

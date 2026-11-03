@@ -1,7 +1,7 @@
 {
   "name": "opencode-translator",
   "description": "Translate web pages through your local opencode server",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "private": true,
   "type": "module",
   "license": "MIT",

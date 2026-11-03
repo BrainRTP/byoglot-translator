@@ -28,7 +28,13 @@ const seg = (n: number, len = 5): Segment => ({ id: String(n), text: "x".repeat(
 const segs = (n: number, len = 5) => Array.from({ length: n }, (_, i) => seg(i + 1, len));
 
 function job(segments: Segment[]): PageJob {
-  return { segments, settings, model, page: { title: "T", hostname: "example.com" } };
+  return {
+    segments,
+    settings,
+    model,
+    languagePrompt: "",
+    page: { title: "T", hostname: "example.com" },
+  };
 }
 
 function memoryCache(initial: Record<string, string> = {}) {
@@ -256,7 +262,14 @@ describe("translatePage cache", () => {
   it("reports cached segments once with cached: true and does not request them", async () => {
     const input = segs(4);
     const key = (s: Segment) =>
-      cacheKey({ text: s.text, sourceLang: "auto", targetLang: "ru", model, prePrompt: "pp" });
+      cacheKey({
+        text: s.text,
+        sourceLang: "auto",
+        targetLang: "ru",
+        model,
+        prePrompt: "pp",
+        languagePrompt: "",
+      });
     const first = input[0] ?? seg(1);
     const { cache } = memoryCache({ [await key(first)]: "cached-1" });
     const fake = fakeBackend();
@@ -282,6 +295,7 @@ describe("translatePage cache", () => {
           targetLang: "ru",
           model,
           prePrompt: "pp",
+          languagePrompt: "",
         })
       ] = "c";
     }
@@ -303,6 +317,7 @@ describe("translatePage cache", () => {
       targetLang: "ru",
       model,
       prePrompt: "pp",
+      languagePrompt: "",
     });
     const { cache } = memoryCache({ [stale]: "old" });
     const fake = fakeBackend();
@@ -314,6 +329,47 @@ describe("translatePage cache", () => {
     );
     expect(fake.prompts).toHaveLength(1);
     expect(rec.results[0]).toEqual([{ id: "1", text: "T1", cached: false }]);
+  });
+
+  it("puts the job language prompt into the prompt sent to the backend", async () => {
+    const fake = fakeBackend();
+    await service(fake).translatePage(
+      { ...job(segs(1)), languagePrompt: "  Use formal tone.  " },
+      recorder().cb,
+      new AbortController().signal,
+    );
+    expect(fake.prompts[0]).toContain(
+      "LANGUAGE STYLE (the user instructions below override it):\nUse formal tone.\n\nUSER INSTRUCTIONS:",
+    );
+  });
+
+  it("does not reuse a cached translation made with another language prompt", async () => {
+    const { cache } = memoryCache();
+    const fake = fakeBackend();
+    const svc = service(fake, cache);
+    const one = [{ id: "1", text: "hello" }];
+    await svc.translatePage(
+      { ...job(one), languagePrompt: "A" },
+      recorder().cb,
+      new AbortController().signal,
+    );
+    expect(fake.prompts).toHaveLength(1);
+    const rec = recorder();
+    await svc.translatePage(
+      { ...job(one), languagePrompt: "B" },
+      rec.cb,
+      new AbortController().signal,
+    );
+    expect(fake.prompts).toHaveLength(2);
+    expect(rec.results[0]).toEqual([{ id: "1", text: "T1", cached: false }]);
+    const again = recorder();
+    await svc.translatePage(
+      { ...job(one), languagePrompt: "A" },
+      again.cb,
+      new AbortController().signal,
+    );
+    expect(fake.prompts).toHaveLength(2);
+    expect(again.results[0]).toEqual([{ id: "1", text: "T1", cached: true }]);
   });
 
   it("writes successful results to the cache", async () => {
@@ -330,6 +386,7 @@ describe("translatePage cache", () => {
       targetLang: "ru",
       model,
       prePrompt: "pp",
+      languagePrompt: "",
     });
     expect(store.get(key)).toBe("T1");
   });
@@ -608,7 +665,14 @@ describe("translatePage abort", () => {
 });
 
 describe("translateSelection", () => {
-  const input = { text: "Hello", context: "ctx", settings, model, hostname: "example.com" };
+  const input = {
+    text: "Hello",
+    context: "ctx",
+    settings,
+    model,
+    hostname: "example.com",
+    languagePrompt: "",
+  };
 
   it("returns the trimmed raw text and builds the selection prompt", async () => {
     const fake = fakeBackend(async () => "  Привет\n");
@@ -616,6 +680,17 @@ describe("translateSelection", () => {
     expect(out).toBe("Привет");
     expect(fake.prompts[0]).toContain("TEXT:\nHello");
     expect(fake.prompts[0]).toContain("CONTEXT (do not translate):\nctx");
+  });
+
+  it("puts the language prompt block into the selection prompt", async () => {
+    const fake = fakeBackend(async () => "ok");
+    await service(fake).translateSelection(
+      { ...input, languagePrompt: "Use formal tone." },
+      new AbortController().signal,
+    );
+    expect(fake.prompts[0]).toContain(
+      "LANGUAGE STYLE (the user instructions below override it):\nUse formal tone.\n\nUSER INSTRUCTIONS:",
+    );
   });
 
   it("throws BackendError on failure", async () => {

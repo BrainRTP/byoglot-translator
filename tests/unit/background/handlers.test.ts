@@ -14,15 +14,18 @@ import type {
   TranslationBackend,
 } from "../../../lib/opencode/types";
 import { BUILTIN_TEMPLATE_ID, DEFAULT_GLOBALS } from "../../../lib/settings/defaults";
+import { LANGUAGE_CODES } from "../../../lib/settings/languages";
 import {
   connectionItem,
   globalsItem,
+  profileOverridesItem,
   siteRulesItem,
   tabHostItem,
   tabSettings,
   templatesItem,
 } from "../../../lib/settings/store";
 import type { Template } from "../../../lib/settings/types";
+import { BUILTIN_PROFILES, PROFILE_IDS } from "../../../lib/translate/profiles";
 
 const conn: Connection = { url: "http://127.0.0.1:4096", username: "opencode", password: "tok" };
 
@@ -69,6 +72,13 @@ const ruTemplate: Template = {
   name: "Wiki",
   builtin: false,
   settings: { prePrompt: "wiki", targetLang: "de" },
+};
+
+const NO_PROFILE_LANG = LANGUAGE_CODES.find((c) => !BUILTIN_PROFILES.has(c)) as string;
+
+const noProfileTemplate: Template = {
+  ...ruTemplate,
+  settings: { ...ruTemplate.settings, targetLang: NO_PROFILE_LANG },
 };
 
 describe("background handlers", () => {
@@ -379,6 +389,43 @@ describe("background handlers", () => {
       expect(call[0].hostname).toBe("example.com");
     });
 
+    it("passes the language prompt of the effective target language to the service", async () => {
+      const { handlers, translateSelection } = setup();
+      await globalsItem.setValue({ ...DEFAULT_GLOBALS, targetLang: "ru", selectionModel });
+      await templatesItem.setValue([
+        { id: BUILTIN_TEMPLATE_ID, name: "b", builtin: true, settings: {} },
+        noProfileTemplate,
+      ]);
+      await handlers.translateSelection(
+        { text: "hello", context: "", hostname: "example.com" },
+        { tab: { id: 5, url: "https://example.com/" } },
+      );
+      await handlers.translateSelection(
+        { text: "hello", context: "", hostname: "example.com", templateId: "ru-wiki" },
+        { tab: { id: 6, url: "https://example.com/" } },
+      );
+      const prompts = translateSelection.mock.calls.map(
+        (c) => (c as unknown as [{ languagePrompt: string }])[0].languagePrompt,
+      );
+      expect(prompts).toEqual([BUILTIN_PROFILES.get("ru"), BUILTIN_PROFILES.get("generic")]);
+    });
+
+    it("passes an empty language prompt when the toggle is off", async () => {
+      const { handlers, translateSelection } = setup();
+      await globalsItem.setValue({
+        ...DEFAULT_GLOBALS,
+        targetLang: "ru",
+        languagePromptEnabled: false,
+        selectionModel,
+      });
+      await handlers.translateSelection(
+        { text: "hello", context: "", hostname: "example.com" },
+        { tab: { id: 5, url: "https://example.com/" } },
+      );
+      const call = translateSelection.mock.calls[0] as unknown as [{ languagePrompt: string }];
+      expect(call[0].languagePrompt).toBe("");
+    });
+
     it("applies a templateId override for this call only", async () => {
       const { handlers, translateSelection } = setup();
       await globalsItem.setValue({ ...DEFAULT_GLOBALS, selectionModel });
@@ -530,6 +577,45 @@ describe("background handlers", () => {
       expect(job?.model).toEqual(pageModel);
       expect(job?.segments).toEqual(req.segments);
       expect(job?.page).toEqual(req.page);
+    });
+
+    it("takes the language prompt from the effective target language, not the global one", async () => {
+      const { handlers } = setup();
+      const pageModel = { providerID: "deepseek", id: "deepseek-flash", variant: "none" };
+      await globalsItem.setValue({ ...DEFAULT_GLOBALS, targetLang: "ru", pageModel });
+      const plain = await handlers.pageJob({ tab: { id: 3, url: "https://example.com/" } }, req);
+      expect(plain.languagePrompt).toBe(BUILTIN_PROFILES.get("ru"));
+
+      await templatesItem.setValue([
+        { id: BUILTIN_TEMPLATE_ID, name: "b", builtin: true, settings: {} },
+        noProfileTemplate,
+      ]);
+      await siteRulesItem.setValue([{ id: "r1", pattern: "example.com", templateId: "ru-wiki" }]);
+      const viaTemplate = await handlers.pageJob(
+        { tab: { id: 3, url: "https://example.com/" } },
+        req,
+      );
+      expect(viaTemplate.settings.targetLang).toBe(NO_PROFILE_LANG);
+      expect(viaTemplate.languagePrompt).toBe(BUILTIN_PROFILES.get("generic"));
+    });
+
+    it("uses the stored override of the chosen profile", async () => {
+      const { handlers } = setup();
+      await globalsItem.setValue({ ...DEFAULT_GLOBALS, targetLang: "ru" });
+      await profileOverridesItem.setValue({ ru: { text: "my ru", base: "old", savedAt: 1 } });
+      const job = await handlers.pageJob({ tab: { id: 3 } }, req);
+      expect(job.languagePrompt).toBe("my ru");
+    });
+
+    it("gives an empty language prompt when the toggle is off", async () => {
+      const { handlers } = setup();
+      await globalsItem.setValue({
+        ...DEFAULT_GLOBALS,
+        targetLang: "ru",
+        languagePromptEnabled: false,
+      });
+      const job = await handlers.pageJob({ tab: { id: 3 } }, req);
+      expect(job.languagePrompt).toBe("");
     });
 
     it("rejects with unauthorized when not paired", async () => {
@@ -741,6 +827,156 @@ describe("background handlers", () => {
 
       await handlers.tabNavigated(1, "https://other.org/");
       expect(await tabSettings(1).getValue()).toBeNull();
+    });
+  });
+
+  describe("language profiles", () => {
+    const builtinRu = BUILTIN_PROFILES.get("ru") as string;
+    const builtinGeneric = BUILTIN_PROFILES.get("generic") as string;
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("lists the built-in texts untouched, language ids first and generic last", async () => {
+      const { handlers } = setup();
+      const list = await handlers.languageProfiles();
+      expect(list.map((p) => p.id)).toEqual([...PROFILE_IDS]);
+      expect(list.at(-1)?.id).toBe("generic");
+      for (const p of list) {
+        expect(p).toEqual({
+          id: p.id,
+          builtin: BUILTIN_PROFILES.get(p.id),
+          text: BUILTIN_PROFILES.get(p.id),
+          modified: false,
+          outdated: false,
+        });
+      }
+    });
+
+    it("save stores the text with the current builtin as base", async () => {
+      const { handlers } = setup();
+      vi.spyOn(Date, "now").mockReturnValue(1234);
+      const list = await handlers.languageProfileOp({ type: "save", id: "ru", text: "my ru" });
+      expect(await profileOverridesItem.getValue()).toEqual({
+        ru: { text: "my ru", base: builtinRu, savedAt: 1234 },
+      });
+      expect(list.find((p) => p.id === "ru")).toEqual({
+        id: "ru",
+        builtin: builtinRu,
+        text: "my ru",
+        modified: true,
+        outdated: false,
+      });
+      expect(list.find((p) => p.id === "generic")?.modified).toBe(false);
+    });
+
+    it("save of the builtin text padded with whitespace removes the override", async () => {
+      const { handlers } = setup();
+      await handlers.languageProfileOp({ type: "save", id: "ru", text: "my ru" });
+      const list = await handlers.languageProfileOp({
+        type: "save",
+        id: "ru",
+        text: `\n  ${builtinRu}\n  `,
+      });
+      expect(await profileOverridesItem.getValue()).toEqual({});
+      expect(list.find((p) => p.id === "ru")?.modified).toBe(false);
+    });
+
+    it("an empty override is a modification with empty text", async () => {
+      const { handlers } = setup();
+      const list = await handlers.languageProfileOp({ type: "save", id: "ru", text: "" });
+      expect(list.find((p) => p.id === "ru")).toMatchObject({ text: "", modified: true });
+      expect((await profileOverridesItem.getValue()).ru?.text).toBe("");
+    });
+
+    it("save refreshes base of an outdated override", async () => {
+      const { handlers } = setup();
+      await profileOverridesItem.setValue({ ru: { text: "mine", base: "old", savedAt: 1 } });
+      const list = await handlers.languageProfileOp({ type: "save", id: "ru", text: "mine 2" });
+      expect((await profileOverridesItem.getValue()).ru?.base).toBe(builtinRu);
+      expect(list.find((p) => p.id === "ru")?.outdated).toBe(false);
+    });
+
+    it("reset removes the override", async () => {
+      const { handlers } = setup();
+      await handlers.languageProfileOp({ type: "save", id: "ru", text: "my ru" });
+      const list = await handlers.languageProfileOp({ type: "reset", id: "ru" });
+      expect(await profileOverridesItem.getValue()).toEqual({});
+      expect(list.find((p) => p.id === "ru")).toMatchObject({ text: builtinRu, modified: false });
+    });
+
+    it("keep rewrites only base", async () => {
+      const { handlers } = setup();
+      await profileOverridesItem.setValue({ ru: { text: "mine", base: "old", savedAt: 7 } });
+      const before = await handlers.languageProfiles();
+      expect(before.find((p) => p.id === "ru")).toMatchObject({ modified: true, outdated: true });
+
+      const list = await handlers.languageProfileOp({ type: "keep", id: "ru" });
+      expect(await profileOverridesItem.getValue()).toEqual({
+        ru: { text: "mine", base: builtinRu, savedAt: 7 },
+      });
+      expect(list.find((p) => p.id === "ru")).toMatchObject({
+        text: "mine",
+        modified: true,
+        outdated: false,
+      });
+    });
+
+    it("any op removes an override that equals the builtin text", async () => {
+      const { handlers } = setup();
+      for (const type of ["keep", "reset"] as const) {
+        await profileOverridesItem.setValue({
+          ru: { text: builtinRu, base: "old", savedAt: 1 },
+          generic: { text: builtinGeneric, base: "old", savedAt: 1 },
+        });
+        await handlers.languageProfileOp({ type, id: "ru" });
+        expect(await profileOverridesItem.getValue(), type).toEqual({
+          generic: { text: builtinGeneric, base: "old", savedAt: 1 },
+        });
+      }
+    });
+
+    it("rejects an unknown id and a text over 20000 characters without writing", async () => {
+      const { handlers } = setup();
+      await expect(
+        handlers.languageProfileOp({ type: "save", id: "xx", text: "a" }),
+      ).rejects.toThrow();
+      await expect(
+        handlers.languageProfileOp({ type: "save", id: "ru", text: "a".repeat(20_001) }),
+      ).rejects.toThrow();
+      expect(await profileOverridesItem.getValue()).toEqual({});
+
+      await handlers.languageProfileOp({ type: "save", id: "ru", text: "a".repeat(20_000) });
+      expect((await profileOverridesItem.getValue()).ru?.text).toHaveLength(20_000);
+    });
+
+    it("rejects reset and keep for an unknown id and keeps its stored override", async () => {
+      const { handlers } = setup();
+      const orphan = { xx: { text: "gone", base: "b", savedAt: 1 } };
+      await profileOverridesItem.setValue(orphan);
+      await expect(handlers.languageProfileOp({ type: "reset", id: "xx" })).rejects.toThrow();
+      await expect(handlers.languageProfileOp({ type: "keep", id: "xx" })).rejects.toThrow();
+      expect(await profileOverridesItem.getValue()).toEqual(orphan);
+    });
+
+    it("never lists or deletes an override whose profile disappeared", async () => {
+      const { handlers } = setup();
+      const orphan = { text: "gone", base: "b", savedAt: 1 };
+      await profileOverridesItem.setValue({ xx: orphan });
+      expect((await handlers.languageProfiles()).map((p) => p.id)).not.toContain("xx");
+
+      const ops = [
+        { type: "save", id: "ru", text: "my ru" },
+        { type: "keep", id: "ru" },
+        { type: "reset", id: "ru" },
+        { type: "save", id: "generic", text: builtinGeneric },
+      ] as const;
+      for (const op of ops) {
+        const list = await handlers.languageProfileOp(op);
+        expect(list.map((p) => p.id)).toEqual([...PROFILE_IDS]);
+        expect((await profileOverridesItem.getValue()).xx).toEqual(orphan);
+      }
     });
   });
 

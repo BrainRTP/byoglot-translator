@@ -1,7 +1,9 @@
 import { browser } from "wxt/browser";
 import type { TranslationCache } from "../cache/cache";
 import type {
+  LanguageProfileView,
   PageState,
+  ProfileOp,
   ProtocolMap,
   ResolvedModel,
   SelectionResult,
@@ -14,10 +16,18 @@ import { parsePairingLink } from "../opencode/pairing";
 import type { Connection, ModelInfo, ModelRef, TranslationBackend } from "../opencode/types";
 import { BUILTIN_TEMPLATE_ID, builtinTemplate } from "../settings/defaults";
 import { applyTemplate, isModified, pickInitialModels, resolveModel } from "../settings/effective";
+import {
+  isProfileModified,
+  isProfileOutdated,
+  languagePromptText,
+  MAX_PROFILE_TEXT,
+  profileText,
+} from "../settings/language-prompt";
 import { isValidPattern, matchSiteRule } from "../settings/site-rules";
 import {
   connectionItem,
   globalsItem,
+  profileOverridesItem,
   siteRulesItem,
   tabHostItem,
   tabSettings,
@@ -30,7 +40,15 @@ import {
   resetBuiltin,
   updateTemplate,
 } from "../settings/templates";
-import type { EffectiveSettings, GlobalSettings, SiteRule, Template } from "../settings/types";
+import type {
+  EffectiveSettings,
+  GlobalSettings,
+  ProfileOverride,
+  ProfileOverrides,
+  SiteRule,
+  Template,
+} from "../settings/types";
+import { BUILTIN_PROFILES, PROFILE_IDS } from "../translate/profiles";
 import type { createTranslationService, PageJob, Segment } from "../translate/service";
 
 export interface HandlerDeps {
@@ -262,6 +280,60 @@ export function createHandlers(deps: HandlerDeps) {
     }
   }
 
+  async function languagePromptFor(targetLang: string): Promise<string> {
+    const [g, overrides] = await Promise.all([
+      globalsItem.getValue(),
+      profileOverridesItem.getValue(),
+    ]);
+    return languagePromptText(g, targetLang, BUILTIN_PROFILES, overrides);
+  }
+
+  function profileViews(overrides: ProfileOverrides): LanguageProfileView[] {
+    return PROFILE_IDS.map((id) => {
+      const builtin = BUILTIN_PROFILES.get(id) ?? "";
+      const o = overrides[id];
+      return {
+        id,
+        builtin,
+        text: profileText(builtin, o),
+        modified: isProfileModified(builtin, o),
+        outdated: isProfileOutdated(builtin, o),
+      };
+    });
+  }
+
+  async function languageProfiles(): Promise<LanguageProfileView[]> {
+    return profileViews(await profileOverridesItem.getValue());
+  }
+
+  async function languageProfileOp(op: ProfileOp): Promise<LanguageProfileView[]> {
+    const builtin = BUILTIN_PROFILES.get(op.id);
+    if (builtin === undefined) throw new Error(`Unknown language profile: ${op.id}`);
+    const overrides = await profileOverridesItem.getValue();
+    let entry: ProfileOverride | undefined;
+    switch (op.type) {
+      case "save":
+        if (op.text.length > MAX_PROFILE_TEXT) {
+          throw new Error(`Profile text is longer than ${MAX_PROFILE_TEXT} characters`);
+        }
+        entry = { text: op.text, base: builtin, savedAt: Date.now() };
+        break;
+      case "reset":
+        entry = undefined;
+        break;
+      case "keep": {
+        const current = overrides[op.id];
+        entry = current && { ...current, base: builtin };
+        break;
+      }
+    }
+    if (!isProfileModified(builtin, entry)) entry = undefined;
+    const rest = Object.fromEntries(Object.entries(overrides).filter(([id]) => id !== op.id));
+    const next = entry ? { ...rest, [op.id]: entry } : rest;
+    await profileOverridesItem.setValue(next);
+    return profileViews(next);
+  }
+
   const handlers = {
     status,
 
@@ -333,6 +405,10 @@ export function createHandlers(deps: HandlerDeps) {
 
     templateOp,
 
+    languageProfiles,
+
+    languageProfileOp,
+
     rules: (): Promise<SiteRule[]> => siteRulesItem.getValue(),
 
     async ruleOp(op: Parameters<ProtocolMap["ruleOp"]>[0]): Promise<SiteRule[]> {
@@ -372,6 +448,7 @@ export function createHandlers(deps: HandlerDeps) {
             settings: view.settings,
             model,
             hostname: i.hostname || hostname,
+            languagePrompt: await languagePromptFor(view.settings.targetLang),
           },
           controller.signal,
         );
@@ -423,6 +500,7 @@ export function createHandlers(deps: HandlerDeps) {
         segments: req.segments,
         settings: view.settings,
         model,
+        languagePrompt: await languagePromptFor(view.settings.targetLang),
         page: req.page,
       };
     },

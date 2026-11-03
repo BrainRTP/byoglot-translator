@@ -19,6 +19,26 @@ test("selection icon opens a card with the translated selection", async ({ paire
     .toBe(`[ru] ${selected}`);
 });
 
+test("selection prompt carries the language style block", async ({ paired, mock }) => {
+  const page = await paired.context.newPage();
+  await page.goto(`${mock.url}/fixtures/article.html`);
+
+  await page.locator("#sel").click({ clickCount: 3 });
+  await expect.poll(() => queryClosedShadow(page, "button.icon")).not.toBeNull();
+  const hit = await queryClosedShadow(page, "button.icon");
+  if (!hit) throw new Error("icon disappeared");
+  await page.mouse.click(hit.center.x, hit.center.y);
+  await expect
+    .poll(async () => (await queryClosedShadow(page, ".card .scroll"))?.text.trim())
+    .toContain("[ru] ");
+
+  const prompts = mock.requests
+    .filter((r) => r.path === "/api/experimental/generate/text")
+    .map((r) => (r.body as { prompt: string }).prompt);
+  expect(prompts).toHaveLength(1);
+  expect(prompts[0]).toContain("LANGUAGE STYLE");
+});
+
 test("pinned card collects a feed, ignores outside clicks and closes with the cross", async ({
   paired,
   mock,

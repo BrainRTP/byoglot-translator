@@ -1,6 +1,23 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import type { Page } from "@playwright/test";
 import { openPopup } from "./extension";
 import { expect, test } from "./fixtures";
+import type { MockOpencode } from "./mock-opencode";
+import { NO_PROFILE_LANG, PROFILES_DIR } from "./profile-files";
+
+function firstLine(profile: string): string {
+  const [line] = readFileSync(path.join(PROFILES_DIR, `${profile}.md`), "utf8")
+    .trim()
+    .split("\n");
+  return line as string;
+}
+
+function generatedPrompts(mock: MockOpencode): string[] {
+  return mock.requests
+    .filter((r) => r.path === "/api/experimental/generate/text")
+    .map((r) => (r.body as { prompt: string }).prompt);
+}
 
 const sourceHtml = (page: Page) => page.locator("#content").innerHTML();
 
@@ -62,4 +79,46 @@ test("translates a modal that the page adds one second later", async ({ paired, 
   await expect(page.locator("#modal-text")).toHaveText(
     "[ru] Do you really want to leave this page now?",
   );
+});
+
+test("page prompt carries the Russian language profile for a Russian target", async ({
+  paired,
+  mock,
+}) => {
+  const page = await paired.context.newPage();
+  await page.goto(`${mock.url}/fixtures/article.html`);
+  const popup = await openPopup(paired, page);
+  await popup.getByRole("button", { name: "Translate page" }).click();
+  await expect(page.locator("#intro")).toContainText("[ru] ", { timeout: 15_000 });
+
+  const prompts = generatedPrompts(mock);
+  expect(prompts.length).toBeGreaterThan(0);
+  for (const prompt of prompts) {
+    expect(prompt).toContain("LANGUAGE STYLE");
+    expect(prompt).toContain(firstLine("ru"));
+    expect(prompt).not.toContain(firstLine("generic"));
+  }
+});
+
+test("page prompt carries the generic language profile for a target without its own", async ({
+  paired,
+  mock,
+}) => {
+  await paired.worker.evaluate(async (targetLang) => {
+    const { globals } = await chrome.storage.local.get("globals");
+    await chrome.storage.local.set({ globals: { ...(globals as object), targetLang } });
+  }, NO_PROFILE_LANG);
+  const page = await paired.context.newPage();
+  await page.goto(`${mock.url}/fixtures/article.html`);
+  const popup = await openPopup(paired, page);
+  await popup.getByRole("button", { name: "Translate page" }).click();
+  await expect(page.locator("#intro")).toContainText("[ru] ", { timeout: 15_000 });
+
+  const prompts = generatedPrompts(mock);
+  expect(prompts.length).toBeGreaterThan(0);
+  for (const prompt of prompts) {
+    expect(prompt).toContain("LANGUAGE STYLE");
+    expect(prompt).toContain(firstLine("generic"));
+    expect(prompt).not.toContain(firstLine("ru"));
+  }
 });

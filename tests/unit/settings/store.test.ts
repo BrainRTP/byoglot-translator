@@ -8,6 +8,7 @@ import {
 import {
   connectionItem,
   globalsItem,
+  profileOverridesItem,
   siteRulesItem,
   tabSettings,
   templatesItem,
@@ -23,6 +24,7 @@ describe("settings store", () => {
     expect(await globalsItem.getValue()).toEqual(initialGlobals(navigator.language));
     expect((await templatesItem.getValue()).map((t) => t.id)).toEqual([BUILTIN_TEMPLATE_ID]);
     expect(await siteRulesItem.getValue()).toEqual([]);
+    expect(await profileOverridesItem.getValue()).toEqual({});
     expect(await tabSettings(7).getValue()).toBeNull();
   });
 
@@ -43,6 +45,15 @@ describe("settings store", () => {
     await fakeBrowser.storage.local.set({ globals: { ...old, targetLang: "fr" } });
     const g = await globalsItem.getValue();
     expect(g.animation).toBe("fade");
+    expect(g.targetLang).toBe("fr");
+  });
+
+  it("reads globals saved before the language prompt with its defaults", async () => {
+    const { languagePromptEnabled: _on, languageProfile: _profile, ...old } = DEFAULT_GLOBALS;
+    await fakeBrowser.storage.local.set({ globals: { ...old, targetLang: "fr" } });
+    const g = await globalsItem.getValue();
+    expect(g.languagePromptEnabled).toBe(true);
+    expect(g.languageProfile).toBe("auto");
     expect(g.targetLang).toBe("fr");
   });
 

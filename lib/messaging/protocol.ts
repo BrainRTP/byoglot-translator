@@ -33,6 +33,19 @@ export type TemplateOp =
   | { type: "delete"; id: string }
   | { type: "resetBuiltin" };
 
+export type LanguageProfileView = {
+  id: string;
+  builtin: string;
+  text: string;
+  modified: boolean;
+  outdated: boolean;
+};
+
+export type ProfileOp =
+  | { type: "save"; id: string; text: string }
+  | { type: "reset"; id: string }
+  | { type: "keep"; id: string };
+
 export type RuleOp = { type: "upsert"; rule: SiteRule } | { type: "delete"; id: string };
 
 export type SelectionResult =
@@ -62,6 +75,8 @@ export interface ProtocolMap {
   templateOp(op: TemplateOp): Template[];
   rules(): SiteRule[];
   ruleOp(op: RuleOp): SiteRule[];
+  languageProfiles(): LanguageProfileView[];
+  languageProfileOp(op: ProfileOp): LanguageProfileView[];
   translateSelection(i: {
     text: string;
     context: string;

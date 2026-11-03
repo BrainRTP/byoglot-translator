@@ -47,6 +47,12 @@ body {
   color: var(--mu);
 }
 
+.fld[disabled] {
+  background: var(--sf);
+  border-color: var(--bd);
+  color: var(--mu);
+}
+
 .fld[aria-invalid="true"] {
   border-color: var(--er);
 }
@@ -99,4 +105,63 @@ textarea.fld {
 .fld.mono {
   font-family: var(--mono);
   font-size: 12px;
+}
+
+.chip {
+  font-size: 11px;
+  line-height: 16px;
+  border: 1px solid var(--bd2);
+  border-radius: 10px;
+  padding: 1px 8px;
+  color: var(--tx);
+  white-space: nowrap;
+  flex: none;
+}
+
+.sw {
+  width: 40px;
+  height: 24px;
+  border-radius: 12px;
+  border: 1px solid var(--bd2);
+  background: var(--bg);
+  position: relative;
+  padding: 0;
+  cursor: pointer;
+  flex: none;
+}
+
+.sw i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bd2);
+  transition: transform 0.15s;
+}
+
+.sw.on {
+  background: var(--ac);
+  border-color: var(--ac);
+}
+
+.sw.on i {
+  background: var(--acf);
+  transform: translateX(16px);
+}
+
+.sw:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+.dim {
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw i {
+    transition: none;
+  }
 }

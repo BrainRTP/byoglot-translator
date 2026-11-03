@@ -27,7 +27,12 @@ export type GlobalSettings = {
   selectionModel: ModelRef | null;
   defaultTemplateId: string;
   uiLang: "auto" | "ru" | "en";
+  languagePromptEnabled: boolean;
+  languageProfile: "auto" | string;
 };
+
+export type ProfileOverride = { text: string; base: string; savedAt: number };
+export type ProfileOverrides = Record<string, ProfileOverride>;
 
 export type SiteRule = { id: string; pattern: string; templateId: string };
 

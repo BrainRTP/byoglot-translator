@@ -86,6 +86,14 @@ Shortcuts on a non-Latin keyboard layout (for example Russian) have to be checke
 - Technical docs: "Keep function names, commands and file paths as they are. Keep IT terms in English and add the translation in brackets after the first use".
 - Casual tone: "Translate simply and briefly, as in a message between colleagues".
 
+## Language prompt
+
+Before the pre-prompt of your template, the extension sends the model a set of rules for the target language: how to avoid word-for-word calques and bureaucratic phrasing, which terms developers use, how to write headings. The rules live in language profiles. The extension ships a Russian profile and a generic one, which is used for every other target language. If the pre-prompt contradicts the language prompt, the model follows the pre-prompt. The language prompt applies to page translation and to selection translation.
+
+It is on by default. In the "Language prompt" section of the settings page you can switch it off, pick another profile or edit the text. "Reset to original" brings the built-in text back. If a new version of the extension changes a profile you edited, the settings page shows a notice and keeps your text.
+
+Missing your language, or want to improve a profile? See [CONTRIBUTING.md](CONTRIBUTING.md#language-profiles).
+
 ## How it works
 
 The background service worker holds the opencode address and token and is the only part that talks to opencode. It uses opencode's HTTP API: `GET /api/model` for the model list and `POST /api/experimental/generate/text` for one-shot generation without an agent session, so nothing appears in your opencode history.

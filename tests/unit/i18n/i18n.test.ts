@@ -53,6 +53,28 @@ describe("i18n", () => {
     }
   });
 
+  it("has language prompt keys in both languages", () => {
+    const keys = Object.keys(en).filter(
+      (k) => k.startsWith("opt.lp.") || k === "opt.nav.langprompt",
+    );
+    expect(keys.length).toBeGreaterThanOrEqual(27);
+    for (const k of keys) {
+      expect(ru).toHaveProperty(k);
+      expect(en[k as keyof typeof en].trim()).not.toBe("");
+    }
+  });
+
+  it("keeps the same placeholders in ru and en", () => {
+    const names = (v: string) => [...v.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
+    for (const k of Object.keys(en) as (keyof typeof en)[])
+      expect(names(ru[k]), k).toEqual(names(en[k]));
+  });
+
+  it("mentions the language prompt in the pre-prompt hint", () => {
+    expect(ru["opt.tpl.prePromptHint"]).toContain("после языкового промпта");
+    expect(en["opt.tpl.prePromptHint"]).toContain("after the language prompt");
+  });
+
   it("includes all error keys", () => {
     for (const k of [
       "offline",

@@ -1,0 +1,102 @@
+body {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.btn {
+  font-size: 13px;
+  height: auto;
+  min-height: 36px;
+  padding: 4px 14px;
+  line-height: 1.3;
+}
+
+.btn.sm {
+  min-height: 30px;
+  padding: 3px 10px;
+}
+
+.btn.dng {
+  color: var(--er);
+}
+
+.btn.pri.sm {
+  font-weight: 600;
+}
+
+.fld {
+  font: inherit;
+  font-size: 13px;
+  height: 36px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--bd2);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--tx);
+  padding: 0 10px;
+  text-overflow: ellipsis;
+}
+
+.fld:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+.fld.inh {
+  color: var(--mu);
+}
+
+.fld[aria-invalid="true"] {
+  border-color: var(--er);
+}
+
+textarea.fld {
+  height: auto;
+  padding: 10px;
+  line-height: 1.5;
+  resize: vertical;
+  display: block;
+}
+
+.lbl {
+  display: block;
+}
+
+.box {
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.note {
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--mu);
+}
+
+.note b {
+  color: var(--tx);
+  font-weight: 600;
+}
+
+.err {
+  color: var(--er);
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.mu {
+  color: var(--mu);
+}
+
+.small {
+  font-size: 12px;
+}
+
+.fld.mono {
+  font-family: var(--mono);
+  font-size: 12px;
+}

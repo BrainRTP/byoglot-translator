@@ -1,0 +1,43 @@
+{
+  "name": "opencode-translator",
+  "description": "Translate web pages through your local opencode server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@12.16.1",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox --mv3",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox --mv3",
+    "test": "vitest run",
+    "check": "tsc --noEmit && svelte-check && biome check .",
+    "e2e": "playwright test --project=mock",
+    "e2e:live": "OCT_LIVE=1 playwright test --project=live",
+    "icons": "node scripts/render-icons.mjs",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "@webext-core/messaging": "4.0.1",
+    "idb": "8.0.4",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.4",
+    "@playwright/test": "1.64.1",
+    "@wxt-dev/module-svelte": "2.0.5",
+    "fake-indexeddb": "6.2.7",
+    "happy-dom": "21.0.4",
+    "svelte": "5.57.3",
+    "svelte-check": "4.7.8",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.1.0",
+    "web-ext": "10.8.0",
+    "wxt": "0.21.5"
+  }
+}

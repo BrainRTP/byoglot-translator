@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Dynamic fixture</title>
+  </head>
+  <body>
+    <main id="content">
+      <p id="static">This paragraph exists before the translation starts.</p>
+    </main>
+    <script>
+      window.openModal = () => {
+        const dialog = document.createElement("div");
+        dialog.id = "modal";
+        dialog.setAttribute("role", "dialog");
+        const text = document.createElement("p");
+        text.id = "modal-text";
+        text.textContent = "Do you really want to leave this page now?";
+        dialog.append(text);
+        document.body.append(dialog);
+      };
+    </script>
+  </body>
+</html>

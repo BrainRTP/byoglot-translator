@@ -1,0 +1,80 @@
+import { browser } from "wxt/browser";
+import { createPageTranslator, shareInFlight } from "../lib/dom/page-translator";
+import { setUiLang } from "../lib/i18n";
+import { PAGE_PORT_NAME } from "../lib/messaging/page-port";
+import { onTabMessage, sendMessage } from "../lib/messaging/protocol";
+import { mountSelectionUi } from "../lib/selection/trigger";
+
+export default defineContentScript({
+  matches: ["<all_urls>"],
+  allFrames: true,
+  runAt: "document_idle",
+  main() {
+    // background resolves tab and hostname from the sender
+    const loadView = shareInFlight(() =>
+      sendMessage("tabView", { tabId: -1 }).then((v) => v.settings),
+    );
+
+    const isTop = window === window.top;
+
+    const translator = createPageTranslator({
+      doc: document,
+      connect: () => browser.runtime.connect({ name: PAGE_PORT_NAME }),
+      getDisplayMode: async () => (await loadView()).displayMode,
+      targetLang: async () => (await loadView()).targetLang,
+      detectLanguage: async (text) => {
+        const result = await browser.i18n.detectLanguage(text);
+        return { lang: result.languages[0]?.language ?? "und", reliable: result.isReliable };
+      },
+      onState: (state) => {
+        if (isTop) void sendMessage("pageBadge", state.state).catch(() => {});
+      },
+    });
+
+    // child frames must not answer: the first response wins, so a never-settling promise
+    // keeps them from shadowing the top frame
+    const silent = () => new Promise<never>(() => {});
+
+    onTabMessage("pageCommand", ({ data }) => {
+      const { state } = translator.state();
+      if (data === "stop") translator.stop();
+      else if (data === "restore") translator.restore();
+      else if (state === "idle" || state === "error") void translator.start();
+      else translator.restore();
+      return isTop ? translator.state() : silent();
+    });
+    if (isTop) onTabMessage("pageState", () => translator.state());
+
+    // content scripts cannot read globals, so the UI language follows the browser
+    setUiLang("auto");
+    const activeRequests = new Set<string>();
+    const cancelAll = () => {
+      const ids = [...activeRequests];
+      activeRequests.clear();
+      for (const id of ids) void sendMessage("cancelSelection", id).catch(() => {});
+    };
+    const selectionUi = mountSelectionUi(document, {
+      translate: (text, context, templateId) => {
+        const requestId = crypto.randomUUID();
+        activeRequests.add(requestId);
+        return sendMessage("translateSelection", {
+          text,
+          context,
+          hostname: location.hostname,
+          requestId,
+          ...(templateId !== undefined && { templateId }),
+        }).finally(() => activeRequests.delete(requestId));
+      },
+      cancel: cancelAll,
+      listTemplates: () => sendMessage("templates", undefined),
+      openSettings: () => void sendMessage("openOptions", undefined).catch(() => {}),
+      currentTemplateId: async () => (await loadView()).templateId,
+    });
+
+    // every frame registers; only the one holding a selection answers
+    onTabMessage("selectionCommand", () => {
+      if (!selectionUi.hasSelection()) return silent();
+      selectionUi.trigger();
+    });
+  },
+});

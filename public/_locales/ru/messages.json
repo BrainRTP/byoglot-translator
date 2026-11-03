@@ -1,0 +1,7 @@
+{
+  "extName": { "message": "opencode Переводчик" },
+  "extDescription": { "message": "Перевод веб-страниц через ваш локальный сервер opencode." },
+  "cmdTranslatePage": { "message": "Перевести страницу" },
+  "cmdTranslateSelection": { "message": "Перевести выделенный текст" },
+  "contextTranslateSelection": { "message": "Перевести выделенное" }
+}

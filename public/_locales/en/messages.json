@@ -1,0 +1,7 @@
+{
+  "extName": { "message": "opencode Translator" },
+  "extDescription": { "message": "Translate web pages through your local opencode server." },
+  "cmdTranslatePage": { "message": "Translate the page" },
+  "cmdTranslateSelection": { "message": "Translate the selection" },
+  "contextTranslateSelection": { "message": "Translate selection" }
+}

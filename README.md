@@ -61,7 +61,7 @@ Use this when you have no opencode but have an API key. The extension calls the 
 
 1. Choose a preset: DeepSeek, OpenRouter, Ollama, LM Studio or Custom URL. The preset fills in the base URL, and you can edit it.
 2. Paste the API key. Ollama and LM Studio do not need one.
-3. Click connect. The extension checks the provider's `/models` list and saves the connection only if the check passes.
+3. Click "Save". The extension checks the provider's `/models` list and saves the connection only if the check passes.
 
 When you add a provider, the browser asks for access to that provider's site. The extension does not ask for access to all sites at install time. `localhost` and `127.0.0.1` need no request, so local Ollama and LM Studio work on any port. If you refuse, the connection is not saved. When you delete a provider, the access is released unless another connection uses the same site.
 

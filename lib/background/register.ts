@@ -54,7 +54,10 @@ export function registerBackground(deps: BackgroundDeps): void {
   handle("status", () => handlers.status());
   handle("pair", (link) => handlers.pair(link));
   handle("connectManual", (conn) => handlers.connectManual(conn));
-  handle("disconnect", () => handlers.disconnect());
+  handle("connections", () => handlers.connections());
+  handle("saveProvider", (i) => handlers.saveProvider(i));
+  handle("activateConnection", (id) => handlers.activateConnection(id));
+  handle("removeConnection", (id) => handlers.removeConnection(id));
   handle("models", () => handlers.models());
   handle("tabView", (i, sender) => handlers.tabView(i, sender));
   handle("setTabSettings", (i) => handlers.setTabSettings(i));

@@ -66,7 +66,7 @@
               password,
             });
     } catch {
-      result = { state: "error", url: "", kind: "offline" };
+      result = { state: "error", url: "", kind: "offline", backend: "opencode" };
     }
     if (result.state === "connected") {
       connected = { version: result.version, host: hostOf(result.url) };

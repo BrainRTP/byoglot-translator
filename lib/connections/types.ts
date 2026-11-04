@@ -28,3 +28,5 @@ export type ConnectionView = {
   hasKey: boolean;
   active: boolean;
 };
+
+export type ConnectionKind = ConnectionRecord["kind"];

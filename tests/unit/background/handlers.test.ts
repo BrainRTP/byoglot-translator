@@ -6,7 +6,7 @@ import {
   type HandlerDeps,
   resolveStoredModel,
 } from "../../../lib/background/handlers";
-import { opencodeConnection as connectionItem } from "../../../lib/background/opencode-connection";
+import type { ConnectionRecord } from "../../../lib/connections/types";
 import { BackendError } from "../../../lib/opencode/errors";
 import type {
   Connection,
@@ -17,6 +17,7 @@ import type {
 import { BUILTIN_TEMPLATE_ID, DEFAULT_GLOBALS } from "../../../lib/settings/defaults";
 import { LANGUAGE_CODES } from "../../../lib/settings/languages";
 import {
+  connectionsStore,
   globalsItem,
   profileOverridesItem,
   siteRulesItem,
@@ -26,6 +27,7 @@ import {
 } from "../../../lib/settings/store";
 import type { Template } from "../../../lib/settings/types";
 import { BUILTIN_PROFILES, PROFILE_IDS } from "../../../lib/translate/profiles";
+import { OPENCODE_ID, seedOpencode, storedOpencode } from "./fixtures";
 
 const conn: Connection = { url: "http://127.0.0.1:4096", username: "opencode", password: "tok" };
 
@@ -56,15 +58,17 @@ function setup(backend: TranslationBackend = fakeBackend(), extra: Partial<Handl
     clear: vi.fn(async () => {}),
     stats: async () => ({ entries: 3 }),
   };
+  const removeOrigin = vi.fn(async (_origin: string) => {});
   const deps: HandlerDeps = {
     getBackend: async () => backend,
     createBackend: () => backend,
     pair: async () => conn,
+    removeOrigin,
     service: { translateSelection },
     cache,
     ...extra,
   };
-  return { handlers: createHandlers(deps), translateSelection, cache };
+  return { handlers: createHandlers(deps), translateSelection, cache, removeOrigin };
 }
 
 const ruTemplate: Template = {
@@ -209,8 +213,14 @@ describe("background handlers", () => {
     it("pair success stores the connection and initial models when pageModel is null", async () => {
       const { handlers } = setup();
       const status = await handlers.pair("http://127.0.0.1:4096/auth/connect/abc");
-      expect(status).toEqual({ state: "connected", url: conn.url, version: "2.1.0" });
-      expect(await connectionItem.getValue()).toEqual(conn);
+      expect(status).toEqual({
+        state: "connected",
+        kind: "opencode",
+        name: "opencode",
+        url: conn.url,
+        version: "2.1.0",
+      });
+      expect(await storedOpencode()).toEqual(conn);
       const g = await globalsItem.getValue();
       expect(g.pageModel).toEqual({
         providerID: "deepseek",
@@ -235,7 +245,7 @@ describe("background handlers", () => {
         }),
       );
       const pending = handlers.pair("http://127.0.0.1:4096/auth/connect/abc");
-      await vi.waitFor(async () => expect(await connectionItem.getValue()).toEqual(conn));
+      await vi.waitFor(async () => expect(await storedOpencode()).toEqual(conn));
       const mine: ModelRef = { providerID: "x", id: "y" };
       await handlers.setGlobals({ ...DEFAULT_GLOBALS, pageModel: mine, targetLang: "de" });
       release();
@@ -248,7 +258,7 @@ describe("background handlers", () => {
     it("pair keeps an existing pageModel", async () => {
       const { handlers } = setup();
       const mine: ModelRef = { providerID: "x", id: "y" };
-      await connectionItem.setValue(conn);
+      await seedOpencode(conn);
       await globalsItem.setValue({ ...DEFAULT_GLOBALS, pageModel: mine });
       await handlers.pair("http://127.0.0.1:4096/auth/connect/abc");
       expect((await globalsItem.getValue()).pageModel).toEqual({
@@ -269,7 +279,7 @@ describe("background handlers", () => {
         kind: "offline",
         url: "http://127.0.0.1:4096",
       });
-      expect(await connectionItem.getValue()).toBeNull();
+      expect(await storedOpencode()).toBeNull();
     });
 
     it("connectManual validates before storing", async () => {
@@ -283,19 +293,21 @@ describe("background handlers", () => {
         state: "error",
         kind: "unauthorized",
       });
-      expect(await connectionItem.getValue()).toBeNull();
+      expect(await storedOpencode()).toBeNull();
 
       const good = setup();
       expect((await good.handlers.connectManual(conn)).state).toBe("connected");
-      expect(await connectionItem.getValue()).toEqual(conn);
+      expect(await storedOpencode()).toEqual(conn);
     });
 
     it("status reports disconnected, connected and mapped errors", async () => {
       const { handlers } = setup();
       expect(await handlers.status()).toEqual({ state: "disconnected" });
-      await connectionItem.setValue(conn);
+      await seedOpencode(conn);
       expect(await handlers.status()).toEqual({
         state: "connected",
+        kind: "opencode",
+        name: "opencode",
         url: conn.url,
         version: "2.1.0",
       });
@@ -309,20 +321,21 @@ describe("background handlers", () => {
           },
         }),
       );
-      await connectionItem.setValue(conn);
+      await seedOpencode(conn);
       expect(await handlers.status()).toEqual({
         state: "error",
         url: conn.url,
         kind: "unauthorized",
+        backend: "opencode",
         retryAfterMs: undefined,
       });
     });
 
-    it("disconnect clears the connection", async () => {
+    it("removeConnection clears the connection", async () => {
       const { handlers } = setup();
-      await connectionItem.setValue(conn);
-      await handlers.disconnect();
-      expect(await connectionItem.getValue()).toBeNull();
+      await seedOpencode(conn);
+      expect(await handlers.removeConnection(OPENCODE_ID)).toEqual([]);
+      expect(await storedOpencode()).toBeNull();
     });
   });
 
@@ -377,7 +390,7 @@ describe("background handlers", () => {
 
     it("tabView flags a stale variant for the popup", async () => {
       const { handlers } = setup();
-      await connectionItem.setValue(conn);
+      await seedOpencode(conn);
       await globalsItem.setValue({
         ...DEFAULT_GLOBALS,
         pageModel: { providerID: "deepseek", id: "deepseek-flash", variant: "ultra" },
@@ -392,7 +405,7 @@ describe("background handlers", () => {
     const selectionModel = { providerID: "deepseek", id: "deepseek-flash", variant: "none" };
 
     beforeEach(async () => {
-      await connectionItem.setValue(conn);
+      await seedOpencode(conn);
     });
 
     it("translates with the sender tab settings and the selection model", async () => {
@@ -511,12 +524,12 @@ describe("background handlers", () => {
           { text: "hello", context: "", hostname: "example.com" },
           { tab: { id: 5, url: "https://example.com/" } },
         ),
-      ).toEqual({ error: "rate_limit", retryAfterMs: 1500 });
+      ).toEqual({ error: "rate_limit", retryAfterMs: 1500, backend: "opencode" });
     });
 
     it("returns unauthorized when not paired", async () => {
       const { handlers, translateSelection } = setup();
-      await connectionItem.setValue(null);
+      await seedOpencode(null);
       expect(
         await handlers.translateSelection(
           { text: "hello", context: "", hostname: "example.com" },
@@ -535,7 +548,7 @@ describe("background handlers", () => {
           { text: "hello", context: "", hostname: "example.com" },
           { tab: { id: 5 } },
         ),
-      ).toEqual({ error: "no_model" });
+      ).toEqual({ error: "no_model", backend: "opencode" });
       expect(translateSelection).not.toHaveBeenCalled();
     });
 
@@ -570,7 +583,7 @@ describe("background handlers", () => {
       expect(signal?.aborted).toBe(false);
       await handlers.cancelSelection("r1", { tab: { id: 5 } });
       expect(signal?.aborted).toBe(true);
-      expect(await pending).toEqual({ error: "aborted", retryAfterMs: undefined });
+      expect(await pending).toEqual({ error: "aborted", backend: "opencode" });
     });
 
     it("cancelling an unknown or finished request does nothing", async () => {
@@ -592,7 +605,7 @@ describe("background handlers", () => {
     };
 
     beforeEach(async () => {
-      await connectionItem.setValue(conn);
+      await seedOpencode(conn);
     });
 
     it("builds a job from the tab view", async () => {
@@ -646,7 +659,7 @@ describe("background handlers", () => {
 
     it("rejects with unauthorized when not paired", async () => {
       const { handlers } = setup();
-      await connectionItem.setValue(null);
+      await seedOpencode(null);
       await expect(handlers.pageJob({ tab: { id: 3 } }, req)).rejects.toMatchObject({
         kind: "unauthorized",
       });
@@ -711,8 +724,8 @@ describe("background handlers", () => {
       await handlers.connectManual(conn);
       const afterConnect = listModels.mock.calls.length;
       expect(afterConnect).toBeGreaterThan(1);
-      await handlers.disconnect();
-      await connectionItem.setValue(conn);
+      await handlers.removeConnection((await handlers.connections())[0]?.id as string);
+      await seedOpencode(conn);
       await view(handlers);
       expect(listModels.mock.calls.length).toBe(afterConnect + 1);
     });
@@ -785,7 +798,7 @@ describe("background handlers", () => {
     });
 
     it("selection and page jobs on another host also ignore stale tab settings", async () => {
-      await connectionItem.setValue(conn);
+      await seedOpencode(conn);
       const { handlers, translateSelection } = setup();
       const model = { providerID: "deepseek", id: "deepseek-flash", variant: "none" };
       await globalsItem.setValue({ ...DEFAULT_GLOBALS, selectionModel: model, pageModel: model });
@@ -1014,27 +1027,294 @@ describe("background handlers", () => {
   });
 });
 
-describe("createBackendProvider", () => {
+describe("connection operations", () => {
+  const ocModel: ModelInfo = { ...flash, providerID: "oc", id: "oc-model" };
+  const prModel: ModelInfo = { ...flash, providerID: "pr", id: "pr-model" };
+  const deepseek = {
+    preset: "deepseek" as const,
+    name: "DeepSeek",
+    baseUrl: "https://api.deepseek.com",
+    apiKey: "sk-secret",
+  };
+  const ollama = {
+    preset: "ollama" as const,
+    name: "Ollama",
+    baseUrl: "http://localhost:11434/v1",
+    apiKey: "",
+  };
+
+  function multi(infoImpl?: (rec: ConnectionRecord) => Promise<{ version: string }>) {
+    const info = vi.fn(async (rec: ConnectionRecord) => infoImpl?.(rec) ?? { version: "9.9" });
+    const createBackend = (rec: ConnectionRecord): TranslationBackend => {
+      const model = rec.kind === "opencode" ? ocModel : prModel;
+      return fakeBackend({
+        info: () => info(rec),
+        listModels: async () => [model],
+        defaultModel: async () => model,
+      });
+    };
+    const { handlers, removeOrigin } = setup(fakeBackend(), {
+      getBackend: createBackendProvider(createBackend),
+      createBackend,
+    });
+    return { handlers, removeOrigin, info };
+  }
+
+  async function saved(): Promise<ConnectionRecord[]> {
+    return connectionsStore.getAll();
+  }
+
   beforeEach(() => {
     fakeBrowser.reset();
   });
 
-  it("throws unauthorized without a connection", async () => {
-    const get = createBackendProvider(() => fakeBackend());
-    await expect(get()).rejects.toMatchObject({ kind: "unauthorized" });
+  it("a new provider becomes active and the list never carries its key", async () => {
+    const { handlers } = multi();
+    await handlers.connectManual(conn);
+    const res = await handlers.saveProvider(deepseek);
+    expect(res.status).toMatchObject({
+      state: "connected",
+      kind: "provider",
+      name: "DeepSeek",
+      url: "https://api.deepseek.com",
+      version: "9.9",
+    });
+    expect((await handlers.status()).state).toBe("connected");
+    expect(res.connections).toHaveLength(2);
+    expect(res.connections.find((c) => c.active)?.kind).toBe("provider");
+    expect(JSON.stringify(res.connections)).not.toContain("sk-secret");
+    expect(JSON.stringify(await handlers.connections())).not.toContain("sk-secret");
+    expect((await handlers.connections()).find((c) => c.kind === "provider")?.hasKey).toBe(true);
   });
 
-  it("caches per connection and recreates when it changes", async () => {
-    const create = vi.fn(() => fakeBackend());
-    const get = createBackendProvider(create);
-    await connectionItem.setValue(conn);
-    const a = await get();
-    expect(await get()).toBe(a);
-    expect(create).toHaveBeenCalledTimes(1);
+  it("switching connections keeps each pageModel", async () => {
+    const { handlers } = multi();
+    await handlers.connectManual(conn);
+    const ocRef = (await handlers.globals()).pageModel;
+    expect(ocRef).toMatchObject({ providerID: "oc", id: "oc-model" });
 
-    await connectionItem.setValue({ ...conn, password: "other" });
-    const b = await get();
-    expect(b).not.toBe(a);
-    expect(create).toHaveBeenCalledTimes(2);
+    const { connections } = await handlers.saveProvider(deepseek);
+    const prRef = (await handlers.globals()).pageModel;
+    expect(prRef).toMatchObject({ providerID: "pr", id: "pr-model" });
+
+    const ocId = connections.find((c) => c.kind === "opencode")?.id as string;
+    const prId = connections.find((c) => c.kind === "provider")?.id as string;
+    expect(await handlers.activateConnection(ocId)).toMatchObject({ kind: "opencode" });
+    expect((await handlers.globals()).pageModel).toEqual(ocRef);
+    expect(await handlers.activateConnection(prId)).toMatchObject({ kind: "provider" });
+    expect((await handlers.globals()).pageModel).toEqual(prRef);
+  });
+
+  it("changing the domain with an empty key is refused and nothing changes", async () => {
+    const { handlers, info, removeOrigin } = multi();
+    const { connections } = await handlers.saveProvider(deepseek);
+    const id = connections[0]?.id as string;
+    info.mockClear();
+    const before = await saved();
+
+    const res = await handlers.saveProvider({
+      ...deepseek,
+      id,
+      preset: "custom",
+      baseUrl: "https://evil.example/v1",
+      apiKey: "",
+    });
+    expect(res.status).toMatchObject({
+      state: "error",
+      kind: "provider_auth",
+      backend: "provider",
+    });
+    expect(info).not.toHaveBeenCalled();
+    expect(removeOrigin).not.toHaveBeenCalled();
+    expect(await saved()).toEqual(before);
+  });
+
+  it("an empty key on edit keeps the stored key and models", async () => {
+    const { handlers, info } = multi();
+    const { connections } = await handlers.saveProvider(deepseek);
+    const id = connections[0]?.id as string;
+    const modelsBefore = (await handlers.globals()).pageModel;
+
+    const res = await handlers.saveProvider({ ...deepseek, id, name: "Renamed", apiKey: "" });
+    expect(res.status).toMatchObject({ state: "connected", name: "Renamed" });
+    const [rec] = await saved();
+    expect(rec).toMatchObject({ kind: "provider", name: "Renamed", apiKey: "sk-secret" });
+    expect((await handlers.globals()).pageModel).toEqual(modelsBefore);
+    expect(info.mock.calls.at(-1)?.[0]).toMatchObject({ apiKey: "sk-secret" });
+  });
+
+  it("changing the origin with a new key revokes the old origin and keeps models", async () => {
+    const { handlers, removeOrigin } = multi();
+    const { connections } = await handlers.saveProvider(deepseek);
+    const id = connections[0]?.id as string;
+    const modelsBefore = (await handlers.globals()).pageModel;
+
+    const res = await handlers.saveProvider({
+      ...deepseek,
+      id,
+      preset: "custom",
+      baseUrl: "https://proxy.example/v1",
+      apiKey: "new",
+    });
+    expect(res.status.state).toBe("connected");
+    expect(removeOrigin).toHaveBeenCalledWith("https://api.deepseek.com");
+    expect((await handlers.globals()).pageModel).toEqual(modelsBefore);
+  });
+
+  it("does not revoke an origin another record still uses", async () => {
+    const { handlers, removeOrigin } = multi();
+    await handlers.saveProvider(deepseek);
+    const second = await handlers.saveProvider({ ...deepseek, name: "Second" });
+    const id = second.connections.find((c) => c.name === "Second")?.id as string;
+    await handlers.saveProvider({
+      ...deepseek,
+      id,
+      baseUrl: "https://proxy.example/v1",
+      preset: "custom",
+      apiKey: "k2",
+    });
+    expect(removeOrigin).not.toHaveBeenCalled();
+  });
+
+  it("a new provider without a key is refused when the preset needs one", async () => {
+    const { handlers, info } = multi();
+    const res = await handlers.saveProvider({ ...deepseek, apiKey: "" });
+    expect(res.status).toMatchObject({ state: "error", kind: "provider_auth" });
+    expect(info).not.toHaveBeenCalled();
+    expect(await saved()).toEqual([]);
+  });
+
+  it("a keyless local preset is accepted", async () => {
+    const { handlers } = multi();
+    const res = await handlers.saveProvider(ollama);
+    expect(res.status).toMatchObject({ state: "connected", kind: "provider" });
+    expect((await handlers.connections())[0]?.hasKey).toBe(false);
+  });
+
+  it("an invalid base URL gives incompatible and saves nothing", async () => {
+    const { handlers, info, removeOrigin } = multi();
+    const res = await handlers.saveProvider({ ...deepseek, preset: "custom", baseUrl: "nope" });
+    expect(res.status).toMatchObject({ state: "error", kind: "incompatible" });
+    expect(info).not.toHaveBeenCalled();
+    expect(removeOrigin).not.toHaveBeenCalled();
+    expect(await saved()).toEqual([]);
+  });
+
+  it("a failed check saves nothing and revokes a remote origin", async () => {
+    const { handlers, removeOrigin } = multi(async () => {
+      throw new BackendError("provider_auth");
+    });
+    const res = await handlers.saveProvider(deepseek);
+    expect(res.status).toMatchObject({
+      state: "error",
+      kind: "provider_auth",
+      backend: "provider",
+    });
+    expect(res.connections).toEqual([]);
+    expect(await saved()).toEqual([]);
+    expect(removeOrigin).toHaveBeenCalledWith("https://api.deepseek.com");
+  });
+
+  it("a failed check on a local origin does not revoke anything", async () => {
+    const { handlers, removeOrigin } = multi(async () => {
+      throw new BackendError("offline");
+    });
+    const res = await handlers.saveProvider(ollama);
+    expect(res.status).toMatchObject({ state: "error", kind: "offline" });
+    expect(removeOrigin).not.toHaveBeenCalled();
+  });
+
+  it("a failed check keeps the origin when another record uses it", async () => {
+    let fail = false;
+    const { handlers, removeOrigin } = multi(async () => {
+      if (fail) throw new BackendError("provider_auth");
+      return { version: "1" };
+    });
+    await handlers.saveProvider(deepseek);
+    fail = true;
+    await handlers.saveProvider({ ...deepseek, name: "Other" });
+    expect(removeOrigin).not.toHaveBeenCalled();
+    expect(await saved()).toHaveLength(1);
+  });
+
+  it("removing the active connection leaves nothing active", async () => {
+    const { handlers, removeOrigin } = multi();
+    await handlers.connectManual(conn);
+    const { connections } = await handlers.saveProvider(deepseek);
+    const prId = connections.find((c) => c.kind === "provider")?.id as string;
+
+    const left = await handlers.removeConnection(prId);
+    expect(left.map((c) => c.kind)).toEqual(["opencode"]);
+    expect(left.some((c) => c.active)).toBe(false);
+    expect(await handlers.status()).toEqual({ state: "disconnected" });
+    expect(await connectionsStore.getActiveId()).toBeNull();
+    expect(removeOrigin).toHaveBeenCalledWith("https://api.deepseek.com");
+    await expect(
+      handlers.pageJob(
+        { tab: { id: 1, url: "https://example.com/" } },
+        {
+          segments: [],
+          page: { title: "t", hostname: "example.com" },
+        },
+      ),
+    ).rejects.toMatchObject({ kind: "unauthorized" });
+  });
+
+  it("removing an inactive connection keeps the active one", async () => {
+    const { handlers, removeOrigin } = multi();
+    await handlers.connectManual(conn);
+    const first = await handlers.connections();
+    await handlers.saveProvider(ollama);
+    await handlers.activateConnection(first[0]?.id as string);
+    const prId = (await handlers.connections()).find((c) => c.kind === "provider")?.id as string;
+    const left = await handlers.removeConnection(prId);
+    expect(left).toHaveLength(1);
+    expect(left[0]?.active).toBe(true);
+    expect(removeOrigin).not.toHaveBeenCalled();
+  });
+
+  it("pair while a provider is active activates opencode without a second record", async () => {
+    const { handlers } = multi();
+    await handlers.connectManual(conn);
+    await handlers.saveProvider(deepseek);
+    const status = await handlers.pair("http://127.0.0.1:4096/auth/connect/abc");
+    expect(status).toMatchObject({ state: "connected", kind: "opencode" });
+    const list = await handlers.connections();
+    expect(list.filter((c) => c.kind === "opencode")).toHaveLength(1);
+    expect(list.find((c) => c.active)?.kind).toBe("opencode");
+  });
+
+  it("setTabSettings and templateOp stamp models with the active connection", async () => {
+    const { handlers } = multi();
+    await handlers.connectManual(conn);
+    const activeId = (await connectionsStore.getActiveId()) as string;
+    const mine: ModelRef = { providerID: "oc", id: "oc-model", variant: "high" };
+
+    const view = await handlers.tabView({ tabId: 1, hostname: "example.com" });
+    const next = await handlers.setTabSettings({
+      tabId: 1,
+      settings: { ...view.settings, pageModel: mine },
+    });
+    expect(next.settings.pageModel).toEqual({ ...mine, connectionId: activeId });
+    expect(next.pageModel.model).toEqual({ ...mine, connectionId: activeId });
+
+    const created = await handlers.templateOp({
+      type: "create",
+      name: "T",
+      settings: { pageModel: mine },
+    });
+    expect(created.find((t) => t.name === "T")?.settings.pageModel).toEqual({
+      ...mine,
+      connectionId: activeId,
+    });
+    const id = created.find((t) => t.name === "T")?.id as string;
+    const updated = await handlers.templateOp({
+      type: "update",
+      id,
+      patch: { settings: { selectionModel: mine } },
+    });
+    const t = updated.find((x) => x.id === id);
+    expect(t?.settings.selectionModel).toEqual({ ...mine, connectionId: activeId });
+    expect(t?.settings.pageModel).toBeUndefined();
   });
 });

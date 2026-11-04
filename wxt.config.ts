@@ -20,6 +20,7 @@ export default defineConfig({
     },
     permissions: ["storage", "activeTab", "contextMenus"],
     host_permissions: ["http://127.0.0.1/*", "http://localhost/*"],
+    optional_host_permissions: ["https://*/*", "http://*/*"],
     commands: {
       "translate-page": {
         suggested_key: { default: "Alt+Shift+T", mac: "Alt+A" },

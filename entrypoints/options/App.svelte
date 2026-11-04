@@ -300,7 +300,9 @@
   async function disconnect() {
     if (!confirm(tr("opt.connection.confirmDisconnect"))) return;
     try {
-      await sendMessage("disconnect", undefined);
+      const list = await sendMessage("connections", undefined);
+      const activeId = list.find((c) => c.active)?.id;
+      if (activeId) await sendMessage("removeConnection", activeId);
       status = { state: "disconnected" };
       models = [];
       mark("connection", true);

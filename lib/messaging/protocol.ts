@@ -1,4 +1,5 @@
 import { defineExtensionMessaging } from "@webext-core/messaging";
+import type { ConnectionKind, ConnectionView, ProviderPreset } from "../connections/types";
 import type { AnimationKind } from "../dom/effects/types";
 import type { BackendErrorKind, Connection, ModelInfo, ModelRef } from "../opencode/types";
 import type {
@@ -11,8 +12,22 @@ import type {
 
 export type Status =
   | { state: "disconnected" }
-  | { state: "connected"; url: string; version: string }
-  | { state: "error"; url: string; kind: BackendErrorKind; retryAfterMs?: number };
+  | { state: "connected"; kind: ConnectionKind; name: string; url: string; version: string }
+  | {
+      state: "error";
+      url: string;
+      kind: BackendErrorKind;
+      backend: ConnectionKind;
+      retryAfterMs?: number;
+    };
+
+export type ProviderInput = {
+  id?: string;
+  preset: ProviderPreset;
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+};
 
 export type ResolvedModel = { model: ModelRef | null; missing: boolean };
 
@@ -50,21 +65,24 @@ export type RuleOp = { type: "upsert"; rule: SiteRule } | { type: "delete"; id: 
 
 export type SelectionResult =
   | { text: string; sourceLang: string; targetLang: string; model: ModelRef }
-  | { error: BackendErrorKind; retryAfterMs?: number };
+  | { error: BackendErrorKind; retryAfterMs?: number; backend?: ConnectionKind };
 
 export type PageState = {
   state: "idle" | "translating" | "translated" | "error";
   done: number;
   total: number;
   failed: number;
-  error?: { kind: BackendErrorKind; retryAfterMs?: number };
+  error?: { kind: BackendErrorKind; retryAfterMs?: number; backend?: ConnectionKind };
 };
 
 export interface ProtocolMap {
   status(): Status;
   pair(link: string): Status;
   connectManual(c: Connection): Status;
-  disconnect(): void;
+  connections(): ConnectionView[];
+  saveProvider(i: ProviderInput): { status: Status; connections: ConnectionView[] };
+  activateConnection(id: string): Status;
+  removeConnection(id: string): ConnectionView[];
   models(): ModelInfo[];
   tabView(i: { tabId: number; hostname?: string }): TabView;
   setTabSettings(i: { tabId: number; settings: EffectiveSettings }): TabView;

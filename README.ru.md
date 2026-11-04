@@ -108,6 +108,7 @@ pnpm dev            # Chrome с горячей перезагрузкой
 pnpm dev:firefox    # Firefox
 pnpm build          # сборка Chrome в dist/chrome-mv3
 pnpm build:firefox  # сборка Firefox в dist/firefox-mv3
+pnpm zip && pnpm zip:firefox  # архивы для магазинов и архив исходников для Firefox в dist/
 pnpm test           # юнит-тесты (Vitest)
 pnpm check          # tsc, svelte-check, biome
 pnpm icons          # пересобрать public/icon из docs/design/icon/svg
@@ -119,6 +120,8 @@ pnpm build && pnpm e2e:live   # живой тест с реальным opencode
 `pnpm e2e:live` не входит в `pnpm e2e`. Он подключается к локальному opencode через `opencode api POST /api/pair`, использует модель `deepseek/deepseek-flash` и стоит немного. Скриншоты сохраняются в `/tmp/byoglot-live/`.
 
 Линт Firefox-сборки: `npx web-ext lint --source-dir dist/firefox-mv3`.
+
+CI на каждый push и pull request запускает `check`, `test`, обе сборки, линт Firefox и e2e с поддельным opencode. Тег вида `v0.2.6` (он должен совпадать с версией в `package.json`) собирает архивы и прикладывает их к релизу на GitHub.
 
 ## Известные ограничения
 

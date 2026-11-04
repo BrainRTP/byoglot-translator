@@ -1,6 +1,6 @@
 {
   "name": "byoglot-translator",
-  "description": "Translate web pages through your local opencode server",
+  "description": "Translate pages and selected text with your own model and prompts, through your local opencode",
   "version": "0.2.7",
   "private": true,
   "type": "module",

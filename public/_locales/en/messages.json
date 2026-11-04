@@ -1,6 +1,8 @@
 {
   "extName": { "message": "ByoGlot Translator" },
-  "extDescription": { "message": "Translate web pages through your local opencode server." },
+  "extDescription": {
+    "message": "Translate pages and selected text with your own model and prompts, through your local opencode."
+  },
   "cmdTranslatePage": { "message": "Translate the page" },
   "cmdTranslateSelection": { "message": "Translate the selection" },
   "contextTranslateSelection": { "message": "Translate selection" }

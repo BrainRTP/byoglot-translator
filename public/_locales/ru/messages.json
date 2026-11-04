@@ -1,6 +1,8 @@
 {
   "extName": { "message": "ByoGlot Переводчик" },
-  "extDescription": { "message": "Перевод веб-страниц через ваш локальный сервер opencode." },
+  "extDescription": {
+    "message": "Перевод страниц и выделенного текста своей моделью и по своим инструкциям через локальный opencode."
+  },
   "cmdTranslatePage": { "message": "Перевести страницу" },
   "cmdTranslateSelection": { "message": "Перевести выделенный текст" },
   "contextTranslateSelection": { "message": "Перевести выделенное" }

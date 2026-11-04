@@ -3,6 +3,7 @@ import { migrateLegacy } from "../connections/migrate";
 import type { ConnectionModels, ConnectionRecord, OpencodeData } from "../connections/types";
 import type { ModelRef } from "../opencode/types";
 import { builtinTemplate, DEFAULT_GLOBALS, initialGlobals } from "./defaults";
+import { ownModel } from "./effective";
 import type {
   EffectiveSettings,
   GlobalSettings,
@@ -90,7 +91,7 @@ export const connectionsStore = {
 };
 
 function stampRef(ref: ModelRef | null, connectionId: string): ModelRef | null {
-  return ref ? { ...ref, connectionId: ref.connectionId ?? connectionId } : null;
+  return ref ? { ...ref, connectionId } : null;
 }
 
 // The two model fields live in the active connection record; everything else stays in globals.
@@ -100,8 +101,8 @@ export const globalsItem = {
     return {
       ...DEFAULT_GLOBALS,
       ...(await rawGlobals.getValue()),
-      pageModel: active?.pageModel ?? null,
-      selectionModel: active?.selectionModel ?? null,
+      pageModel: ownModel(active?.pageModel, active?.id ?? null),
+      selectionModel: ownModel(active?.selectionModel, active?.id ?? null),
     };
   },
   async setValue(value: GlobalSettings): Promise<void> {

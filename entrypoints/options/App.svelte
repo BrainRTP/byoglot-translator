@@ -303,17 +303,22 @@
     void browser.tabs.create({ url: browser.runtime.getURL("/onboarding.html") });
   }
 
-  async function refreshStatus() {
-    status = await sendMessage("status", undefined);
-    models = status.state === "connected" ? await loadModels() : [];
+  async function refreshStatus(known?: Status) {
+    status = known ?? (await sendMessage("status", undefined));
+    const [g, list] = await Promise.all([
+      sendMessage("globals", undefined),
+      status.state === "connected" ? loadModels() : Promise.resolve([] as ModelInfo[]),
+    ]);
+    globals = g;
+    models = list;
   }
 
   async function useConnection(id: string) {
     busyId = id;
     try {
-      status = await sendMessage("activateConnection", id);
+      const next = await sendMessage("activateConnection", id);
       connections = await sendMessage("connections", undefined);
-      models = status.state === "connected" ? await loadModels() : [];
+      await refreshStatus(next);
       mark("connection", true);
     } catch {
       mark("connection", false);

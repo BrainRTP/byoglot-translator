@@ -71,4 +71,15 @@ describe("connection list helpers", () => {
     expect(originInUse(list, "https://api.deepseek.com", "p")).toBe(false);
     expect(originInUse(list, "https://openrouter.ai")).toBe(false);
   });
+
+  it("originInUse ignores ports like permission patterns do", () => {
+    const local = (id: string, port: number): ConnectionRecord => ({
+      ...pr,
+      id,
+      baseUrl: `http://192.168.1.5:${port}/v1`,
+    });
+    const list = [local("a", 11434), local("b", 1234)];
+    expect(originInUse(list, "http://192.168.1.5:11434", "a")).toBe(true);
+    expect(originInUse([local("a", 11434)], "http://192.168.1.5:11434", "a")).toBe(false);
+  });
 });

@@ -42,10 +42,11 @@ function recordUrl(rec: ConnectionRecord): string {
 }
 
 export function originInUse(list: ConnectionRecord[], origin: string, exceptId?: string): boolean {
+  const pattern = originPattern(origin);
   return list.some((rec) => {
     if (rec.id === exceptId) return false;
     try {
-      return originOf(recordUrl(rec)) === origin;
+      return originPattern(recordUrl(rec)) === pattern;
     } catch {
       return false;
     }

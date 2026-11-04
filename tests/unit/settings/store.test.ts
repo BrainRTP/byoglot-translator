@@ -219,7 +219,7 @@ describe("settings store", () => {
       expect(g.selectionModel).toBeNull();
     });
 
-    it("writes models into the active record and stamps missing connectionId", async () => {
+    it("writes models into the active record and stamps the active connectionId", async () => {
       await connectionsStore.setAll([rec]);
       await connectionsStore.setActiveId("a");
       await globalsItem.setValue({
@@ -230,11 +230,35 @@ describe("settings store", () => {
       });
       const active = await connectionsStore.getActive();
       expect(active?.pageModel).toEqual({ providerID: "d", id: "n", connectionId: "a" });
-      expect(active?.selectionModel).toEqual({ providerID: "d", id: "s", connectionId: "keep" });
+      expect(active?.selectionModel).toEqual({ providerID: "d", id: "s", connectionId: "a" });
       const raw = await fakeBrowser.storage.local.get("globals");
       expect(raw.globals).not.toHaveProperty("pageModel");
       expect(raw.globals).not.toHaveProperty("selectionModel");
       expect((await globalsItem.getValue()).targetLang).toBe("de");
+    });
+
+    it("returns only models owned by the active connection", async () => {
+      await connectionsStore.setAll([
+        { ...rec, pageModel: { providerID: "d", id: "m", connectionId: "other" } },
+      ]);
+      await connectionsStore.setActiveId("a");
+      const g = await globalsItem.getValue();
+      expect(g.pageModel).toBeNull();
+    });
+
+    it("re-stamps a foreign connectionId to the active one on write", async () => {
+      await connectionsStore.setAll([rec]);
+      await connectionsStore.setActiveId("a");
+      await globalsItem.setValue({
+        ...DEFAULT_GLOBALS,
+        pageModel: { providerID: "d", id: "n", variant: "high", connectionId: "old" },
+      });
+      expect((await globalsItem.getValue()).pageModel).toEqual({
+        providerID: "d",
+        id: "n",
+        variant: "high",
+        connectionId: "a",
+      });
     });
 
     it("drops models when there is no active connection", async () => {

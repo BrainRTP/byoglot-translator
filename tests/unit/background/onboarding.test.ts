@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { registerOnboarding } from "../../../lib/background/onboarding";
-import { connectionItem } from "../../../lib/settings/store";
+import { opencodeConnection as connectionItem } from "../../../lib/background/opencode-connection";
 
 type Listener = (details: { reason: string }) => Promise<void>;
 

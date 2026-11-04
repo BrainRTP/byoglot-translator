@@ -1,7 +1,7 @@
 import type { TranslationCache } from "../cache/cache";
 import { BackendError } from "../opencode/errors";
 import type { Connection, TranslationBackend } from "../opencode/types";
-import { connectionItem } from "../settings/store";
+import { opencodeConnection } from "./opencode-connection";
 
 function sameConnection(a: Connection, b: Connection): boolean {
   return a.url === b.url && a.username === b.username && a.password === b.password;
@@ -12,7 +12,7 @@ export function createBackendProvider(
 ): () => Promise<TranslationBackend> {
   let cached: { conn: Connection; backend: TranslationBackend } | null = null;
   return async () => {
-    const conn = await connectionItem.getValue();
+    const conn = await opencodeConnection.getValue();
     if (!conn) {
       cached = null;
       throw new BackendError("unauthorized");

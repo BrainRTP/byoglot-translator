@@ -25,7 +25,6 @@ import {
 } from "../settings/language-prompt";
 import { isValidPattern, matchSiteRule } from "../settings/site-rules";
 import {
-  connectionItem,
   globalsItem,
   profileOverridesItem,
   siteRulesItem,
@@ -50,6 +49,7 @@ import type {
 } from "../settings/types";
 import { BUILTIN_PROFILES, PROFILE_IDS } from "../translate/profiles";
 import type { createTranslationService, PageJob, Segment } from "../translate/service";
+import { opencodeConnection } from "./opencode-connection";
 
 export interface HandlerDeps {
   getBackend(): Promise<TranslationBackend>;
@@ -196,7 +196,7 @@ export function createHandlers(deps: HandlerDeps) {
   }
 
   async function status(): Promise<Status> {
-    const conn = await connectionItem.getValue();
+    const conn = await opencodeConnection.getValue();
     if (!conn) return { state: "disconnected" };
     try {
       const info = await (await deps.getBackend()).info();
@@ -225,7 +225,7 @@ export function createHandlers(deps: HandlerDeps) {
     key: "pageModel" | "selectionModel",
     templateOverride?: string,
   ): Promise<{ view: TabView; model: ModelRef }> {
-    if (!(await connectionItem.getValue())) throw new BackendError("unauthorized");
+    if (!(await opencodeConnection.getValue())) throw new BackendError("unauthorized");
     let view = await resolveView(tabId, hostname, templateOverride);
     if (!view[key].model) {
       await initModels();
@@ -238,7 +238,7 @@ export function createHandlers(deps: HandlerDeps) {
 
   async function saveConnection(conn: Connection): Promise<Status> {
     modelsCache = null;
-    await connectionItem.setValue(conn);
+    await opencodeConnection.setValue(conn);
     await initModels();
     return status();
   }
@@ -360,7 +360,7 @@ export function createHandlers(deps: HandlerDeps) {
 
     async disconnect(): Promise<void> {
       modelsCache = null;
-      await connectionItem.setValue(null);
+      await opencodeConnection.setValue(null);
     },
 
     models: fetchModels,

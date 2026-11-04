@@ -6,6 +6,7 @@ import {
   type HandlerDeps,
   resolveStoredModel,
 } from "../../../lib/background/handlers";
+import { opencodeConnection as connectionItem } from "../../../lib/background/opencode-connection";
 import { BackendError } from "../../../lib/opencode/errors";
 import type {
   Connection,
@@ -16,7 +17,6 @@ import type {
 import { BUILTIN_TEMPLATE_ID, DEFAULT_GLOBALS } from "../../../lib/settings/defaults";
 import { LANGUAGE_CODES } from "../../../lib/settings/languages";
 import {
-  connectionItem,
   globalsItem,
   profileOverridesItem,
   siteRulesItem,
@@ -216,6 +216,7 @@ describe("background handlers", () => {
         providerID: "deepseek",
         id: "deepseek-flash",
         variant: "none",
+        connectionId: expect.any(String),
       });
       expect(g.selectionModel).toEqual(g.pageModel);
     });
@@ -240,16 +241,17 @@ describe("background handlers", () => {
       release();
       await pending;
       const g = await globalsItem.getValue();
-      expect(g.pageModel).toEqual(mine);
+      expect(g.pageModel).toEqual(expect.objectContaining(mine));
       expect(g.targetLang).toBe("de");
     });
 
     it("pair keeps an existing pageModel", async () => {
       const { handlers } = setup();
       const mine: ModelRef = { providerID: "x", id: "y" };
+      await connectionItem.setValue(conn);
       await globalsItem.setValue({ ...DEFAULT_GLOBALS, pageModel: mine });
       await handlers.pair("http://127.0.0.1:4096/auth/connect/abc");
-      expect((await globalsItem.getValue()).pageModel).toEqual(mine);
+      expect((await globalsItem.getValue()).pageModel).toEqual(expect.objectContaining(mine));
     });
 
     it("pair failure returns an error status and stores nothing", async () => {
@@ -352,6 +354,7 @@ describe("background handlers", () => {
 
     it("tabView flags a stale variant for the popup", async () => {
       const { handlers } = setup();
+      await connectionItem.setValue(conn);
       await globalsItem.setValue({
         ...DEFAULT_GLOBALS,
         pageModel: { providerID: "deepseek", id: "deepseek-flash", variant: "ultra" },
@@ -380,12 +383,12 @@ describe("background handlers", () => {
         text: "privet",
         sourceLang: "auto",
         targetLang: expect.any(String),
-        model: selectionModel,
+        model: { ...selectionModel, connectionId: expect.any(String) },
       });
       const call = translateSelection.mock.calls[0] as unknown as [
         { model: ModelRef; hostname: string; settings: { targetLang: string } },
       ];
-      expect(call[0].model).toEqual(selectionModel);
+      expect(call[0].model).toEqual({ ...selectionModel, connectionId: expect.any(String) });
       expect(call[0].hostname).toBe("example.com");
     });
 
@@ -574,7 +577,7 @@ describe("background handlers", () => {
       const pageModel = { providerID: "deepseek", id: "deepseek-flash", variant: "none" };
       await globalsItem.setValue({ ...DEFAULT_GLOBALS, pageModel });
       const job = await handlers.pageJob({ tab: { id: 3, url: "https://example.com/" } }, req);
-      expect(job?.model).toEqual(pageModel);
+      expect(job?.model).toEqual({ ...pageModel, connectionId: expect.any(String) });
       expect(job?.segments).toEqual(req.segments);
       expect(job?.page).toEqual(req.page);
     });

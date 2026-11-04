@@ -1,0 +1,32 @@
+# Weekly version updates. Minor and patch bumps come grouped, majors come one by one.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # pnpm refuses too fresh releases, so wait a few days before proposing them.
+    cooldown:
+      default-days: 3
+    groups:
+      dev-minor:
+        dependency-type: development
+        update-types: [minor, patch]
+      prod-minor:
+        dependency-type: production
+        update-types: [minor, patch]
+    commit-message:
+      prefix: chore
+      include: scope
+    labels: [dependencies, area:infra]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+    labels: [dependencies, area:infra]

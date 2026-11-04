@@ -121,6 +121,7 @@ pnpm dev                     # Chromium with hot reload
 pnpm dev:firefox             # Firefox
 pnpm build                   # dist/chrome-mv3
 pnpm build:firefox           # dist/firefox-mv3
+pnpm zip && pnpm zip:firefox # store zips and the Firefox sources zip in dist/
 pnpm test                    # unit tests (Vitest)
 pnpm check                   # tsc, svelte-check, biome
 pnpm icons                   # rebuild public/icon from docs/design/icon/svg
@@ -132,6 +133,8 @@ pnpm build && pnpm e2e:live  # live test with your opencode on Wikipedia
 `pnpm e2e:live` is never part of `pnpm e2e`. It pairs with your local opencode, translates https://wikipedia.org/wiki/Node.js with `deepseek/deepseek-flash` and has a small cost. Screenshots go to `/tmp/byoglot-live/`.
 
 Lint the Firefox build with `npx web-ext lint --source-dir dist/firefox-mv3`.
+
+CI runs `check`, `test`, both builds, the Firefox lint and the mock e2e on every push and pull request. Pushing a tag like `v0.2.6` (it has to match the version in `package.json`) builds the zips and attaches them to a GitHub release.
 
 The stack: WXT, Svelte 5, TypeScript 7 (svelte-check runs on TypeScript 6 through `.pnpmfile.cjs`, because it does not support 7 yet), Zod, idb, Vitest, Playwright, Biome. The translation quality stand that tunes the prompts lives in `tests/quality/`, see [CONTRIBUTING.md](CONTRIBUTING.md#checking-a-profile-with-the-quality-stand).
 

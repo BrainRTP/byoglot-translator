@@ -33,7 +33,7 @@ export default defineConfig({
     ...(browser === "firefox" && {
       browser_specific_settings: {
         gecko: {
-          id: "byoglot-translator@local",
+          id: "byoglot-translator@brainrtp",
           // The built-in data consent needs Firefox 140.
           strict_min_version: "140.0",
           data_collection_permissions: { required: ["websiteContent", "browsingActivity"] },

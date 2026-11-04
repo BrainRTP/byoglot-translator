@@ -1,0 +1,8 @@
+{
+  "error": {
+    "message": "Authentication Fails, Your api key: ****-bad is invalid (request_id: 744d1a56-aee7-4302-a4e5-12a6876413e2)",
+    "type": "authentication_error",
+    "param": null,
+    "code": "invalid_request_error"
+  }
+}

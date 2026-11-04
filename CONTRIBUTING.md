@@ -2,6 +2,8 @@
 
 For code changes, set the project up as described under "Development" in [README.md](README.md). `pnpm test` and `pnpm check` must pass before you send a pull request.
 
+Bugs, feature requests and language profiles have their own issue forms. A pull request title follows [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `chore:` and so on), because pull requests are squash-merged and the title becomes the commit message.
+
 The rest of this file covers language profiles, the translation rules for one language.
 
 ## Language profiles

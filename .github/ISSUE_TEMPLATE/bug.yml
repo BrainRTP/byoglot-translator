@@ -1,0 +1,57 @@
+name: Bug report
+description: Something in the extension does not work as described
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did and what went wrong.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open https://...
+        2. Click "Translate page"
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Extension version
+      description: Shown on chrome://extensions or about:addons.
+      placeholder: "0.2.7"
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and its version
+      placeholder: "Chrome 142"
+    validations:
+      required: true
+  - type: input
+    id: backend
+    attributes:
+      label: opencode version, model and effort
+      placeholder: "opencode 2.2.5, deepseek/deepseek-flash, none"
+  - type: input
+    id: url
+    attributes:
+      label: Page address
+      description: Optional. Leave it out if the page is private.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Screenshots or console errors
+      description: Errors from the page console or from the service worker console ("Inspect views" on chrome://extensions). Never paste your opencode token or a provider key.

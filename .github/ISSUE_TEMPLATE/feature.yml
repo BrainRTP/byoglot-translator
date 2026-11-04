@@ -1,0 +1,23 @@
+name: Feature request
+description: Propose a change or a new feature
+labels: [enhancement]
+body:
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: The problem, or what you cannot do today.
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What
+      description: What should change. Concrete behaviour helps more than a general wish.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: Optional. How we will know it works.

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { registerOnboarding } from "../../../lib/background/onboarding";
-import { connectionItem } from "../../../lib/settings/store";
+import { seedOpencode } from "./fixtures";
 
 type Listener = (details: { reason: string }) => Promise<void>;
 
@@ -16,7 +16,7 @@ describe("registerOnboarding", () => {
       onInstalled = cb as unknown as Listener;
     });
     vi.spyOn(fakeBrowser.tabs, "create").mockImplementation(create);
-    await connectionItem.setValue(null);
+    await seedOpencode(null);
     registerOnboarding();
   });
 
@@ -32,7 +32,7 @@ describe("registerOnboarding", () => {
   });
 
   it("does nothing on install when already connected", async () => {
-    await connectionItem.setValue({
+    await seedOpencode({
       url: "http://127.0.0.1:1",
       username: "opencode",
       password: "t",

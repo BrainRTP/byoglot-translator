@@ -24,6 +24,37 @@ export type Seed = {
 const FLASH = { providerID: "deepseek", id: "deepseek-flash", variant: "none" };
 
 export async function seedConnection(worker: Worker, seed: Seed): Promise<void> {
+  const id = "e2e-opencode";
+  const model = { ...(seed.pageModel ?? FLASH), connectionId: id };
+  await worker.evaluate(
+    (s) =>
+      chrome.storage.local.set({
+        connections: [
+          {
+            id: s.id,
+            kind: "opencode",
+            url: s.url,
+            username: "opencode",
+            password: s.token,
+            pageModel: s.model,
+            selectionModel: s.model,
+          },
+        ],
+        activeConnectionId: s.id,
+        globals: {
+          sourceLang: "auto",
+          targetLang: "ru",
+          displayMode: "replace",
+          defaultTemplateId: "builtin-default",
+          uiLang: "en",
+        },
+      }),
+    { id, url: seed.url, token: seed.token, model },
+  );
+}
+
+/** The storage layout of 0.2.7 and earlier, which the extension migrates on first read. */
+export async function seedLegacyConnection(worker: Worker, seed: Seed): Promise<void> {
   const model = seed.pageModel ?? FLASH;
   await worker.evaluate(
     (s) =>
@@ -67,4 +98,41 @@ export async function openPopup(ext: Extension, target: Page): Promise<Page> {
   );
   await popup.goto(`chrome-extension://${ext.id}/popup.html`);
   return popup;
+}
+
+export async function seedProvider(worker: Worker, seed: { url: string; key: string }) {
+  await worker.evaluate(
+    (s) => {
+      const id = "e2e-provider";
+      const model = {
+        connectionId: id,
+        providerID: "custom",
+        id: "deepseek-flash",
+        variant: "none",
+      };
+      return chrome.storage.local.set({
+        connections: [
+          {
+            id,
+            kind: "provider",
+            name: "Custom",
+            preset: "custom",
+            baseUrl: s.url,
+            apiKey: s.key,
+            pageModel: model,
+            selectionModel: model,
+          },
+        ],
+        activeConnectionId: id,
+        globals: {
+          sourceLang: "auto",
+          targetLang: "ru",
+          displayMode: "replace",
+          defaultTemplateId: "builtin-default",
+          uiLang: "en",
+        },
+      });
+    },
+    { url: seed.url, key: seed.key },
+  );
 }

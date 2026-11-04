@@ -35,7 +35,8 @@ function fakePort() {
   };
 }
 
-const handlersWith = (pageJob: () => Promise<PageJob>) => ({ pageJob }) as unknown as Handlers;
+const handlersWith = (pageJob: () => Promise<PageJob>, kind?: "opencode" | "provider") =>
+  ({ pageJob, activeKind: async () => kind }) as unknown as Handlers;
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 describe("attachPagePort", () => {
@@ -91,6 +92,36 @@ describe("attachPagePort", () => {
     send(translate);
     await tick();
     expect(sent[0]).toEqual({ type: "fatal", jobId: "j1", kind: "rate_limit", retryAfterMs: 900 });
+  });
+
+  it("tags fatal errors with the active connection kind", async () => {
+    const { port, sent, send } = fakePort();
+    attachPagePort(
+      port,
+      handlersWith(async () => {
+        throw new BackendError("provider_auth");
+      }, "provider"),
+      { translatePage: vi.fn(async () => {}) },
+    );
+    send(translate);
+    await tick();
+    expect(sent[0]).toMatchObject({ type: "fatal", kind: "provider_auth", backend: "provider" });
+  });
+
+  it("posts a service fatal with its backend before done", async () => {
+    const { port, sent, send } = fakePort();
+    const translatePage = vi.fn(async (_j: PageJob, cb: PageCallbacks) => {
+      cb.onFatal(new BackendError("rate_limit"));
+    });
+    attachPagePort(
+      port,
+      handlersWith(async () => job, "provider"),
+      { translatePage },
+    );
+    send(translate);
+    await tick();
+    expect(sent.map((m) => m.type)).toEqual(["fatal", "done"]);
+    expect(sent[0]).toMatchObject({ kind: "rate_limit", backend: "provider" });
   });
 
   it("aborts on abort message and skips done", async () => {

@@ -1,4 +1,6 @@
-export type ModelRef = { providerID: string; id: string; variant?: string };
+import type { OpencodeData } from "../connections/types";
+
+export type ModelRef = { providerID: string; id: string; variant?: string; connectionId?: string };
 
 export type ModelInfo = {
   providerID: string;
@@ -11,7 +13,7 @@ export type ModelInfo = {
 
 export type ServerInfo = { version: string };
 
-export type Connection = { url: string; username: string; password: string };
+export type Connection = OpencodeData;
 
 export type BackendErrorKind =
   | "offline"

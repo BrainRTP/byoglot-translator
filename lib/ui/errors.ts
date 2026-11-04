@@ -1,3 +1,4 @@
+import type { ConnectionKind } from "../connections/types";
 import { formatRetryAfter, type MessageKey, resolveLang, t } from "../i18n";
 import type { BackendErrorKind } from "../opencode/types";
 
@@ -52,6 +53,18 @@ const ACTIONS: Record<PresentableKind, ErrorAction> = {
   no_model: "chooseModel",
 };
 
+const PROVIDER_TITLES: Partial<Record<PresentableKind, MessageKey>> = {
+  offline: "provider.offline.title",
+  incompatible: "provider.incompatible.title",
+  provider_auth: "provider.auth.title",
+};
+
+const PROVIDER_BODIES: Partial<Record<PresentableKind, Record<ErrorSurface, MessageKey>>> = {
+  offline: { popup: "provider.offlineBody", card: "provider.offline" },
+  incompatible: { popup: "provider.incompatible", card: "provider.incompatible" },
+  provider_auth: { popup: "provider.auth", card: "provider.auth" },
+};
+
 export function resetClock(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString(resolveLang(), {
     hour: "2-digit",
@@ -75,13 +88,16 @@ export function describeError(
   surface: ErrorSurface,
   retryAfterMs?: number,
   now: number = Date.now(),
+  backend: ConnectionKind = "opencode",
 ): ErrorPresentation {
+  const provider = backend === "provider";
+  const title = (provider && PROVIDER_TITLES[kind]) || TITLES[kind];
+  const bodyKey = (provider && PROVIDER_BODIES[kind]?.[surface]) || BODIES[kind][surface];
   return {
     tone: kind === "rate_limit" ? "wn" : "er",
-    title: t(TITLES[kind]),
-    body:
-      kind === "rate_limit" ? rateLimitBody(surface, retryAfterMs, now) : t(BODIES[kind][surface]),
-    hint: HINTS[kind],
+    title: t(title),
+    body: kind === "rate_limit" ? rateLimitBody(surface, retryAfterMs, now) : t(bodyKey),
+    hint: provider ? undefined : HINTS[kind],
     action: ACTIONS[kind],
   };
 }

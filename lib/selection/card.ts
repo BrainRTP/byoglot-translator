@@ -1,3 +1,4 @@
+import type { ConnectionKind } from "../connections/types";
 import { resolveLang, t } from "../i18n";
 import type { BackendErrorKind, ModelRef } from "../opencode/types";
 import type { Template } from "../settings/types";
@@ -7,7 +8,7 @@ import { attachWindow, type WindowShell } from "./window";
 
 export type SelectionTranslation =
   | { text: string; sourceLang?: string; targetLang?: string; model?: ModelRef }
-  | { error: BackendErrorKind; retryAfterMs?: number };
+  | { error: BackendErrorKind; retryAfterMs?: number; backend?: ConnectionKind };
 
 export type CardDeps = {
   translate(text: string, context: string, templateId?: string): Promise<SelectionTranslation>;
@@ -24,7 +25,7 @@ export type CardRequest = { text: string; context: string; anchor: Anchor };
 type State =
   | { kind: "loading" }
   | { kind: "result"; text: string; langs: string; model: string }
-  | { kind: "error"; error: BackendErrorKind; retryAfterMs?: number };
+  | { kind: "error"; error: BackendErrorKind; retryAfterMs?: number; backend?: ConnectionKind };
 
 export type CardMode = "oneshot" | "pinned";
 
@@ -83,8 +84,14 @@ function clamp(v: number, min: number, max: number): number {
   return Math.min(Math.max(v, min), max);
 }
 
-function errorView(kind: BackendErrorKind, retryAfterMs?: number) {
-  return describeError(kind === "aborted" ? "bad_response" : kind, "card", retryAfterMs);
+function errorView(kind: BackendErrorKind, retryAfterMs?: number, backend?: ConnectionKind) {
+  return describeError(
+    kind === "aborted" ? "bad_response" : kind,
+    "card",
+    retryAfterMs,
+    Date.now(),
+    backend,
+  );
 }
 
 function languageName(code: string): string {
@@ -230,7 +237,7 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
       if (state.model) foot.append(h(doc, "div", "mono muted", state.model));
       el.append(scroll, foot);
     } else {
-      const view = errorView(state.error, state.retryAfterMs);
+      const view = errorView(state.error, state.retryAfterMs, state.backend);
       const box = h(doc, "div", "err");
       box.setAttribute("role", "alert");
       box.append(h(doc, "div", `et ${view.tone}`, view.title), h(doc, "div", undefined, view.body));

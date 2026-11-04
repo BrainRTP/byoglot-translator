@@ -1,7 +1,7 @@
 {
   "name": "byoglot-translator",
-  "description": "Translate pages and selected text with your own model and prompts, through your local opencode",
-  "version": "0.2.7",
+  "description": "Translate pages and selected text with your own model and prompts, through opencode or your own API key",
+  "version": "0.2.8",
   "private": true,
   "type": "module",
   "license": "MIT",

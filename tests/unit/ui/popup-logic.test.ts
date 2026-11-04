@@ -49,6 +49,12 @@ describe("errorView", () => {
     expect(errorView("no_model")?.action).toBe("chooseModel");
     expect(errorView("aborted")).toBeNull();
   });
+
+  it("uses provider wording for a provider backend", () => {
+    const v = errorView("offline", undefined, Date.now(), "provider");
+    expect(JSON.stringify(v)).not.toMatch(/opencode/i);
+    expect(v?.hint).toBeUndefined();
+  });
 });
 
 describe("mainAction", () => {
@@ -148,6 +154,14 @@ describe("modelWarning", () => {
 describe("pageFailure", () => {
   const failed = (kind: "rate_limit" | "provider_auth" | "unauthorized" | "aborted") =>
     page({ state: "error", done: 34, total: 120, error: { kind, retryAfterMs: 60_000 } });
+
+  it("takes the backend from the page error", () => {
+    const f = pageFailure(
+      page({ state: "error", done: 1, total: 5, error: { kind: "offline", backend: "provider" } }),
+      false,
+    );
+    expect(JSON.stringify(f.error)).not.toMatch(/opencode/i);
+  });
 
   it("shows nothing when the page is not in error", () => {
     expect(pageFailure(page({ state: "translating" }), false)).toEqual({

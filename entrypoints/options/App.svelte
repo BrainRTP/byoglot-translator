@@ -1,10 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { browser } from "wxt/browser";
+  import type { ConnectionView } from "../../lib/connections/types";
   import { resolveLang, type UiLang } from "../../lib/i18n";
   import {
     type LanguageProfileView,
     type ProfileOp,
+    type ProviderInput,
     type RuleOp,
     type Status,
     sendMessage,
@@ -14,15 +16,16 @@
   import { DEFAULT_GLOBALS } from "../../lib/settings/defaults";
   import type { GlobalSettings, SiteRule, Template } from "../../lib/settings/types";
   import AnimationSection from "../../lib/ui/AnimationSection.svelte";
+  import ConnectionList from "../../lib/ui/ConnectionList.svelte";
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
   import LanguagePrompt from "../../lib/ui/LanguagePrompt.svelte";
   import { languageOptions } from "../../lib/ui/languages";
   import ModelSelect from "../../lib/ui/ModelSelect.svelte";
   import { isFirefoxAgent, type ModelId } from "../../lib/ui/options-logic";
-  import { errorView, variantFor } from "../../lib/ui/popup-logic";
+  import ProviderForm from "../../lib/ui/ProviderForm.svelte";
+  import { variantFor } from "../../lib/ui/popup-logic";
   import Segmented from "../../lib/ui/Segmented.svelte";
   import SiteRules from "../../lib/ui/SiteRules.svelte";
-  import StatusDot from "../../lib/ui/StatusDot.svelte";
   import { createSerialQueue } from "../../lib/ui/serial-queue";
   import TemplateEditor from "../../lib/ui/TemplateEditor.svelte";
 
@@ -65,6 +68,9 @@
   let loaded = $state(false);
   let loadFailed = $state(false);
   let status = $state<Status | null>(null);
+  let connections = $state<ConnectionView[]>([]);
+  let editor = $state<{ existing?: ConnectionView } | null>(null);
+  let busyId = $state<string | null>(null);
   let globals = $state<GlobalSettings | null>(null);
   let templates = $state<Template[]>([]);
   let rules = $state<SiteRule[]>([]);
@@ -92,8 +98,6 @@
   const profilesQueue = createSerialQueue();
   const firefox = isFirefoxAgent(navigator.userAgent);
 
-  const connected = $derived(status?.state === "connected");
-  const failure = $derived(status?.state === "error" ? errorView(status.kind, status.retryAfterMs) : null);
   const uiOptions = $derived<{ value: UiLang; label: string }[]>([
     { value: "auto", label: tr("selection.auto") },
     { value: "ru", label: "Русский" },
@@ -140,14 +144,16 @@
   async function load() {
     loadFailed = false;
     try {
-      const [g, tpl, rl, st, cache, prof] = await Promise.all([
+      const [g, tpl, rl, st, cache, prof, conns] = await Promise.all([
         sendMessage("globals", undefined),
         sendMessage("templates", undefined),
         sendMessage("rules", undefined),
         sendMessage("status", undefined),
         sendMessage("cacheStats", undefined),
         sendMessage("languageProfiles", undefined),
+        sendMessage("connections", undefined),
       ]);
+      connections = conns;
       globals = g;
       templates = tpl;
       rules = rl;
@@ -297,12 +303,54 @@
     void browser.tabs.create({ url: browser.runtime.getURL("/onboarding.html") });
   }
 
-  async function disconnect() {
-    if (!confirm(tr("opt.connection.confirmDisconnect"))) return;
+  async function refreshStatus(known?: Status) {
+    status = known ?? (await sendMessage("status", undefined));
+    const [g, list] = await Promise.all([
+      sendMessage("globals", undefined),
+      status.state === "connected" ? loadModels() : Promise.resolve([] as ModelInfo[]),
+    ]);
+    globals = g;
+    models = list;
+  }
+
+  async function useConnection(id: string) {
+    busyId = id;
     try {
-      await sendMessage("disconnect", undefined);
-      status = { state: "disconnected" };
-      models = [];
+      const next = await sendMessage("activateConnection", id);
+      connections = await sendMessage("connections", undefined);
+      await refreshStatus(next);
+      mark("connection", true);
+    } catch {
+      mark("connection", false);
+    } finally {
+      busyId = null;
+    }
+  }
+
+  async function removeConnection(view: ConnectionView) {
+    if (!confirm(`${tr("conn.removeConfirm", { name: view.name })}`)) return;
+    busyId = view.id;
+    try {
+      connections = await sendMessage("removeConnection", view.id);
+      await refreshStatus();
+      mark("connection", true);
+    } catch {
+      mark("connection", false);
+    } finally {
+      busyId = null;
+    }
+  }
+
+  async function saveProvider(input: ProviderInput): Promise<Status> {
+    const res = await sendMessage("saveProvider", input);
+    connections = res.connections;
+    return res.status;
+  }
+
+  async function providerSaved() {
+    editor = null;
+    try {
+      await refreshStatus();
       mark("connection", true);
     } catch {
       mark("connection", false);
@@ -403,36 +451,33 @@
         <div class="main">
           <section class="sec first" id="connection">
             {@render heading("connection", flags.connection)}
-            <div class="box conn">
-              <div class="col">
-                <div class="state">
-                  <StatusDot tone={connected ? "ok" : "er"} />
-                  <span>
-                    {#if connected}{tr("status.connected")}
-                    {:else if failure}{failure.title}
-                    {:else}{tr("status.disconnected")}{/if}
-                  </span>
-                </div>
-                <div class="mono mu">
-                  {#if status?.state === "connected"}
-                    {tr("opt.connection.version", { version: status.version, url: status.url })}
-                  {:else if status?.state === "error"}
-                    {status.url}{failure?.hint ? ` · ${failure.hint}` : ""}
-                  {:else}
-                    {tr("opt.connection.notConnected")}
-                  {/if}
-                </div>
+            {#if connections.length > 0}
+              <ConnectionList
+                {connections}
+                {status}
+                {busyId}
+                onuse={useConnection}
+                onedit={(view) => (editor = { existing: view })}
+                onremove={removeConnection}
+              />
+            {:else}
+              <p class="mu lead">{tr("opt.connection.notConnected")}</p>
+            {/if}
+            {#if editor}
+              <div class="box gap">
+                {#key editor.existing?.id ?? "new"}
+                  <ProviderForm
+                    existing={editor.existing}
+                    onsave={saveProvider}
+                    ondone={providerSaved}
+                    oncancel={() => (editor = null)}
+                  />
+                {/key}
               </div>
-              <div class="btns">
-                <button type="button" class="btn" onclick={openOnboarding}>
-                  {status?.state === "disconnected" ? tr("popup.connectOpencode") : tr("opt.connection.reconnect")}
-                </button>
-                {#if status?.state !== "disconnected"}
-                  <button type="button" class="btn dng" onclick={disconnect}>
-                    {tr("opt.connection.disconnect")}
-                  </button>
-                {/if}
-              </div>
+            {/if}
+            <div class="btns gap">
+              <button type="button" class="btn" onclick={() => (editor = {})}>{tr("conn.add")}</button>
+              <button type="button" class="btn" onclick={openOnboarding}>{tr("conn.connectOpencode")}</button>
             </div>
           </section>
 
@@ -691,18 +736,6 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-  }
-  .col {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-  }
-  .state {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 600;
   }
   .btns {
     display: flex;

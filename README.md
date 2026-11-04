@@ -2,7 +2,7 @@
 
 English | [Русский](README.ru.md)
 
-A Chrome and Firefox extension (Manifest V3) that translates web pages and selected text with the model you already use in [opencode](https://opencode.ai). ByoGlot stands for "bring your own" plus "-glot": the model and the translation instructions are yours. The extension has no API keys, accounts or servers of its own. It talks to opencode on your computer, and opencode calls the model provider you configured there.
+A Chrome and Firefox extension (Manifest V3) that translates web pages and selected text with a model you bring. You connect it in one of two ways: to your local [opencode](https://opencode.ai), or to your own provider with an API key (DeepSeek, OpenRouter, Ollama, LM Studio or any OpenAI-compatible URL). ByoGlot stands for "bring your own" plus "-glot": the model and the translation instructions are yours. The extension has no accounts or servers of its own and ships no keys. Your text goes only to the connection you picked.
 
 MIT license. Free, no subscription, no ads, no telemetry. An independent project, not affiliated with the opencode team.
 
@@ -15,7 +15,7 @@ MIT license. Free, no subscription, no ads, no telemetry. An independent project
 
 ## Why
 
-Most AI translators either lock you into their own subscription or ask for an API key per provider. If you already pay for models in opencode, this extension reuses them. You also control how the text is translated: you write the instructions yourself. Keep terms in English and add the translation in brackets, explain academic words with examples and etymology, or just translate plainly. Save those instructions as templates and bind them to sites.
+Most AI translators either lock you into their own subscription or ask for an API key per provider. If you already pay for models in opencode, or have a key from a provider such as DeepSeek, this extension reuses them. You also control how the text is translated: you write the instructions yourself. Keep terms in English and add the translation in brackets, explain academic words with examples and etymology, or just translate plainly. Save those instructions as templates and bind them to sites.
 
 ## Features
 
@@ -24,13 +24,14 @@ Most AI translators either lock you into their own subscription or ask for an AP
 - Selection translation in a movable, resizable window with two modes. One-shot translates one fragment and closes on a click elsewhere. Pinned stays open and translates every new mouse selection into a feed. Nothing is sent just because you selected something in One-shot mode.
 - Templates: presets with a free-form pre-prompt, target language, display mode, and separate model and effort for pages and for selections. Applying a template copies its values to the current tab, so tweaks in the popup never change the saved template unless you save them.
 - Site rules: bind a template to `example.com` or `*.example.com`.
-- Any model opencode can use, with its effort level (opencode calls it a variant: `none`, `low`, `high`, `max` and so on).
+- Any model of the active connection, with its effort level (opencode calls it a variant: `none`, `low`, `high`, `max` and so on).
+- Several saved connections. Exactly one is active at a time and both pages and selections use it. Each connection remembers its own page and selection models.
 - Translation cache in IndexedDB, so repeated strings and repeat visits cost nothing.
 - Interface in English and Russian, light and dark themes.
 
 ## Requirements
 
-- opencode 2.x running as a background service (`opencode service start`). opencode 1.x is not supported.
+- One of the two: opencode 2.x running as a background service (`opencode service start`; opencode 1.x is not supported), or an API key for an OpenAI-compatible provider. Ollama and LM Studio need no key.
 - Chrome, Edge, Brave, Arc or another Chromium browser, or Firefox, with Manifest V3.
 - For development: Node.js 24 or newer and pnpm 12 (via corepack).
 
@@ -43,14 +44,30 @@ Most AI translators either lock you into their own subscription or ask for an AP
 
 After loading, reload tabs that were already open, otherwise they have no content script yet.
 
-## Connect to opencode
+## Ways to connect
 
-A connection page opens on first install.
+A connection page opens on first install. Pick "opencode" or "My provider". You can save several connections later in the settings and switch between them. Only the active one is used. Deleting the active connection leaves the extension without one, so your text is never sent to another provider by surprise.
+
+### opencode
 
 1. Run `opencode pair` in a terminal. It prints a one-time link like `http://127.0.0.1:<port>/auth/connect/<code>`, valid for 5 minutes.
 2. Paste the link (or the whole command output) on the connection page and click "Connect".
 
 Manual mode is for an opencode server you started yourself with a password, on another port of this computer: enter the URL (`http://127.0.0.1:<port>` or `http://localhost:<port>`), username and password. Remote servers are not supported, because the extension's host permissions cover only `127.0.0.1` and `localhost`.
+
+### My provider
+
+Use this when you have no opencode but have an API key. The extension calls the `chat/completions` and `models` endpoints of an OpenAI-compatible API.
+
+1. Choose a preset: DeepSeek, OpenRouter, Ollama, LM Studio or Custom URL. The preset fills in the base URL, and you can edit it.
+2. Paste the API key. Ollama and LM Studio do not need one.
+3. Click "Save". The extension checks the provider's `/models` list and saves the connection only if the check passes.
+
+When you add a provider, the browser asks for access to that provider's site. The extension does not ask for access to all sites at install time. `localhost` and `127.0.0.1` need no request, so local Ollama and LM Studio work on any port. If you refuse, the connection is not saved. When you delete a provider, the access is released unless another connection uses the same site.
+
+The key is stored unencrypted in the extension's `storage.local`, like the opencode token. It never reaches web pages or content scripts, and the settings page does not show it back: leave the field empty when editing to keep the old key. If you change the base URL to another site, enter the key again.
+
+Effort works per provider. DeepSeek offers `none` plus the levels its `/models` list reports. OpenRouter offers `none`, `low`, `medium` and `high` for models that support reasoning. Ollama, LM Studio and a custom URL offer only `none`. The default is `none`, and for DeepSeek the extension sends it explicitly, because DeepSeek thinks by default.
 
 For fast selection translation pick a light model with effort `none`, for example `deepseek/deepseek-flash`. Thinking (any effort above `none`) makes translation roughly 5 to 7 times slower.
 
@@ -103,7 +120,7 @@ Missing your language, or want to improve a profile? See [CONTRIBUTING.md](CONTR
 
 ## How it works
 
-The background service worker holds the opencode address and token and is the only part that talks to opencode. It uses opencode's HTTP API: `GET /api/model` for the model list and `POST /api/experimental/generate/text` for one-shot generation without an agent session, so nothing appears in your opencode history.
+The background service worker holds the connection data (the opencode address and token, or the provider URL and key) and is the only part that talks to the backend. For a provider it sends one `POST {baseUrl}/chat/completions` request per batch, without streaming. For opencode it uses opencode's HTTP API: `GET /api/model` for the model list and `POST /api/experimental/generate/text` for one-shot generation without an agent session, so nothing appears in your opencode history.
 
 The content script walks the page and collects text blocks. Inline markup (links, bold, code) is replaced with numbered placeholders such as `<x1>docs</x1>`, so the model sees whole sentences. Blocks go to the background in batches (25 blocks or 4000 characters, up to 4 requests at once). The model answers with JSON keyed by block id, and the translation is written back into the original text nodes, so links and event handlers keep working. A MutationObserver picks up new content.
 
@@ -113,7 +130,7 @@ The opencode endpoint is marked experimental, so all calls go through one adapte
 
 The short version is below, the full policy is in [PRIVACY.md](PRIVACY.md).
 
-The text you translate (plus the page title and domain, and for selections the surrounding paragraph) goes to your local opencode and from there to the provider of the model you chose. The extension itself sends nothing anywhere else. The opencode token is stored unencrypted in the extension's `storage.local`, like in other extensions of this kind, and never reaches web pages or content scripts.
+The text you translate (plus the page title and domain, and for selections the surrounding paragraph) goes to the active connection. With opencode it goes to your local opencode and from there to the provider of the model you chose. With "My provider" it goes straight to the base URL you entered, and that provider's privacy policy applies. The extension itself sends nothing anywhere else. The opencode token and the provider API key are stored unencrypted in the extension's `storage.local`, like in other extensions of this kind, and never reach web pages or content scripts.
 
 To report a vulnerability, see [SECURITY.md](SECURITY.md).
 

@@ -1,25 +1,26 @@
 import type { TranslationCache } from "../cache/cache";
+import type { ConnectionRecord } from "../connections/types";
 import { BackendError } from "../opencode/errors";
-import type { Connection, TranslationBackend } from "../opencode/types";
-import { connectionItem } from "../settings/store";
+import type { TranslationBackend } from "../opencode/types";
+import { connectionsStore } from "../settings/store";
 
-function sameConnection(a: Connection, b: Connection): boolean {
-  return a.url === b.url && a.username === b.username && a.password === b.password;
+function fingerprint(rec: ConnectionRecord): string {
+  const { pageModel: _page, selectionModel: _selection, ...rest } = rec;
+  return JSON.stringify(rest);
 }
 
 export function createBackendProvider(
-  create: (conn: Connection) => TranslationBackend,
+  create: (rec: ConnectionRecord) => TranslationBackend,
 ): () => Promise<TranslationBackend> {
-  let cached: { conn: Connection; backend: TranslationBackend } | null = null;
+  let cached: { key: string; backend: TranslationBackend } | null = null;
   return async () => {
-    const conn = await connectionItem.getValue();
-    if (!conn) {
+    const rec = await connectionsStore.getActive();
+    if (!rec) {
       cached = null;
       throw new BackendError("unauthorized");
     }
-    if (!cached || !sameConnection(cached.conn, conn)) {
-      cached = { conn, backend: create(conn) };
-    }
+    const key = fingerprint(rec);
+    if (cached?.key !== key) cached = { key, backend: create(rec) };
     return cached.backend;
   };
 }

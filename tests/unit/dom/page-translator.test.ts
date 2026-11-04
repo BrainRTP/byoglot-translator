@@ -704,6 +704,18 @@ describe("stop, restore, fatal", () => {
     expect(t.translator.state()).toMatchObject({ state: "translated", done: 4 });
   });
 
+  it("fatal carries the backend kind into the error state", async () => {
+    const t = setup(`<p id="p0">Item number 0</p>`, { auto: false });
+    await t.translator.start();
+    await settle();
+    const [j1] = t.translates() as [Translate];
+    t.emit({ type: "fatal", jobId: j1.jobId, kind: "provider_auth", backend: "provider" });
+    expect(t.translator.state()).toMatchObject({
+      state: "error",
+      error: { kind: "provider_auth", backend: "provider" },
+    });
+  });
+
   it("fatal sets error, aborts jobs and ignores everything after it", async () => {
     const items = Array.from({ length: 120 }, (_, i) => `<p id="p${i}">Item number ${i}</p>`);
     const t = setup(items.join(""), { auto: false });

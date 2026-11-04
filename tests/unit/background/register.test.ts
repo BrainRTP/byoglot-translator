@@ -20,6 +20,7 @@ function deps(): BackgroundDeps {
     getBackend: async () => backend,
     createBackend: () => backend,
     pair: async () => ({ url: "http://127.0.0.1:1", username: "opencode", password: "t" }),
+    removeOrigin: async () => {},
     cache: {
       getMany: async () => new Map(),
       putMany: async () => {},
@@ -90,7 +91,17 @@ describe("registerBackground", () => {
   });
 
   it("rejects connection-level messages from a content script", async () => {
-    for (const type of ["status", "connectManual", "pair", "setGlobals", "cacheClear"]) {
+    for (const type of [
+      "status",
+      "connectManual",
+      "pair",
+      "setGlobals",
+      "cacheClear",
+      "connections",
+      "saveProvider",
+      "activateConnection",
+      "removeConnection",
+    ]) {
       const res = await dispatch(type, undefined, contentScript());
       expect(res.err?.message, type).toMatch(/not allowed/);
     }

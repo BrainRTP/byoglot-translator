@@ -1,3 +1,4 @@
+import type { ConnectionKind } from "../connections/types";
 import { t } from "../i18n";
 import type { PageState, TabView } from "../messaging/protocol";
 import type { BackendErrorKind, ModelInfo } from "../opencode/types";
@@ -22,8 +23,9 @@ export function errorView(
   kind: BackendErrorKind,
   retryAfterMs?: number,
   now: number = Date.now(),
+  backend: ConnectionKind = "opencode",
 ): ErrorView | null {
-  return kind === "aborted" ? null : describeError(kind, "popup", retryAfterMs, now);
+  return kind === "aborted" ? null : describeError(kind, "popup", retryAfterMs, now, backend);
 }
 
 export function pageFailure(
@@ -32,7 +34,14 @@ export function pageFailure(
 ): { error: ErrorView | null; showResume: boolean } {
   if (page.state !== "error") return { error: null, showResume: false };
   const error =
-    dismissed || !page.error ? null : errorView(page.error.kind, page.error.retryAfterMs);
+    dismissed || !page.error
+      ? null
+      : errorView(
+          page.error.kind,
+          page.error.retryAfterMs,
+          Date.now(),
+          page.error.backend ?? "opencode",
+        );
   if (!error) return { error: null, showResume: true };
   return { error, showResume: error.action === "chooseModel" };
 }

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
+import { translate } from "./mock-translate";
 
 export type MockMode = "ok" | "rate_limit" | "unauthorized";
 
@@ -22,7 +23,6 @@ export type MockOpencode = {
 };
 
 const FIXTURES_DIR = path.join(import.meta.dirname, "fixtures");
-const PREFIX = "[ru] ";
 const MODEL = {
   providerID: "deepseek",
   id: "deepseek-flash",
@@ -30,21 +30,6 @@ const MODEL = {
   variants: [{ id: "none" }],
   limit: { context: 100000, output: 8000 },
 };
-
-function translate(prompt: string): string {
-  const input = prompt.lastIndexOf("\nINPUT:\n");
-  if (input >= 0) {
-    const segments = JSON.parse(prompt.slice(input + "\nINPUT:\n".length)) as Record<
-      string,
-      string
-    >;
-    return JSON.stringify(
-      Object.fromEntries(Object.entries(segments).map(([id, text]) => [id, PREFIX + text])),
-    );
-  }
-  const marker = "\n\nTEXT:\n";
-  return PREFIX + prompt.slice(prompt.lastIndexOf(marker) + marker.length);
-}
 
 async function readBody(req: http.IncomingMessage): Promise<string> {
   let body = "";

@@ -68,3 +68,40 @@ export async function openPopup(ext: Extension, target: Page): Promise<Page> {
   await popup.goto(`chrome-extension://${ext.id}/popup.html`);
   return popup;
 }
+
+export async function seedProvider(worker: Worker, seed: { url: string; key: string }) {
+  await worker.evaluate(
+    (s) => {
+      const id = "e2e-provider";
+      const model = {
+        connectionId: id,
+        providerID: "custom",
+        id: "deepseek-flash",
+        variant: "none",
+      };
+      return chrome.storage.local.set({
+        connections: [
+          {
+            id,
+            kind: "provider",
+            name: "Custom",
+            preset: "custom",
+            baseUrl: s.url,
+            apiKey: s.key,
+            pageModel: model,
+            selectionModel: model,
+          },
+        ],
+        activeConnectionId: id,
+        globals: {
+          sourceLang: "auto",
+          targetLang: "ru",
+          displayMode: "replace",
+          defaultTemplateId: "builtin-default",
+          uiLang: "en",
+        },
+      });
+    },
+    { url: seed.url, key: seed.key },
+  );
+}

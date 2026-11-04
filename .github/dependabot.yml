@@ -18,7 +18,7 @@ updates:
     commit-message:
       prefix: chore
       include: scope
-    labels: [dependencies, area:infra]
+    labels: ["dependencies", "area:infra"]
 
   - package-ecosystem: github-actions
     directory: /
@@ -29,4 +29,4 @@ updates:
         patterns: ["*"]
     commit-message:
       prefix: ci
-    labels: [dependencies, area:infra]
+    labels: ["dependencies", "area:infra"]

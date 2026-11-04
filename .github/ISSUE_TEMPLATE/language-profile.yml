@@ -1,6 +1,6 @@
 name: Language profile
 description: Add or improve the translation rules for a target language
-labels: [enhancement, area:prompt]
+labels: ["enhancement", "area:prompt"]
 body:
   - type: markdown
     attributes:

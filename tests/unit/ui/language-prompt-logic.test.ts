@@ -23,8 +23,10 @@ beforeEach(() => setUiLang("ru"));
 afterEach(() => setUiLang("auto"));
 
 describe("CONTRIBUTING_URL", () => {
-  it("is empty until the repository has a public address", () => {
-    expect(CONTRIBUTING_URL).toBe("");
+  it("points to the language profiles section of the contributing guide", () => {
+    expect(CONTRIBUTING_URL).toBe(
+      "https://github.com/BrainRTP/byoglot-translator/blob/main/CONTRIBUTING.md#language-profiles",
+    );
   });
 });
 

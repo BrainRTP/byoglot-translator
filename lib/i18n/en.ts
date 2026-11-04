@@ -43,7 +43,6 @@ export const en = {
   "common.settings": "Settings",
   "common.retry": "Retry",
   "common.cancel": "Cancel",
-  "popup.connectOpencode": "Connect opencode",
   "popup.translatePage": "Translate page",
   "popup.showOriginal": "Show original",
   "popup.stop": "Stop",
@@ -86,11 +85,14 @@ export const en = {
   "popup.rateLimit":
     "Resets in {time} (at {clock}). Translation is paused, you can choose another model.",
   "popup.rateLimitUnknown": "Translation is paused. Try again later or choose another model.",
-  "onboarding.title": "Connect opencode",
+  "onboarding.title": "Connect a model",
   "onboarding.intro":
     "The extension translates pages and selected text with the model you chose in opencode. It connects to opencode on this computer.",
   "onboarding.footer":
     "Text goes to your local opencode and from there to the provider of the model you chose.",
+  "onboarding.introProvider":
+    "The extension translates pages and selected text with a model from your provider. The key stays in the extension and is sent only to the provider's address.",
+  "onboarding.footerProvider": "Text goes straight to the provider you connect.",
   "onboarding.langSwitch": "Interface language",
   "onboarding.step1": "Run in a terminal",
   "onboarding.step2": "Paste the link you got",
@@ -137,10 +139,6 @@ export const en = {
   "opt.saved": "Saved",
   "opt.saveFailed": "Could not save",
   "opt.loadFailed.title": "Could not load the settings",
-  "opt.connection.reconnect": "Reconnect",
-  "opt.connection.disconnect": "Disconnect",
-  "opt.connection.confirmDisconnect": "Disconnect from opencode? You will need to connect again.",
-  "opt.connection.version": "opencode {version} · {url}",
   "opt.connection.notConnected": "Connect the extension to opencode to translate pages.",
   "opt.lang.ui": "Interface language",
   "opt.lang.source": "Source language",

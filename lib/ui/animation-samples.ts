@@ -15,8 +15,8 @@ export const SCENE: Sample = [
   { tag: "h3", en: "Getting started", ru: "Начало работы" },
   {
     tag: "p",
-    en: "The extension talks to a local opencode server, so your text never leaves this computer. See the <x1>setup guide</x1> if the connection fails.",
-    ru: "Расширение работает с локальным сервером opencode, поэтому текст не покидает этот компьютер. Если подключение не удается, откройте <x1>руководство по настройке</x1>.",
+    en: "The extension translates the page with the model you picked, one block at a time. See the <x1>setup guide</x1> if the connection fails.",
+    ru: "Расширение переводит страницу выбранной вами моделью, блок за блоком. Если подключение не удается, откройте <x1>руководство по настройке</x1>.",
   },
   {
     tag: "li",

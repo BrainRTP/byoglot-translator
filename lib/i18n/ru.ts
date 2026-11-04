@@ -45,7 +45,6 @@ export const ru = {
   "common.settings": "Настройки",
   "common.retry": "Повторить",
   "common.cancel": "Отмена",
-  "popup.connectOpencode": "Подключить opencode",
   "popup.translatePage": "Перевести страницу",
   "popup.showOriginal": "Показать оригинал",
   "popup.stop": "Остановить",
@@ -88,11 +87,14 @@ export const ru = {
   "popup.rateLimit":
     "Сброс через {time} (в {clock}). Перевод приостановлен, можно выбрать другую модель.",
   "popup.rateLimitUnknown": "Перевод приостановлен. Повторите позже или выберите другую модель.",
-  "onboarding.title": "Подключите opencode",
+  "onboarding.title": "Подключите модель",
   "onboarding.intro":
     "Расширение переводит страницы и выделенный текст моделью, которую вы выбрали в opencode. Подключение идет к opencode на этом компьютере.",
   "onboarding.footer":
     "Текст уходит в ваш локальный opencode, а оттуда к провайдеру выбранной модели.",
+  "onboarding.introProvider":
+    "Расширение переводит страницы и выделенный текст моделью вашего провайдера. Ключ хранится в расширении и отправляется только на адрес провайдера.",
+  "onboarding.footerProvider": "Текст уходит напрямую к провайдеру, которого вы подключаете.",
   "onboarding.langSwitch": "Язык интерфейса",
   "onboarding.step1": "Выполните в терминале",
   "onboarding.step2": "Вставьте полученную ссылку",
@@ -139,10 +141,6 @@ export const ru = {
   "opt.saved": "Сохранено",
   "opt.saveFailed": "Не удалось сохранить",
   "opt.loadFailed.title": "Не удалось загрузить настройки",
-  "opt.connection.reconnect": "Переподключить",
-  "opt.connection.disconnect": "Отключить",
-  "opt.connection.confirmDisconnect": "Отключиться от opencode? Потребуется подключить заново.",
-  "opt.connection.version": "opencode {version} · {url}",
   "opt.connection.notConnected": "Подключите расширение к opencode, чтобы переводить страницы.",
   "opt.lang.ui": "Язык интерфейса",
   "opt.lang.source": "Исходный язык",

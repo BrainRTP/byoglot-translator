@@ -158,7 +158,7 @@
     <div class="col">
       <div class="intro">
         <h1>{tr("onboarding.title")}</h1>
-        <p>{tr("onboarding.intro")}</p>
+        <p>{tr(kind === "provider" ? "onboarding.introProvider" : "onboarding.intro")}</p>
       </div>
 
       {#if phase === "success" && connected}
@@ -261,7 +261,7 @@
     </div>
   </main>
 
-  <footer>{tr("onboarding.footer")}</footer>
+  <footer>{tr(kind === "provider" ? "onboarding.footerProvider" : "onboarding.footer")}</footer>
 </div>
 
 {#snippet alert(f: Failure)}

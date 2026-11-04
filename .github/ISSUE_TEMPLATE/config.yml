@@ -2,4 +2,4 @@ blank_issues_enabled: false
 contact_links:
   - name: Report a vulnerability
     url: https://github.com/BrainRTP/byoglot-translator/blob/main/SECURITY.md
-    about: Please email security problems instead of opening a public issue.
+    about: Report security problems privately, through GitHub or by email, not in a public issue.

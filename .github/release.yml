@@ -1,0 +1,11 @@
+# Sections of the generated release notes, by pull request label. Dependabot pull requests carry the dependencies label.
+changelog:
+  categories:
+    - title: Features
+      labels: [enhancement]
+    - title: Fixes
+      labels: [bug]
+    - title: Dependencies
+      labels: [dependencies]
+    - title: Other changes
+      labels: ["*"]

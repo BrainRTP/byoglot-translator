@@ -2,9 +2,9 @@
 
 ## Reporting a vulnerability
 
-Email brainrtp@yandex.ru with "ByoGlot security" in the subject. Please do not open a public issue for a vulnerability.
+Report it through [private vulnerability reporting](https://github.com/BrainRTP/byoglot-translator/security/advisories/new) on GitHub, or email brainrtp@yandex.ru with "ByoGlot security" in the subject. Please do not open a public issue for a vulnerability.
 
-Include what you found, the steps to reproduce it, the extension version and the browser, and what an attacker could do with it. You will get an answer by email, and the fix is published after a release that contains it.
+Include what you found, the steps to reproduce it, the extension version and the browser, and what an attacker could do with it. You will get an answer in the report or by email, and the fix is published after a release that contains it.
 
 ## Supported versions
 

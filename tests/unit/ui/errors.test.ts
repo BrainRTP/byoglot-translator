@@ -84,3 +84,28 @@ describe("describeError for the card", () => {
     expect(describeError("rate_limit", "card", 3_600_000, now).body).toContain("в 14:05");
   });
 });
+
+describe("describeError for a provider connection", () => {
+  const now = Date.UTC(2026, 10, 3, 6, 46);
+
+  it.each(["offline", "incompatible", "provider_auth"] as const)(
+    "%s never mentions opencode and has no hint",
+    (kind) => {
+      for (const surface of ["popup", "card"] as const) {
+        const v = describeError(kind, surface, undefined, now, "provider");
+        expect(`${v.title} ${v.body}`).not.toMatch(/opencode/i);
+        expect(v.hint).toBeUndefined();
+      }
+    },
+  );
+
+  it("offline names the provider", () => {
+    expect(describeError("offline", "card", undefined, now, "provider").title).toBe(
+      "Cannot reach the provider",
+    );
+  });
+
+  it("opencode texts stay the default", () => {
+    expect(describeError("offline", "card", undefined, now).title).toBe("opencode is not running");
+  });
+});

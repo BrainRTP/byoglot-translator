@@ -1207,6 +1207,27 @@ describe("connection operations", () => {
     expect(rec).toMatchObject({ name: "Renamed", pageModel: mine });
   });
 
+  it("an edit whose record was deleted during the check saves nothing", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let slow = false;
+    const { handlers } = multi(async () => {
+      if (slow) await gate;
+      return { version: "1" };
+    });
+    const { connections } = await handlers.saveProvider(deepseek);
+    const id = connections[0]?.id as string;
+    slow = true;
+    const pending = handlers.saveProvider({ ...deepseek, id, name: "Renamed", apiKey: "" });
+    await handlers.removeConnection(id);
+    release();
+    const res = await pending;
+    expect(res.status).toMatchObject({ state: "error", kind: "incompatible" });
+    expect(await saved()).toEqual([]);
+  });
+
   it("a keyless local preset is accepted", async () => {
     const { handlers } = multi();
     const res = await handlers.saveProvider(ollama);

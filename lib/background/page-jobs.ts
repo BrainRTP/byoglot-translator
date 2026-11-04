@@ -28,19 +28,14 @@ export function attachPagePort(port: PagePort, handlers: Handlers, service: Serv
     try {
       const job = await handlers.pageJob(port.sender ?? {}, msg);
       if (controller.signal.aborted) return;
+      const backend = await handlers.activeKind();
       await service.translatePage(
         job,
         {
           onResults: (results) => post({ type: "results", jobId, results }),
           onFailed: (ids) => post({ type: "failed", jobId, ids }),
-          onFatal: async (e) =>
-            post({
-              type: "fatal",
-              jobId,
-              kind: e.kind,
-              retryAfterMs: e.retryAfterMs,
-              backend: await handlers.activeKind(),
-            }),
+          onFatal: (e) =>
+            post({ type: "fatal", jobId, kind: e.kind, retryAfterMs: e.retryAfterMs, backend }),
         },
         controller.signal,
       );

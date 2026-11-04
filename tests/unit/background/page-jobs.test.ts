@@ -108,6 +108,22 @@ describe("attachPagePort", () => {
     expect(sent[0]).toMatchObject({ type: "fatal", kind: "provider_auth", backend: "provider" });
   });
 
+  it("posts a service fatal with its backend before done", async () => {
+    const { port, sent, send } = fakePort();
+    const translatePage = vi.fn(async (_j: PageJob, cb: PageCallbacks) => {
+      cb.onFatal(new BackendError("rate_limit"));
+    });
+    attachPagePort(
+      port,
+      handlersWith(async () => job, "provider"),
+      { translatePage },
+    );
+    send(translate);
+    await tick();
+    expect(sent.map((m) => m.type)).toEqual(["fatal", "done"]);
+    expect(sent[0]).toMatchObject({ kind: "rate_limit", backend: "provider" });
+  });
+
   it("aborts on abort message and skips done", async () => {
     const { port, sent, send } = fakePort();
     let signal: AbortSignal | undefined;

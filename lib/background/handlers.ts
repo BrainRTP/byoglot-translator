@@ -377,15 +377,19 @@ export function createHandlers(deps: HandlerDeps) {
     try {
       version = (await deps.createBackend(candidate).info()).version;
     } catch (error) {
-      await revokeOrigin(list, origin);
+      const latest = await connectionsStore.getAll();
+      await revokeOrigin(latest, origin);
       return {
         status: errorStatus(i.baseUrl, error, "provider"),
-        connections: await views(list),
+        connections: await views(latest),
       };
     }
 
     const fresh = await connectionsStore.getAll();
     const current = fresh.find((rec) => rec.id === candidate.id);
+    if (existing && !current) {
+      return { status: problem(i.baseUrl, "incompatible"), connections: await views(fresh) };
+    }
     await activate(
       {
         ...candidate,

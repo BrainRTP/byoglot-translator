@@ -263,7 +263,10 @@ test("a target language without its own profile shows the generic one and a hint
   await expect(c.section).toContainText(
     `Для ${languageGenitive(NO_PROFILE_LANG)} своего профиля пока нет, используется общий.`,
   );
-  await expect(c.section.getByRole("link")).toHaveCount(0);
+  await expect(c.section.getByRole("link", { name: "Помочь с профилем" })).toHaveAttribute(
+    "href",
+    "https://github.com/BrainRTP/byoglot-translator/blob/main/CONTRIBUTING.md#language-profiles",
+  );
 });
 
 test("a stored profile that does not exist falls back to auto without a warning", async ({

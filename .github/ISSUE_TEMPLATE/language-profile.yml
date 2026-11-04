@@ -1,0 +1,57 @@
+name: Language profile
+description: Add or improve the translation rules for a target language
+labels: ["enhancement", "area:prompt"]
+body:
+  - type: markdown
+    attributes:
+      value: The steps and the acceptance bar are in [CONTRIBUTING.md](https://github.com/BrainRTP/byoglot-translator/blob/main/CONTRIBUTING.md#language-profiles). This form collects what the pull request has to show.
+  - type: input
+    id: code
+    attributes:
+      label: Language code
+      description: A code from lib/settings/languages.ts, for example de.
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: New profile or a change
+      options:
+        - A new profile
+        - A change to an existing profile
+    validations:
+      required: true
+  - type: textarea
+    id: lint
+    attributes:
+      label: Lint output
+      description: The pnpm quality:lint table for the baseline and your profile on every page, and the share of first-pass failures.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: pairs
+    attributes:
+      label: Before and after
+      description: Three to five short pairs from side-by-side.md, each with the source sentence, the baseline output and the output with your profile.
+    validations:
+      required: true
+  - type: input
+    id: reader
+    attributes:
+      label: Who read side-by-side.md
+      description: A native speaker of the target language, you or a reviewer.
+    validations:
+      required: true
+  - type: checkboxes
+    id: bar
+    attributes:
+      label: Acceptance bar
+      description: The judge round is run by the maintainer before merging.
+      options:
+        - label: On every page fail is 0 and fail1 is at most 2% of the blocks.
+          required: true
+        - label: A native speaker read side-by-side.md and found no meaning errors.
+          required: true
+        - label: The profile has 8000 characters or fewer, and pnpm test passes.
+          required: true

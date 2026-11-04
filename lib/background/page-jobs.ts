@@ -33,8 +33,14 @@ export function attachPagePort(port: PagePort, handlers: Handlers, service: Serv
         {
           onResults: (results) => post({ type: "results", jobId, results }),
           onFailed: (ids) => post({ type: "failed", jobId, ids }),
-          onFatal: (e) =>
-            post({ type: "fatal", jobId, kind: e.kind, retryAfterMs: e.retryAfterMs }),
+          onFatal: async (e) =>
+            post({
+              type: "fatal",
+              jobId,
+              kind: e.kind,
+              retryAfterMs: e.retryAfterMs,
+              backend: await handlers.activeKind(),
+            }),
         },
         controller.signal,
       );
@@ -42,7 +48,13 @@ export function attachPagePort(port: PagePort, handlers: Handlers, service: Serv
     } catch (error) {
       if (controller.signal.aborted) return;
       const e = toBackendError(error);
-      post({ type: "fatal", jobId, kind: e.kind, retryAfterMs: e.retryAfterMs });
+      post({
+        type: "fatal",
+        jobId,
+        kind: e.kind,
+        retryAfterMs: e.retryAfterMs,
+        backend: await handlers.activeKind(),
+      });
     } finally {
       if (jobs.get(jobId) === controller) jobs.delete(jobId);
     }

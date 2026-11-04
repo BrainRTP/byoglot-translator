@@ -343,6 +343,7 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
         break;
       case "fatal":
         failure = { kind: message.kind };
+        if (message.backend !== undefined) failure.backend = message.backend;
         if (message.retryAfterMs !== undefined) failure.retryAfterMs = message.retryAfterMs;
         abandon();
         phase = "error";

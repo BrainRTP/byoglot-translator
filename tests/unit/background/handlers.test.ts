@@ -1184,6 +1184,29 @@ describe("connection operations", () => {
     expect(await saved()).toEqual([]);
   });
 
+  it("a model change written during the check survives the save", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let slow = false;
+    const { handlers } = multi(async () => {
+      if (slow) await gate;
+      return { version: "1" };
+    });
+    const { connections } = await handlers.saveProvider(deepseek);
+    const id = connections[0]?.id as string;
+    slow = true;
+    const pending = handlers.saveProvider({ ...deepseek, id, name: "Renamed", apiKey: "" });
+    await vi.waitFor(() => expect(slow).toBe(true));
+    const mine: ModelRef = { providerID: "pr", id: "other", connectionId: id };
+    await globalsItem.setValue({ ...(await handlers.globals()), pageModel: mine });
+    release();
+    await pending;
+    const [rec] = await saved();
+    expect(rec).toMatchObject({ name: "Renamed", pageModel: mine });
+  });
+
   it("a keyless local preset is accepted", async () => {
     const { handlers } = multi();
     const res = await handlers.saveProvider(ollama);

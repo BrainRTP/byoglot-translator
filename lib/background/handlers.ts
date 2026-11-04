@@ -254,6 +254,10 @@ export function createHandlers(deps: HandlerDeps) {
     }
   }
 
+  async function activeKind(): Promise<ConnectionKind | undefined> {
+    return (await connectionsStore.getActive())?.kind;
+  }
+
   async function views(list?: ConnectionRecord[]): Promise<ConnectionView[]> {
     const [all, activeId] = await Promise.all([
       list ?? connectionsStore.getAll(),
@@ -380,7 +384,16 @@ export function createHandlers(deps: HandlerDeps) {
       };
     }
 
-    await activate(candidate, list);
+    const fresh = await connectionsStore.getAll();
+    const current = fresh.find((rec) => rec.id === candidate.id);
+    await activate(
+      {
+        ...candidate,
+        pageModel: current?.pageModel ?? candidate.pageModel,
+        selectionModel: current?.selectionModel ?? candidate.selectionModel,
+      },
+      fresh,
+    );
     const next = await connectionsStore.getAll();
     if (existingOrigin && existingOrigin !== origin) await revokeOrigin(next, existingOrigin);
     return {
@@ -519,6 +532,8 @@ export function createHandlers(deps: HandlerDeps) {
 
     connections: () => views(),
 
+    activeKind,
+
     saveProvider,
 
     async activateConnection(id: string): Promise<Status> {
@@ -653,8 +668,7 @@ export function createHandlers(deps: HandlerDeps) {
         };
       } catch (error) {
         const e = toBackendError(error);
-        const backend = (await connectionsStore.getActive())?.kind;
-        return { error: e.kind, retryAfterMs: e.retryAfterMs, backend };
+        return { error: e.kind, retryAfterMs: e.retryAfterMs, backend: await activeKind() };
       } finally {
         if (i.requestId && selectionJobs.get(i.requestId)?.controller === controller) {
           selectionJobs.delete(i.requestId);

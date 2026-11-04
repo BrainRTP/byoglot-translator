@@ -33,6 +33,7 @@ export async function cacheKey(i: {
     i.model.providerID,
     i.model.id,
     i.model.variant ?? "",
+    i.model.connectionId ?? "",
     i.prePrompt,
   ];
   const lang = i.languagePrompt.trim();

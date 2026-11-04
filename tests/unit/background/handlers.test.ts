@@ -330,29 +330,49 @@ describe("background handlers", () => {
     const models = [flash];
 
     it("keeps a valid variant", () => {
-      const ref = { providerID: "deepseek", id: "deepseek-flash", variant: "high" };
-      expect(resolveStoredModel(ref, models, null)).toEqual({ model: ref, missing: false });
+      const ref = {
+        providerID: "deepseek",
+        id: "deepseek-flash",
+        variant: "high",
+        connectionId: "c1",
+      };
+      expect(resolveStoredModel(ref, models, null, "c1")).toEqual({ model: ref, missing: false });
     });
 
     it("drops an unknown variant and flags it missing", () => {
-      const ref = { providerID: "deepseek", id: "deepseek-flash", variant: "ultra" };
-      expect(resolveStoredModel(ref, models, null)).toEqual({
-        model: { providerID: "deepseek", id: "deepseek-flash", variant: undefined },
+      const ref = {
+        providerID: "deepseek",
+        id: "deepseek-flash",
+        variant: "ultra",
+        connectionId: "c1",
+      };
+      expect(resolveStoredModel(ref, models, null, "c1")).toEqual({
+        model: { ...ref, variant: undefined },
         missing: true,
       });
     });
 
     it("falls back to the global model when the model is gone", () => {
       const fallback = { providerID: "deepseek", id: "deepseek-flash" };
-      expect(resolveStoredModel({ providerID: "a", id: "b" }, models, fallback)).toEqual({
+      const ref = { providerID: "a", id: "b", connectionId: "c1" };
+      expect(resolveStoredModel(ref, models, fallback, "c1")).toEqual({
         model: fallback,
         missing: true,
       });
     });
 
+    it("skips a model of another connection without flagging it", () => {
+      const fallback = { providerID: "deepseek", id: "deepseek-flash", connectionId: "c2" };
+      const ref = { providerID: "a", id: "b", connectionId: "c1" };
+      expect(resolveStoredModel(ref, models, fallback, "c2")).toEqual({
+        model: fallback,
+        missing: false,
+      });
+    });
+
     it("does not flag anything when the model list is unavailable", () => {
-      const ref = { providerID: "a", id: "b", variant: "v" };
-      expect(resolveStoredModel(ref, null, null)).toEqual({ model: ref, missing: false });
+      const ref = { providerID: "a", id: "b", variant: "v", connectionId: "c1" };
+      expect(resolveStoredModel(ref, null, null, "c1")).toEqual({ model: ref, missing: false });
     });
 
     it("tabView flags a stale variant for the popup", async () => {

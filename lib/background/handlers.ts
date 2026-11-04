@@ -15,7 +15,13 @@ import { BackendError } from "../opencode/errors";
 import { parsePairingLink } from "../opencode/pairing";
 import type { Connection, ModelInfo, ModelRef, TranslationBackend } from "../opencode/types";
 import { BUILTIN_TEMPLATE_ID, builtinTemplate } from "../settings/defaults";
-import { applyTemplate, isModified, pickInitialModels, resolveModel } from "../settings/effective";
+import {
+  applyTemplate,
+  isModified,
+  ownModel,
+  pickInitialModels,
+  resolveModel,
+} from "../settings/effective";
 import {
   isProfileModified,
   isProfileOutdated,
@@ -25,6 +31,7 @@ import {
 } from "../settings/language-prompt";
 import { isValidPattern, matchSiteRule } from "../settings/site-rules";
 import {
+  connectionsStore,
   globalsItem,
   profileOverridesItem,
   siteRulesItem,
@@ -87,7 +94,9 @@ export function resolveStoredModel(
   ref: ModelRef | null,
   models: ModelInfo[] | null,
   fallback: ModelRef | null,
+  activeId: string | null,
 ): ResolvedModel {
+  if (ref && !ownModel(ref, activeId)) return { model: fallback, missing: false };
   if (!models) return { model: ref ?? fallback, missing: false };
   const resolved = resolveModel(ref, models, fallback);
   if (!ref || resolved.missing) return resolved;
@@ -143,10 +152,11 @@ export function createHandlers(deps: HandlerDeps) {
     hostname: string,
     templateOverride?: string,
   ): Promise<TabView> {
-    const [g, templates, rules] = await Promise.all([
+    const [g, templates, rules, activeId] = await Promise.all([
       globalsItem.getValue(),
       templatesItem.getValue(),
       siteRulesItem.getValue(),
+      connectionsStore.getActiveId(),
     ]);
     const byId = (id: string) => templates.find((t) => t.id === id);
     const defaultTemplate =
@@ -169,13 +179,13 @@ export function createHandlers(deps: HandlerDeps) {
     let settings: EffectiveSettings;
     if (override) {
       template = override;
-      settings = applyTemplate(override, g);
+      settings = applyTemplate(override, g, activeId);
     } else if (stored) {
       template = byId(stored.templateId) ?? defaultTemplate;
       settings = stored;
     } else {
       template = (rule && byId(rule.templateId)) ?? defaultTemplate;
-      settings = applyTemplate(template, g);
+      settings = applyTemplate(template, g, activeId);
     }
 
     const models = await loadModels();
@@ -183,10 +193,15 @@ export function createHandlers(deps: HandlerDeps) {
       settings,
       animation: g.animation,
       template,
-      modified: isModified(settings, template, g),
+      modified: isModified(settings, template, g, activeId),
       rule,
-      pageModel: resolveStoredModel(settings.pageModel, models, g.pageModel),
-      selectionModel: resolveStoredModel(settings.selectionModel, models, g.selectionModel),
+      pageModel: resolveStoredModel(settings.pageModel, models, g.pageModel, activeId),
+      selectionModel: resolveStoredModel(
+        settings.selectionModel,
+        models,
+        g.selectionModel,
+        activeId,
+      ),
     };
   }
 
@@ -211,7 +226,9 @@ export function createHandlers(deps: HandlerDeps) {
     try {
       const backend = await deps.getBackend();
       const [models, def] = await Promise.all([fetchModels(), backend.defaultModel()]);
-      const picked = pickInitialModels(models, def);
+      const activeId = await connectionsStore.getActiveId();
+      if (!activeId) return;
+      const picked = pickInitialModels(models, def, activeId);
       if (!picked.pageModel) return;
       const current = await globalsItem.getValue();
       if (current.pageModel) return;
@@ -387,10 +404,14 @@ export function createHandlers(deps: HandlerDeps) {
       hostname: string;
       templateId: string;
     }): Promise<TabView> {
-      const [g, templates] = await Promise.all([globalsItem.getValue(), templatesItem.getValue()]);
+      const [g, templates, activeId] = await Promise.all([
+        globalsItem.getValue(),
+        templatesItem.getValue(),
+        connectionsStore.getActiveId(),
+      ]);
       const template = templates.find((t) => t.id === i.templateId);
       if (!template) throw new Error(`Template not found: ${i.templateId}`);
-      await tabSettings(i.tabId).setValue(applyTemplate(template, g));
+      await tabSettings(i.tabId).setValue(applyTemplate(template, g, activeId));
       await rememberHost(i.tabId, i.hostname);
       return resolveView(i.tabId, i.hostname);
     },

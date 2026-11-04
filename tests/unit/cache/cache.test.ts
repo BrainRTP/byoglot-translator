@@ -32,6 +32,12 @@ describe("cacheKey", () => {
     expect(b).not.toBe(a);
   });
 
+  it("differs when only the connection id differs", async () => {
+    const a = await cacheKey({ ...base, model: { ...model, connectionId: "c1" } });
+    const b = await cacheKey({ ...base, model: { ...model, connectionId: "c2" } });
+    expect(a).not.toBe(b);
+  });
+
   it("differs by text, source language, target language and pre-prompt", async () => {
     const a = await cacheKey(base);
     expect(await cacheKey({ ...base, text: "Hello!" })).not.toBe(a);
@@ -47,9 +53,9 @@ describe("cacheKey language prompt", () => {
     return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
   };
 
-  it("keeps the 7-field key when the language prompt is empty", async () => {
+  it("keeps the 8-field key when the language prompt is empty", async () => {
     const legacy = await sha256(
-      JSON.stringify(["Hello", "auto", "ru", "anthropic", "claude-haiku", "", ""]),
+      JSON.stringify(["Hello", "auto", "ru", "anthropic", "claude-haiku", "", "", ""]),
     );
     expect(await cacheKey(base)).toBe(legacy);
   });

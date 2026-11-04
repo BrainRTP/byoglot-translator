@@ -3,7 +3,9 @@ import { defineConfig } from "wxt";
 export default defineConfig({
   modules: ["@wxt-dev/module-svelte"],
   outDir: "dist",
-  manifest: {
+  // AMO reviewers rebuild from the sources zip; the pnpm hook and the Node version are hidden files.
+  zip: { includeSources: ["**/*", ".pnpmfile.cjs", ".nvmrc"] },
+  manifest: ({ browser }) => ({
     name: "__MSG_extName__",
     description: "__MSG_extDescription__",
     default_locale: "en",
@@ -28,11 +30,16 @@ export default defineConfig({
         description: "__MSG_cmdTranslateSelection__",
       },
     },
-    browser_specific_settings: {
-      gecko: {
-        id: "byoglot-translator@local",
-        data_collection_permissions: { required: ["websiteContent", "browsingActivity"] },
+    ...(browser === "firefox" && {
+      browser_specific_settings: {
+        gecko: {
+          id: "byoglot-translator@brainrtp",
+          // The built-in data consent needs Firefox 140.
+          strict_min_version: "140.0",
+          data_collection_permissions: { required: ["websiteContent", "browsingActivity"] },
+        },
+        gecko_android: { strict_min_version: "142.0" },
       },
-    },
-  },
+    }),
+  }),
 });

@@ -111,6 +111,8 @@ The opencode endpoint is marked experimental, so all calls go through one adapte
 
 ## Privacy
 
+The short version is below, the full policy is in [PRIVACY.md](PRIVACY.md).
+
 The text you translate (plus the page title and domain, and for selections the surrounding paragraph) goes to your local opencode and from there to the provider of the model you chose. The extension itself sends nothing anywhere else. The opencode token is stored unencrypted in the extension's `storage.local`, like in other extensions of this kind, and never reaches web pages or content scripts.
 
 To report a vulnerability, see [SECURITY.md](SECURITY.md).

@@ -67,7 +67,9 @@
   const connected = $derived(status?.state === "connected");
   const pageFail = $derived(pageFailure(page, dismissed));
   const failure = $derived(
-    status?.state === "error" ? errorView(status.kind, status.retryAfterMs) : pageFail.error,
+    status?.state === "error"
+      ? errorView(status.kind, status.retryAfterMs, Date.now(), status.backend)
+      : pageFail.error,
   );
   const showResume = $derived(status?.state !== "error" && pageFail.showResume);
   const progress = $derived(progressView(page));
@@ -381,7 +383,7 @@
           {status?.state === "connected" ? tr("status.connected") : tr("status.disconnected")}
         </span>
         {#if status?.state === "connected"}
-          <span class="mono muted">opencode {status.version}</span>
+          <span class="mono muted">{status.kind === "provider" ? status.name : `opencode ${status.version}`}</span>
         {/if}
       </div>
       <button class="btn ico" type="button" aria-label={tr("common.settings")} onclick={openOptions}>
@@ -395,7 +397,7 @@
 
     {#if status?.state === "disconnected"}
       <button class="btn pri big" type="button" onclick={openOnboarding}>
-        {tr("popup.connectOpencode")}
+        {tr("popup.connect")}
       </button>
     {:else}
       {#if failure}

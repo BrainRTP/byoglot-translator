@@ -2,8 +2,9 @@
   import { onMount } from "svelte";
   import { browser } from "wxt/browser";
   import { resolveLang, type UiLang } from "../../lib/i18n";
-  import { type Status, sendMessage } from "../../lib/messaging/protocol";
+  import { type ProviderInput, type Status, sendMessage } from "../../lib/messaging/protocol";
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
+  import ProviderForm from "../../lib/ui/ProviderForm.svelte";
   import { type PairErrorKind, pairErrorView } from "../../lib/ui/pair-errors";
   import Segmented from "../../lib/ui/Segmented.svelte";
 
@@ -13,6 +14,7 @@
   const PAIR_COMMAND = "opencode pair";
 
   let lang = $state<"ru" | "en">(resolveLang());
+  let kind = $state<"opencode" | "provider">("opencode");
   let mode = $state<"link" | "manual">("link");
   let phase = $state<"idle" | "connecting" | "success">("idle");
   let link = $state("");
@@ -20,7 +22,7 @@
   let username = $state("opencode");
   let password = $state("");
   let failure = $state<Failure | null>(null);
-  let connected = $state<{ version: string; host: string } | null>(null);
+  let connected = $state<{ label: string; host: string } | null>(null);
   let copied = $state(false);
 
   const canConnect = $derived(
@@ -69,7 +71,7 @@
       result = { state: "error", url: "", kind: "offline", backend: "opencode" };
     }
     if (result.state === "connected") {
-      connected = { version: result.version, host: hostOf(result.url) };
+      connected = { label: `opencode ${result.version}`, host: hostOf(result.url) };
       link = "";
       password = "";
       phase = "success";
@@ -81,6 +83,16 @@
       kind: pairErrorView(kind, mode).kind,
       host: hostOf(result.state === "error" && result.url ? result.url : url),
     };
+  }
+
+  async function saveProvider(input: ProviderInput): Promise<Status> {
+    return (await sendMessage("saveProvider", input)).status;
+  }
+
+  function providerSaved(status: Status) {
+    if (status.state !== "connected") return;
+    connected = { label: status.name, host: hostOf(status.url) };
+    phase = "success";
   }
 
   async function copyCommand() {
@@ -153,7 +165,7 @@
         <div class="body">
           <div class="ok-box">
             <div class="ok-title"><span class="dot"></span>{tr("status.connected")}</div>
-            <div class="mono muted">opencode {connected.version} · {connected.host}</div>
+            <div class="mono muted">{connected.label} · {connected.host}</div>
           </div>
           <p class="muted hint">{tr("onboarding.successHint")}</p>
           <button class="btn pri" type="button" onclick={finish}>{tr("onboarding.done")}</button>
@@ -161,6 +173,18 @@
         </div>
       {:else}
         <div class="body">
+          <Segmented
+            label={tr("conn.choice")}
+            value={kind}
+            options={[
+              { value: "opencode", label: tr("conn.kind.opencode") },
+              { value: "provider", label: tr("conn.kind.provider") },
+            ]}
+            onchange={(next) => (kind = next)}
+          />
+          {#if kind === "provider"}
+            <ProviderForm onsave={saveProvider} ondone={providerSaved} />
+          {:else}
           {#if mode === "link"}
             <div class="step">
               <div class="num">1</div>
@@ -231,6 +255,7 @@
               {mode === "link" ? tr("onboarding.manual") : tr("onboarding.byLink")}
             </button>
           </div>
+          {/if}
         </div>
       {/if}
     </div>

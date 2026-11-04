@@ -2,6 +2,7 @@ import { browser } from "wxt/browser";
 import { createBackendProvider, lazyCache } from "../lib/background/connection";
 import { registerBackground } from "../lib/background/register";
 import { openTranslationCache } from "../lib/cache/cache";
+import { originPattern } from "../lib/connections/list";
 import type { ConnectionRecord } from "../lib/connections/types";
 import { createOpencodeBackend } from "../lib/opencode/backend";
 import { pair } from "../lib/opencode/pairing";
@@ -14,7 +15,7 @@ function createBackend(rec: ConnectionRecord) {
 
 async function removeOrigin(origin: string): Promise<void> {
   try {
-    await browser.permissions.remove({ origins: [`${origin}/*`] });
+    await browser.permissions.remove({ origins: [originPattern(origin)] });
   } catch {}
 }
 

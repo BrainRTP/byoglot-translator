@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isLocalOrigin, originInUse, originOf, toView } from "../../../lib/connections/list";
+import {
+  isLocalOrigin,
+  originInUse,
+  originOf,
+  originPattern,
+  toView,
+} from "../../../lib/connections/list";
 import type { ConnectionRecord } from "../../../lib/connections/types";
 
 const models = { pageModel: null, selectionModel: null };
@@ -22,6 +28,12 @@ const pr: ConnectionRecord = {
 };
 
 describe("connection list helpers", () => {
+  it("originPattern drops port and path", () => {
+    expect(originPattern("http://localhost:11434/v1")).toBe("http://localhost/*");
+    expect(originPattern("https://api.deepseek.com/v1/x?y=1")).toBe("https://api.deepseek.com/*");
+    expect(originPattern("https://example.com:8443")).toBe("https://example.com/*");
+  });
+
   it("originOf and isLocalOrigin", () => {
     expect(originOf("https://api.deepseek.com/v1/x")).toBe("https://api.deepseek.com");
     expect(isLocalOrigin("http://127.0.0.1:4096")).toBe(true);

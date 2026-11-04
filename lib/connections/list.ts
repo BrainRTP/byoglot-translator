@@ -4,6 +4,11 @@ export function originOf(url: string): string {
   return new URL(url).origin;
 }
 
+export function originPattern(url: string): string {
+  const { protocol, hostname } = new URL(url);
+  return `${protocol}//${hostname}/*`;
+}
+
 export function isLocalOrigin(origin: string): boolean {
   const host = new URL(origin).hostname;
   return host === "127.0.0.1" || host === "localhost";

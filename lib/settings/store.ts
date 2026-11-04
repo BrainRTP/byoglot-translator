@@ -47,10 +47,13 @@ async function migrateOnce(): Promise<void> {
     crypto.randomUUID(),
   );
   if (!migrated) return;
-  await rawTemplates.setValue(migrated.templates);
-  await rawGlobals.setValue(withoutModels(stored));
-  await rawActiveId.setValue(migrated.activeId);
-  await rawConnections.setValue(migrated.connections);
+  if ((await rawConnections.getValue()) !== null) return;
+  await storage.setItems([
+    { item: rawConnections, value: migrated.connections },
+    { item: rawActiveId, value: migrated.activeId },
+    { item: rawTemplates, value: migrated.templates },
+    { item: rawGlobals, value: withoutModels(stored) },
+  ]);
   await rawLegacyConnection.removeValue();
 }
 

@@ -241,7 +241,7 @@ describe("background handlers", () => {
       release();
       await pending;
       const g = await globalsItem.getValue();
-      expect(g.pageModel).toEqual(expect.objectContaining(mine));
+      expect(g.pageModel).toEqual({ ...mine, connectionId: expect.any(String) });
       expect(g.targetLang).toBe("de");
     });
 
@@ -251,7 +251,10 @@ describe("background handlers", () => {
       await connectionItem.setValue(conn);
       await globalsItem.setValue({ ...DEFAULT_GLOBALS, pageModel: mine });
       await handlers.pair("http://127.0.0.1:4096/auth/connect/abc");
-      expect((await globalsItem.getValue()).pageModel).toEqual(expect.objectContaining(mine));
+      expect((await globalsItem.getValue()).pageModel).toEqual({
+        ...mine,
+        connectionId: expect.any(String),
+      });
     });
 
     it("pair failure returns an error status and stores nothing", async () => {

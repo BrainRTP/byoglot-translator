@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing/fake-browser";
+import type { ConnectionRecord } from "../../../lib/connections/types";
 import {
   BUILTIN_TEMPLATE_ID,
   DEFAULT_GLOBALS,
@@ -139,6 +140,20 @@ describe("settings store", () => {
       expect((raw.templates as Template[])[0]?.settings.selectionModel?.connectionId).toBe(
         first?.id,
       );
+    });
+
+    it("keeps the models in connections and out of globals, and ignores a legacy key next to a list", async () => {
+      await seedLegacy();
+      const [first] = await connectionsStore.getAll();
+      const raw = await fakeBrowser.storage.local.get(["globals", "connections"]);
+      expect(raw.globals).not.toHaveProperty("pageModel");
+      expect((raw.connections as ConnectionRecord[])[0]?.pageModel).toEqual({
+        ...page,
+        connectionId: first?.id,
+      });
+      await fakeBrowser.storage.local.set({ connection: { ...legacy, password: "late" } });
+      expect(await connectionsStore.getAll()).toEqual([first]);
+      expect((await globalsItem.getValue()).pageModel).toEqual(first?.pageModel);
     });
 
     it("is idempotent", async () => {

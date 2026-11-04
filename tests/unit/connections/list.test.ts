@@ -36,7 +36,7 @@ describe("connection list helpers", () => {
     expect(JSON.stringify(b)).not.toContain("sk-secret-key");
     expect(a).toMatchObject({
       name: "opencode",
-      url: oc.kind === "opencode" ? oc.url : "",
+      url: "http://127.0.0.1:4096",
       hasKey: true,
       active: true,
     });

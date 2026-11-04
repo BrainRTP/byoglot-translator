@@ -8,7 +8,8 @@ import {
 import { tr } from "./i18n.svelte";
 import { languageGenitive, languageName } from "./languages";
 
-export const CONTRIBUTING_URL = "";
+export const CONTRIBUTING_URL =
+  "https://github.com/BrainRTP/byoglot-translator/blob/main/CONTRIBUTING.md#language-profiles";
 
 const AUTO = "auto";
 

@@ -165,7 +165,6 @@ The stack: WXT, Svelte 5, TypeScript 7 (svelte-check runs on TypeScript 6 throug
 - `title`, `alt` and `placeholder` attributes are not translated yet.
 - The `>_` mark in the icon is not readable at 16 px.
 - Popup errors do not name the provider or HTTP status behind a limit or key error.
-- The Firefox build has passed `web-ext lint` but has not been tested by hand yet.
 
 ## License
 

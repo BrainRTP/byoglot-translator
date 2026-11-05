@@ -88,9 +88,10 @@ describe("buildSelectionPrompt", () => {
     const p = buildSelectionPrompt(sel);
     expect(p).toContain("USER INSTRUCTIONS:\nexplain academic words");
     expect(p).toContain("plain text or simple markdown");
-    expect(p).toContain("Do not wrap the answer in JSON");
+    expect(p).toContain("Do not wrap it in JSON");
     expect(p).toContain("CONTEXT (do not translate):\nUbiquitous computing is everywhere.");
     expect(p).toContain("TEXT:\nubiquitous");
+    expect(p).toContain("A reader selected the TEXT below");
     expect(p).toContain("to Russian");
     expect(p).toContain("the source language (detect it)");
     expect(p).toContain("example.com");

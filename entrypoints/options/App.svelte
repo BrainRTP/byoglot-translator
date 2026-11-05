@@ -78,6 +78,7 @@
   let rules = $state<SiteRule[]>([]);
   let profiles = $state<LanguageProfileView[]>([]);
   let models = $state<ModelInfo[]>([]);
+  let modelsLoading = $state(false);
   let cacheEntries = $state(0);
   let shortcuts = $state<Shortcut[]>([]);
   let flags = $state<Record<Section, Flag>>({
@@ -146,18 +147,25 @@
     }
   }
 
-  async function loadModels(): Promise<ModelInfo[]> {
-    return sendMessage("models", undefined).catch(() => []);
+  // for providers the status check itself lists the models, so both can take seconds
+  async function loadModels(known?: Status) {
+    modelsLoading = true;
+    try {
+      const st = known ?? (await sendMessage("status", undefined));
+      status = st;
+      models = st.state === "connected" ? await sendMessage("models", undefined).catch(() => []) : [];
+    } finally {
+      modelsLoading = false;
+    }
   }
 
   async function load() {
     loadFailed = false;
     try {
-      const [g, tpl, rl, st, cache, prof, conns] = await Promise.all([
+      const [g, tpl, rl, cache, prof, conns] = await Promise.all([
         sendMessage("globals", undefined),
         sendMessage("templates", undefined),
         sendMessage("rules", undefined),
-        sendMessage("status", undefined),
         sendMessage("cacheStats", undefined),
         sendMessage("languageProfiles", undefined),
         sendMessage("connections", undefined),
@@ -167,12 +175,11 @@
       templates = tpl;
       rules = rl;
       profiles = prof;
-      status = st;
       cacheEntries = cache.entries;
       applyLang(g.uiLang);
       applyTheme(document.documentElement, g.theme);
       void loadShortcuts();
-      models = st.state === "connected" ? await loadModels() : [];
+      void loadModels().catch(() => {});
     } catch {
       loadFailed = true;
     } finally {
@@ -324,17 +331,15 @@
   }
 
   async function refreshStatus(known?: Status) {
-    status = known ?? (await sendMessage("status", undefined));
-    const [, list] = await Promise.all([
+    await Promise.all([
       globalsQueue.enqueue(
         () => sendMessage("globals", undefined),
         (g) => {
           globals = g;
         },
       ),
-      status.state === "connected" ? loadModels() : Promise.resolve([] as ModelInfo[]),
+      loadModels(known),
     ]);
-    models = list;
   }
 
   async function useConnection(id: string) {
@@ -444,6 +449,7 @@
       <span class="lbl">{tr("popup.model")}</span>
       <ModelSelect
         {models}
+        loading={modelsLoading}
         value={current}
         label={`${title}: ${tr("popup.model")}`}
         onchange={(m) => setModel(kind, m)}
@@ -482,7 +488,7 @@
     </header>
 
     {#if !loaded}
-      <div class="mu" role="status">{tr("selection.loading")}</div>
+      <div class="mu" role="status">{tr("popup.loading")}</div>
     {:else if loadFailed || !globals}
       <div class="box fail" role="alert">
         <div class="strong">{tr("opt.loadFailed.title")}</div>
@@ -599,7 +605,7 @@
               <b>{tr("models.thinkingTitle")}</b>
               {tr("models.thinkingHint")}
             </div>
-            {#if models.length === 0}
+            {#if models.length === 0 && !modelsLoading}
               <div class="mu small gap">{tr("models.unavailable")}</div>
             {/if}
             <div class="cards">
@@ -615,6 +621,7 @@
               {templates}
               {globals}
               {models}
+              {modelsLoading}
               {rules}
               onop={templateOp}
               onsetdefault={(id) => patchGlobals("templates", { defaultTemplateId: id })}

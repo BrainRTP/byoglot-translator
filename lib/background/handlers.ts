@@ -1,7 +1,13 @@
 import { browser } from "wxt/browser";
 import { storage } from "wxt/utils/storage";
 import type { TranslationCache } from "../cache/cache";
-import { isLocalOrigin, originInUse, originOf, toView } from "../connections/list";
+import {
+  isLocalOrigin,
+  normalizeBaseUrl,
+  originInUse,
+  originOf,
+  toView,
+} from "../connections/list";
 import type { ConnectionKind, ConnectionRecord, ConnectionView } from "../connections/types";
 import type {
   LanguageProfileView,
@@ -133,6 +139,7 @@ function stampSettings(settings: TemplateSettings, activeId: string | null): Tem
 
 const MODELS_TTL_MS = 30_000;
 const MODELS_FETCH_TIMEOUT_MS = 8_000;
+const CONNECT_TIMEOUT_MS = 10_000;
 const STATUS_TTL_MS = 5 * 60_000;
 
 // session storage outlives the service worker, so the popup does not hit the network on every open
@@ -410,10 +417,12 @@ export function createHandlers(deps: HandlerDeps) {
       connections: await views(list),
     });
     let origin: string;
+    let baseUrl: string;
     try {
       const url = new URL(i.baseUrl);
       if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("scheme");
-      origin = originOf(i.baseUrl);
+      origin = url.origin;
+      baseUrl = normalizeBaseUrl(i.baseUrl);
     } catch {
       return refuse("incompatible");
     }
@@ -431,7 +440,7 @@ export function createHandlers(deps: HandlerDeps) {
       if (existing) {
         if (existingOrigin !== origin) return refuse("provider_auth");
         apiKey = existing.apiKey;
-      } else if (needsKey(i.preset, i.baseUrl)) {
+      } else if (needsKey(i.preset, baseUrl)) {
         return refuse("provider_auth");
       }
     }
@@ -441,19 +450,20 @@ export function createHandlers(deps: HandlerDeps) {
       id: existing?.id ?? crypto.randomUUID(),
       preset: i.preset,
       name: i.name,
-      baseUrl: i.baseUrl,
+      baseUrl,
       apiKey,
       pageModel: existing?.pageModel ?? null,
       selectionModel: existing?.selectionModel ?? null,
     };
     let version: string;
     try {
-      version = (await deps.createBackend(candidate).info()).version;
+      version = (await deps.createBackend(candidate).info(AbortSignal.timeout(CONNECT_TIMEOUT_MS)))
+        .version;
     } catch (error) {
       const latest = await connectionsStore.getAll();
       await revokeOrigin(latest, origin);
       return {
-        status: errorStatus(i.baseUrl, error, "provider"),
+        status: errorStatus(baseUrl, error, "provider"),
         connections: await views(latest),
       };
     }
@@ -462,7 +472,7 @@ export function createHandlers(deps: HandlerDeps) {
     const current = fresh.find((rec) => rec.id === candidate.id);
     if (existing && !current) {
       await revokeOrigin(fresh, origin);
-      return { status: problem(i.baseUrl, "incompatible"), connections: await views(fresh) };
+      return { status: problem(baseUrl, "incompatible"), connections: await views(fresh) };
     }
     await activate(
       {
@@ -604,8 +614,16 @@ export function createHandlers(deps: HandlerDeps) {
 
     async connectManual(conn: Connection): Promise<Status> {
       try {
+        const url = new URL(conn.url);
+        if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("scheme");
+      } catch {
+        return errorStatus(conn.url, new BackendError("incompatible"), "opencode");
+      }
+      try {
         const list = await connectionsStore.getAll();
-        await deps.createBackend(opencodeRecord(conn, list)).info();
+        await deps
+          .createBackend(opencodeRecord(conn, list))
+          .info(AbortSignal.timeout(CONNECT_TIMEOUT_MS));
       } catch (error) {
         return errorStatus(conn.url, error, "opencode");
       }

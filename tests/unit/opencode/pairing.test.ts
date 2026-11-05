@@ -80,6 +80,24 @@ describe("pair", () => {
     );
   });
 
+  it("passes a timeout signal to the connect fetch and info", async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) =>
+      String(input).endsWith("/api/info") ? json({ version: "2.2.5" }) : json({ token: "t" }),
+    );
+    await pair(link, fetchImpl as unknown as typeof fetch);
+    expect(callAt(fetchImpl, 0).init.signal).toBeInstanceOf(AbortSignal);
+    expect(callAt(fetchImpl, 1).init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("maps a timeout to offline", async () => {
+    const fetchImpl = async () => {
+      throw new DOMException("timed out", "TimeoutError");
+    };
+    await expect(pair(link, fetchImpl as unknown as typeof fetch)).rejects.toMatchObject({
+      kind: "offline",
+    });
+  });
+
   it("maps 401 on connect to unauthorized", async () => {
     const fetchImpl = vi.fn(async () => json({ _tag: "UnauthorizedError" }, 401));
     await expect(pair(link, fetchImpl as unknown as typeof fetch)).rejects.toMatchObject({

@@ -162,6 +162,13 @@ describe("generate", () => {
     expect((await kindOf(backend.generate("x", model))).kind).toBe("aborted");
   });
 
+  it("maps TimeoutError to offline", async () => {
+    const { backend } = backendWith(async () => {
+      throw new DOMException("timed out", "TimeoutError");
+    });
+    expect((await kindOf(backend.generate("x", model))).kind).toBe("offline");
+  });
+
   it("maps a 200 body that does not match the schema to incompatible", async () => {
     const { backend } = backendWith(async () => json({ data: { content: "nope" } }));
     expect((await kindOf(backend.generate("x", model))).kind).toBe("incompatible");

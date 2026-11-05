@@ -4,6 +4,11 @@ export function originOf(url: string): string {
   return new URL(url).origin;
 }
 
+export function normalizeBaseUrl(raw: string): string {
+  const url = new URL(raw);
+  return (url.origin + url.pathname).replace(/\/+$/, "");
+}
+
 export function originPattern(url: string): string {
   const { protocol, hostname } = new URL(url);
   return `${protocol}//${hostname}/*`;

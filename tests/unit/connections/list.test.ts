@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isLocalOrigin,
+  normalizeBaseUrl,
   originInUse,
   originOf,
   originPattern,
@@ -47,6 +48,13 @@ describe("connection list helpers", () => {
     expect(isLocalOrigin("http://127.0.0.1:4096")).toBe(true);
     expect(isLocalOrigin("http://localhost:11434")).toBe(true);
     expect(isLocalOrigin("https://api.deepseek.com")).toBe(false);
+  });
+
+  it("normalizeBaseUrl keeps origin and path only", () => {
+    expect(normalizeBaseUrl("https://u:p@host.com:8443/v1/?x=1#h")).toBe(
+      "https://host.com:8443/v1",
+    );
+    expect(normalizeBaseUrl("https://host.com/")).toBe("https://host.com");
   });
 
   it("toView never leaks the key or password", () => {

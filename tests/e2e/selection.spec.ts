@@ -146,10 +146,10 @@ test("insert button translates the selection in place and keeps the link", async
 
   await insertFromCard(page);
 
-  await expect.poll(async () => (await intro.innerText()).includes("[ru] ")).toBe(true);
+  await expect.poll(async () => (await intro.textContent()).includes("[ru] ")).toBe(true);
   await expect(page.locator("#intro a")).toHaveCount(1);
   await expect(page.locator("#docs-link")).toHaveAttribute("href", "/fixtures/other.html");
-  expect(await intro.innerText()).toContain(
+  expect(await intro.textContent()).toContain(
     "The event loop lets the runtime handle many connections at once.",
   );
 });
@@ -161,7 +161,7 @@ test("revert button restores the original html", async ({ paired, mock }) => {
   const original = await intro.innerHTML();
 
   await insertFromCard(page);
-  await expect.poll(async () => (await intro.innerText()).includes("[ru] ")).toBe(true);
+  await expect.poll(async () => (await intro.textContent()).includes("[ru] ")).toBe(true);
 
   await expect
     .poll(() => queryClosedShadow(page, "button.revert[aria-label]", "revert"))

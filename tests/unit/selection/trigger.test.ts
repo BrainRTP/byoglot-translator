@@ -242,6 +242,35 @@ describe("shadow styles", () => {
     expect(STYLES).not.toMatch(/:host\{/);
   });
 
+  it.each([
+    ["dark", "dark"],
+    ["light", "light"],
+    ["system", null],
+  ] as const)(
+    "theme %s sets data-theme=%s on the wrapper after opening the card",
+    async (choice, attr) => {
+      mount({ theme: async () => choice });
+      await selectAndRelease(paragraph("Many historians describe serendipity."), 5, 15);
+      icon()?.click();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(shadow().querySelector(".root")?.getAttribute("data-theme") ?? null).toBe(attr);
+    },
+  );
+
+  it("keeps the system theme when the theme request fails", async () => {
+    mount({ theme: () => Promise.reject(new Error("x")) });
+    await selectAndRelease(paragraph("Many historians describe serendipity."), 5, 15);
+    icon()?.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(shadow().querySelector(".root")?.hasAttribute("data-theme")).toBe(false);
+  });
+
+  it("styles let the attribute override prefers-color-scheme", () => {
+    expect(STYLES).toContain('.root[data-theme="dark"]{');
+    expect(STYLES).toContain('.root[data-theme="light"]{color-scheme:light}');
+    expect(STYLES).toContain('@media (prefers-color-scheme: dark){.root:not([data-theme="light"])');
+  });
+
   it("renders the icon and card inside the wrapper", async () => {
     mount();
     const p = paragraph("Many historians describe serendipity.");

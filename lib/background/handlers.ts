@@ -235,6 +235,7 @@ export function createHandlers(deps: HandlerDeps) {
       settings,
       animation: g.animation,
       progressBar: g.progressBar,
+      theme: g.theme,
       template,
       modified: isModified(settings, template, g, activeId),
       rule,

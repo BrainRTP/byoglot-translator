@@ -8,6 +8,7 @@ import type {
   SiteRule,
   Template,
   TemplateSettings,
+  ThemeChoice,
 } from "../settings/types";
 
 export type Status =
@@ -35,6 +36,7 @@ export type TabView = {
   settings: EffectiveSettings;
   animation: AnimationKind;
   progressBar: boolean;
+  theme: ThemeChoice;
   template: Template;
   modified: boolean;
   rule: SiteRule | undefined;

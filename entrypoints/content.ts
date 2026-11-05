@@ -84,6 +84,7 @@ export default defineContentScript({
       listTemplates: () => sendMessage("templates", undefined),
       openSettings: () => void sendMessage("openOptions", undefined).catch(() => {}),
       currentTemplateId: async () => (await loadView()).settings.templateId,
+      theme: async () => (await loadView()).theme,
     });
 
     // every frame registers; only the one holding a selection answers

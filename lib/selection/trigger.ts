@@ -1,9 +1,11 @@
 import { BLOCK_SELECTOR, MARK_ATTR } from "../dom/constants";
 import { t } from "../i18n";
+import type { ThemeChoice } from "../settings/types";
+import { applyTheme } from "../ui/theme";
 import { type Anchor, type CardDeps, createCard, svgIcon } from "./card";
 import { HOST_STYLE, STYLES } from "./styles";
 
-export type SelectionUiDeps = CardDeps;
+export type SelectionUiDeps = CardDeps & { theme?(): Promise<ThemeChoice> };
 
 export type SelectionUi = {
   trigger(): void;
@@ -114,6 +116,11 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
   doc.documentElement.append(host);
 
   const card = createCard(root, deps);
+  const refreshTheme = () =>
+    void deps
+      .theme?.()
+      .then((choice) => applyTheme(root, choice))
+      .catch(() => {});
   let icon: HTMLButtonElement | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -124,6 +131,7 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
 
   function showIcon(snap: Snapshot) {
     hideIcon();
+    refreshTheme();
     const { anchor } = snap;
     const vw = win.innerWidth;
     const vh = win.innerHeight;
@@ -223,6 +231,7 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
       const snap = readSelection(doc, true);
       if (!snap) return;
       hideIcon();
+      refreshTheme();
       card.add(snap);
     },
     hasSelection: () => readSelection(doc, true) !== null,

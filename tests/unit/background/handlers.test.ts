@@ -109,6 +109,13 @@ describe("background handlers", () => {
     expect(other.rule).toBeUndefined();
   });
 
+  it("tabView carries the global theme setting", async () => {
+    const { handlers } = setup();
+    expect((await handlers.tabView({ tabId: 1, hostname: "example.com" })).theme).toBe("system");
+    await handlers.setGlobals({ ...(await handlers.globals()), theme: "dark" });
+    expect((await handlers.tabView({ tabId: 1, hostname: "example.com" })).theme).toBe("dark");
+  });
+
   it("tabView carries the global animation setting", async () => {
     const { handlers } = setup();
     expect((await handlers.tabView({ tabId: 1, hostname: "example.com" })).animation).toBe("wave");

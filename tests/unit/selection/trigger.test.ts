@@ -1132,3 +1132,117 @@ describe("selection window events", () => {
     expect(entries()).toHaveLength(2);
   });
 });
+
+describe("insert into the page", () => {
+  const anchor = { left: 100, right: 200, top: 100, bottom: 120 };
+  const range = () => document.createRange();
+  let host: HTMLElement;
+  let cardApi: ReturnType<typeof createCard>;
+
+  function setup(overrides: Partial<CardDeps> = {}) {
+    host = document.createElement("div");
+    document.body.append(host);
+    cardApi = createCard(host, {
+      translate: vi.fn().mockResolvedValue({ text: "x" }),
+      listTemplates: vi.fn().mockResolvedValue([builtin, custom]),
+      ...overrides,
+    });
+  }
+
+  const head = () => host.querySelector(".head") as HTMLElement;
+  const insertBtn = () =>
+    host.querySelector<HTMLButtonElement>('button[aria-label="Insert into the page"]');
+  const flush = () => vi.advanceTimersByTimeAsync(0);
+
+  afterEach(() => {
+    cardApi?.close();
+    host?.remove();
+  });
+
+  function kind(el: Element): string {
+    if (el.localName !== "button") return el.localName;
+    if (el.classList.contains("pin")) return "pin";
+    return el.getAttribute("aria-label") === "Close" ? "close" : "insert";
+  }
+
+  it("card header shows an insert button left of pin", async () => {
+    setup({ insert: vi.fn().mockResolvedValue("done") });
+    cardApi.open({ text: "a", context: "c", anchor, range: range() });
+    await flush();
+    expect([...head().children].map(kind)).toEqual(["select", "span", "insert", "pin", "close"]);
+    expect(insertBtn()?.hidden).toBe(false);
+  });
+
+  it("insert button calls deps.insert with the newest entry range", async () => {
+    const insert = vi.fn().mockResolvedValue("done");
+    setup({ insert });
+    const second = range();
+    cardApi.open({ text: "a", context: "c", anchor, range: range() });
+    cardApi.setMode("pinned");
+    cardApi.add({ text: "b", context: "c", anchor, range: second });
+    await flush();
+    insertBtn()?.click();
+    expect(insert).toHaveBeenCalledOnce();
+    expect(insert).toHaveBeenCalledWith(second);
+  });
+
+  it("no insert button for a form field selection or without deps.insert", async () => {
+    setup({ insert: vi.fn() });
+    cardApi.open({ text: "a", context: "c", anchor });
+    await flush();
+    expect(insertBtn()?.hidden).toBe(true);
+    cardApi.close();
+    host.remove();
+    setup();
+    cardApi.open({ text: "a", context: "c", anchor, range: range() });
+    await flush();
+    expect(insertBtn()?.hidden).toBe(true);
+  });
+
+  it("insert button is disabled while inserting and flashes insertEmpty", async () => {
+    let resolve: (v: "empty") => void = () => {};
+    const insert = vi.fn(() => new Promise<"empty">((r) => (resolve = r)));
+    setup({ insert });
+    cardApi.open({ text: "a", context: "c", anchor, range: range() });
+    await flush();
+    insertBtn()?.click();
+    expect(insertBtn()?.disabled).toBe(true);
+    resolve("empty");
+    await flush();
+    expect(insertBtn()?.disabled).toBe(false);
+    expect(insertBtn()?.title).toBe("Nothing to insert");
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(insertBtn()?.title).toBe("Insert into the page");
+  });
+
+  it("an error outcome flashes the error title", async () => {
+    setup({ insert: vi.fn().mockResolvedValue({ error: "offline" }) });
+    cardApi.open({ text: "a", context: "c", anchor, range: range() });
+    await flush();
+    insertBtn()?.click();
+    await flush();
+    expect(insertBtn()?.title).not.toBe("Insert into the page");
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(insertBtn()?.title).toBe("Insert into the page");
+  });
+
+  it("SelectionUi.insert inserts without opening the card", () => {
+    const insert = vi.fn().mockResolvedValue("done");
+    mount({ insert });
+    const p = paragraph("Many historians describe serendipity.");
+    selectText(p.firstChild as Text, 5, 15);
+    ui?.insert();
+    expect(insert).toHaveBeenCalledOnce();
+    expect(String(insert.mock.calls[0]?.[0])).toBe("historians");
+    expect(card()).toBeNull();
+  });
+
+  it("SelectionUi.insert does nothing when canInsert returns false", () => {
+    const insert = vi.fn().mockResolvedValue("done");
+    mount({ insert, canInsert: () => false });
+    const p = paragraph("Many historians describe serendipity.");
+    selectText(p.firstChild as Text, 5, 15);
+    ui?.insert();
+    expect(insert).not.toHaveBeenCalled();
+  });
+});

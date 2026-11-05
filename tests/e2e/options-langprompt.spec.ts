@@ -276,7 +276,7 @@ test("a stored profile that does not exist falls back to auto without a warning"
   const c = controls(page);
 
   await expect(c.profile).toHaveValue("auto");
-  await expect(c.section).not.toContainText("написан для другого языка");
+  await expect(c.section).not.toContainText("применяется только к переводу на свой язык");
   await expect(c.text).toHaveValue(builtin("ru"));
 });
 
@@ -285,7 +285,8 @@ test("an explicit profile of another language shows a warning, the generic one d
 }) => {
   const page = await openSection(paired, { targetLang: "de" });
   const c = controls(page);
-  const warning = "Профиль «Русский» написан для другого языка, перевод может выйти хуже.";
+  const warning =
+    "Профиль «Русский» применяется только к переводу на свой язык. Для других языков работает «Авто».";
   await expect(c.section).not.toContainText(warning);
 
   await c.profile.selectOption("ru");

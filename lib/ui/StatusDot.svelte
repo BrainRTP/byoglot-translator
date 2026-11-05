@@ -1,5 +1,5 @@
 <script lang="ts">
-  let { tone }: { tone: "ok" | "er" } = $props();
+  let { tone }: { tone: "ok" | "er" | "wait" } = $props();
 </script>
 
 <span class="dot {tone}" aria-hidden="true"></span>
@@ -17,5 +17,8 @@
   }
   .er {
     background: var(--er);
+  }
+  .wait {
+    background: var(--mu);
   }
 </style>

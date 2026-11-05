@@ -42,6 +42,7 @@ export const ru = {
   "app.name": "ByoGlot",
   "status.connected": "Подключено",
   "status.disconnected": "Нет подключения",
+  "status.checking": "Проверка...",
   "common.settings": "Настройки",
   "common.retry": "Повторить",
   "common.cancel": "Отмена",

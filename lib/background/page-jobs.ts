@@ -34,8 +34,10 @@ export function attachPagePort(port: PagePort, handlers: Handlers, service: Serv
         {
           onResults: (results) => post({ type: "results", jobId, results }),
           onFailed: (ids) => post({ type: "failed", jobId, ids }),
-          onFatal: (e) =>
-            post({ type: "fatal", jobId, kind: e.kind, retryAfterMs: e.retryAfterMs, backend }),
+          onFatal: (e) => {
+            void handlers.forgetStatus();
+            post({ type: "fatal", jobId, kind: e.kind, retryAfterMs: e.retryAfterMs, backend });
+          },
         },
         controller.signal,
       );
@@ -43,6 +45,7 @@ export function attachPagePort(port: PagePort, handlers: Handlers, service: Serv
     } catch (error) {
       if (controller.signal.aborted) return;
       const e = toBackendError(error);
+      void handlers.forgetStatus();
       post({
         type: "fatal",
         jobId,

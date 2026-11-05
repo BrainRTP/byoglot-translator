@@ -327,6 +327,58 @@ describe("background handlers", () => {
       });
     });
 
+    it("status reuses a connected check for 5 minutes unless asked for a fresh one", async () => {
+      const info = vi.fn(async () => ({ version: "2.1.0" }));
+      const { handlers } = setup(fakeBackend({ info }));
+      await seedOpencode(conn);
+      const now = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+      try {
+        await handlers.status();
+        expect((await handlers.status()).state).toBe("connected");
+        expect(info).toHaveBeenCalledTimes(1);
+        await handlers.status({ fresh: true });
+        expect(info).toHaveBeenCalledTimes(2);
+        now.mockReturnValue(1_000_000 + 5 * 60_000 + 1);
+        await handlers.status();
+        expect(info).toHaveBeenCalledTimes(3);
+      } finally {
+        now.mockRestore();
+      }
+    });
+
+    it("status rechecks an error on every call", async () => {
+      const info = vi.fn(async (): Promise<{ version: string }> => {
+        throw new BackendError("offline");
+      });
+      const { handlers } = setup(fakeBackend({ info }));
+      await seedOpencode(conn);
+      await handlers.status();
+      expect((await handlers.status()).state).toBe("error");
+      expect(info).toHaveBeenCalledTimes(2);
+    });
+
+    it("lastStatus answers from the last check without the network", async () => {
+      const info = vi.fn(async () => ({ version: "2.1.0" }));
+      const { handlers } = setup(fakeBackend({ info }));
+      expect(await handlers.lastStatus()).toEqual({ state: "disconnected" });
+      await seedOpencode(conn);
+      expect(await handlers.lastStatus()).toBeNull();
+      await handlers.status();
+      expect(await handlers.lastStatus()).toMatchObject({ state: "connected", kind: "opencode" });
+      expect(info).toHaveBeenCalledTimes(1);
+      await handlers.forgetStatus();
+      expect(await handlers.lastStatus()).toBeNull();
+    });
+
+    it("a connection change drops the last check", async () => {
+      const { handlers } = setup();
+      await seedOpencode(conn);
+      await handlers.status();
+      await handlers.removeConnection((await handlers.connections())[0]?.id ?? "");
+      expect(await handlers.lastStatus()).toEqual({ state: "disconnected" });
+      expect(await handlers.status()).toEqual({ state: "disconnected" });
+    });
+
     it("status maps an unauthorized backend error", async () => {
       const { handlers } = setup(
         fakeBackend({
@@ -402,16 +454,26 @@ describe("background handlers", () => {
       expect(resolveStoredModel(ref, null, null, "c1")).toEqual({ model: ref, missing: false });
     });
 
-    it("tabView flags a stale variant for the popup", async () => {
+    it("tabView flags a stale variant once the model list is cached", async () => {
       const { handlers } = setup();
       await seedOpencode(conn);
       await globalsItem.setValue({
         ...DEFAULT_GLOBALS,
         pageModel: { providerID: "deepseek", id: "deepseek-flash", variant: "ultra" },
       });
+      const first = await handlers.tabView({ tabId: 1, hostname: "example.com" });
+      expect(first.pageModel.missing).toBe(false);
+      await handlers.models();
       const view = await handlers.tabView({ tabId: 1, hostname: "example.com" });
       expect(view.pageModel.missing).toBe(true);
       expect(view.pageModel.model?.variant).toBeUndefined();
+    });
+
+    it("tabView does not wait for a slow model list", async () => {
+      const { handlers } = setup(fakeBackend({ listModels: () => new Promise(() => {}) }));
+      await seedOpencode(conn);
+      const view = await handlers.tabView({ tabId: 1, hostname: "example.com" });
+      expect(view.pageModel.missing).toBe(false);
     });
   });
 

@@ -35,8 +35,9 @@ function fakePort() {
   };
 }
 
+const forgetStatus = vi.fn(async () => {});
 const handlersWith = (pageJob: () => Promise<PageJob>, kind?: "opencode" | "provider") =>
-  ({ pageJob, activeKind: async () => kind }) as unknown as Handlers;
+  ({ pageJob, activeKind: async () => kind, forgetStatus }) as unknown as Handlers;
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 describe("attachPagePort", () => {
@@ -92,6 +93,45 @@ describe("attachPagePort", () => {
     send(translate);
     await tick();
     expect(sent[0]).toEqual({ type: "fatal", jobId: "j1", kind: "rate_limit", retryAfterMs: 900 });
+  });
+
+  it("a fatal error drops the cached connection status, done keeps it", async () => {
+    forgetStatus.mockClear();
+    const ok = fakePort();
+    attachPagePort(
+      ok.port,
+      handlersWith(async () => job),
+      { translatePage: vi.fn(async () => {}) },
+    );
+    ok.send(translate);
+    await tick();
+    expect(forgetStatus).not.toHaveBeenCalled();
+
+    const fromService = fakePort();
+    attachPagePort(
+      fromService.port,
+      handlersWith(async () => job),
+      {
+        translatePage: vi.fn(async (_j: PageJob, cb: PageCallbacks) => {
+          cb.onFatal(new BackendError("offline"));
+        }),
+      },
+    );
+    fromService.send(translate);
+    await tick();
+    expect(forgetStatus).toHaveBeenCalledTimes(1);
+
+    const fromJob = fakePort();
+    attachPagePort(
+      fromJob.port,
+      handlersWith(async () => {
+        throw new BackendError("unauthorized");
+      }),
+      { translatePage: vi.fn(async () => {}) },
+    );
+    fromJob.send(translate);
+    await tick();
+    expect(forgetStatus).toHaveBeenCalledTimes(2);
   });
 
   it("tags fatal errors with the active connection kind", async () => {

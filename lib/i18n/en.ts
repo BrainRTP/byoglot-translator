@@ -40,6 +40,7 @@ export const en = {
   "app.name": "ByoGlot",
   "status.connected": "Connected",
   "status.disconnected": "Not connected",
+  "status.checking": "Checking...",
   "common.settings": "Settings",
   "common.retry": "Retry",
   "common.cancel": "Cancel",

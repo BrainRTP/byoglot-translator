@@ -84,16 +84,17 @@ export function revealKeyframes(blockRect: DOMRect, lines: DOMRect[]): Keyframe[
     const yTop = clampY(line.top - blockRect.top);
     const yBottom = clampY(line.bottom - blockRect.top);
     const { start: startAt, end: endAt } = spans[i] as { start: number; end: number };
-    const isLast = i === lines.length - 1;
     frames.push({
       clipPath: polygon(w, clampX(line.left - blockRect.left), yTop, yBottom),
       offset: startAt,
     });
     frames.push({
-      clipPath: isLast ? open : polygon(w, clampX(line.right - blockRect.left), yTop, yBottom),
-      offset: isLast ? 1 : endAt,
+      clipPath: polygon(w, clampX(line.right - blockRect.left), yTop, yBottom),
+      offset: endAt,
     });
   });
+  // a separate frame at 1: interpolating the last line into `open` ran ahead of the pen
+  frames.push({ clipPath: open, offset: 1 });
   return frames;
 }
 

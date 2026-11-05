@@ -133,6 +133,7 @@
   function commandLabel(name: string, description: string | undefined): string {
     if (name === "translate-page") return tr("opt.hotkeys.translatePage");
     if (name === "translate-selection") return tr("opt.hotkeys.translateSelection");
+    if (name === "insert-selection") return tr("opt.hotkeys.insertSelection");
     return description || name;
   }
 

@@ -69,7 +69,7 @@ export default defineContentScript({
       for (const id of ids) void sendMessage("cancelSelection", id).catch(() => {});
     };
     const selectionUi = mountSelectionUi(document, {
-      translate: (text, context, templateId) => {
+      translate: (text, context, templateId, window) => {
         const requestId = crypto.randomUUID();
         activeRequests.add(requestId);
         return sendMessage("translateSelection", {
@@ -77,6 +77,7 @@ export default defineContentScript({
           context,
           hostname: location.hostname,
           requestId,
+          window,
           ...(templateId !== undefined && { templateId }),
         }).finally(() => activeRequests.delete(requestId));
       },

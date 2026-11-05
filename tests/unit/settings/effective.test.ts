@@ -6,6 +6,7 @@ import {
   isModified,
   ownModel,
   pickInitialModels,
+  pinnedModel,
   resolveModel,
   stampModel,
   toTemplateSettings,
@@ -239,8 +240,20 @@ describe("pickInitialModels", () => {
     };
     expect(pickInitialModels(models, models[0] ?? null, "c1")).toEqual({
       pageModel: ref,
-      selectionModel: ref,
+      selectionModel: { ...ref, variant: "high" },
     });
+  });
+
+  it("picks high for selection when available and none for the page", () => {
+    const def = model("a", "x", ["none", "low", "high"]);
+    const r = pickInitialModels([def], def, "c1");
+    expect(r.pageModel?.variant).toBe("none");
+    expect(r.selectionModel?.variant).toBe("high");
+  });
+
+  it("keeps the old selection choice when high is missing", () => {
+    const def = model("a", "x", ["low", "none"]);
+    expect(pickInitialModels([def], def, "c1").selectionModel?.variant).toBe("none");
   });
 
   it("omits the variant for deepseek-flash when it has no none variant", () => {
@@ -282,5 +295,32 @@ describe("pickInitialModels", () => {
       pageModel: null,
       selectionModel: null,
     });
+  });
+});
+
+describe("pinnedModel", () => {
+  const base = { providerID: "p", id: "m", variant: "low", connectionId: "c1" };
+  const info = (variants: string[]) => model("p", "m", variants);
+
+  it("uses the stored pinned effort when the model supports it", () => {
+    expect(pinnedModel(base, info(["low", "medium", "high"]), "medium").variant).toBe("medium");
+  });
+
+  it("falls back to high when the stored effort is unsupported", () => {
+    expect(pinnedModel(base, info(["low", "high"]), "xhigh").variant).toBe("high");
+  });
+
+  it("drops the variant when the model has no high", () => {
+    const r = pinnedModel(base, info(["low", "medium"]), "max");
+    expect(r).toEqual({ providerID: "p", id: "m", connectionId: "c1" });
+  });
+
+  it("uses high when nothing is stored", () => {
+    expect(pinnedModel(base, info(["low", "high"]), null).variant).toBe("high");
+  });
+
+  it("keeps pinnedEffort ?? high without model info", () => {
+    expect(pinnedModel(base, undefined, "medium").variant).toBe("medium");
+    expect(pinnedModel(base, undefined, null).variant).toBe("high");
   });
 });

@@ -57,8 +57,8 @@ pnpm quality:translate --config tests/quality/configs/ext-v1.json --run de-gen-s
 pnpm quality:translate --config tests/quality/configs/ext-v1.json --run de-cand-sp --set targetLang=de --set languagePrompt=profile:de
 pnpm quality:translate --config tests/quality/configs/ext-v1.json --run de-gen-fw --set targetLang=de --set snapshot=fowler-techdebt --set languagePrompt=profile:generic
 pnpm quality:translate --config tests/quality/configs/ext-v1.json --run de-cand-fw --set targetLang=de --set snapshot=fowler-techdebt --set languagePrompt=profile:de
-pnpm quality:translate --config tests/quality/configs/ext-v1.json --run de-gen-sel --set targetLang=de --set mode=selection --set snapshot=selections --set frame=frame/selection-v0.txt --set languagePrompt=profile:generic
-pnpm quality:translate --config tests/quality/configs/ext-v1.json --run de-cand-sel --set targetLang=de --set mode=selection --set snapshot=selections --set frame=frame/selection-v0.txt --set languagePrompt=profile:de
+pnpm quality:translate --config tests/quality/configs/ext-v1.json --run de-gen-sel --set targetLang=de --set mode=selection --set snapshot=selections --set frame=frame/selection-v1.txt --set languagePrompt=profile:generic
+pnpm quality:translate --config tests/quality/configs/ext-v1.json --run de-cand-sel --set targetLang=de --set mode=selection --set snapshot=selections --set frame=frame/selection-v1.txt --set languagePrompt=profile:de
 ```
 
 `--set key=value` overrides one field of the config. `profile:<code>` reads `lib/translate/profiles/<code>.md`. To test a draft before you copy it there, use `--set languagePrompt=lang/<code>-v1.md`. A run writes its result to `tests/quality/.data/runs/<run>/`. Read `side-by-side.md` in that folder: it lists each source block with the translation.

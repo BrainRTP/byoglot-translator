@@ -23,6 +23,7 @@ export const DEFAULT_GLOBALS: GlobalSettings = {
   progressBar: true,
   pageModel: null,
   selectionModel: null,
+  pinnedEffort: null,
   defaultTemplateId: BUILTIN_TEMPLATE_ID,
   uiLang: "auto",
   languagePromptEnabled: true,

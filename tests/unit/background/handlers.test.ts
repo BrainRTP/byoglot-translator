@@ -242,7 +242,7 @@ describe("background handlers", () => {
         variant: "none",
         connectionId: expect.any(String),
       });
-      expect(g.selectionModel).toEqual(g.pageModel);
+      expect(g.selectionModel).toEqual({ ...g.pageModel, variant: "high" });
     });
 
     it("pair does not overwrite a pageModel set while models were loading", async () => {
@@ -440,6 +440,36 @@ describe("background handlers", () => {
       ];
       expect(call[0].model).toEqual({ ...selectionModel, connectionId: expect.any(String) });
       expect(call[0].hostname).toBe("example.com");
+    });
+
+    it("pinned requests use the pinned effort, one-shot keeps the selection variant", async () => {
+      const { handlers, translateSelection } = setup(
+        fakeBackend({
+          listModels: async () => [{ ...flash, variants: ["none", "medium", "high"] }],
+        }),
+      );
+      await globalsItem.setValue({ ...DEFAULT_GLOBALS, selectionModel, pinnedEffort: "medium" });
+      const sender = { tab: { id: 5, url: "https://example.com/" } };
+      const base = { text: "hello", context: "", hostname: "example.com" };
+      await handlers.translateSelection({ ...base, window: "pinned" }, sender);
+      await handlers.translateSelection({ ...base, window: "oneshot" }, sender);
+      await handlers.translateSelection(base, sender);
+      const variants = translateSelection.mock.calls.map(
+        (c) => (c as unknown as [{ model: ModelRef }])[0].model.variant,
+      );
+      expect(variants).toEqual(["medium", "none", "none"]);
+    });
+
+    it("pinned requests default to high and skip an unsupported stored effort", async () => {
+      const { handlers, translateSelection } = setup();
+      await globalsItem.setValue({ ...DEFAULT_GLOBALS, selectionModel, pinnedEffort: "xhigh" });
+      const res = await handlers.translateSelection(
+        { text: "hello", context: "", hostname: "example.com", window: "pinned" },
+        { tab: { id: 5, url: "https://example.com/" } },
+      );
+      const call = translateSelection.mock.calls[0] as unknown as [{ model: ModelRef }];
+      expect(call[0].model.variant).toBe("high");
+      expect("model" in res && res.model?.variant).toBe("high");
     });
 
     it("passes the language prompt of the effective target language to the service", async () => {

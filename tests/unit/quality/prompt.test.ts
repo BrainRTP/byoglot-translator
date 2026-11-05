@@ -99,9 +99,9 @@ describe("buildSelectionLabPrompt", () => {
     context: "Para\n\ntext",
   };
 
-  it("reproduces the extension selection prompt for frame v0", () => {
+  it("reproduces the extension selection prompt for frame v1", () => {
     const lab = buildSelectionLabPrompt({
-      frame: read("frame/selection-v0.txt"),
+      frame: read("frame/selection-v1.txt"),
       languagePrompt: null,
       template: "",
       ...sel,
@@ -109,10 +109,10 @@ describe("buildSelectionLabPrompt", () => {
     expect(lab).toBe(buildSelectionPrompt({ prePrompt: "", languagePrompt: "", ...sel }));
   });
 
-  it("reproduces the extension selection prompt for frame v0 with a profile", () => {
+  it("reproduces the extension selection prompt for frame v1 with a profile", () => {
     const languagePrompt = readPrompt("profile:ru");
     const lab = buildSelectionLabPrompt({
-      frame: read("frame/selection-v0.txt"),
+      frame: read("frame/selection-v1.txt"),
       languagePrompt,
       template: plain,
       ...sel,

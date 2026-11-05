@@ -103,6 +103,7 @@ export interface ProtocolMap {
     context: string;
     hostname: string;
     templateId?: string;
+    window?: "oneshot" | "pinned";
     requestId?: string;
   }): SelectionResult;
   cancelSelection(requestId: string): void;

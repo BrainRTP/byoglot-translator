@@ -28,7 +28,7 @@ const MODEL = {
   providerID: "deepseek",
   id: "deepseek-flash",
   name: "deepseek-flash",
-  variants: [{ id: "none" }],
+  variants: ["none", "low", "medium", "high"].map((id) => ({ id })),
   limit: { context: 100000, output: 8000 },
 };
 

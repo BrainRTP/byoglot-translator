@@ -1,6 +1,8 @@
 import type { ModelInfo, ModelRef } from "../opencode/types";
 import type { EffectiveSettings, GlobalSettings, Template, TemplateSettings } from "./types";
 
+export const SELECTION_DEFAULT_EFFORT = "high";
+
 const FAVORITE = { providerID: "deepseek", id: "deepseek-flash" };
 
 function copyModel(m: ModelRef | null | undefined): ModelRef | null {
@@ -90,23 +92,37 @@ function withVariant(m: ModelInfo, variant: string | undefined, connectionId: st
     : { providerID: m.providerID, id: m.id, variant, connectionId };
 }
 
+export function pinnedModel(
+  base: ModelRef,
+  info: ModelInfo | undefined,
+  pinnedEffort: string | null,
+): ModelRef {
+  const { variant: _drop, ...rest } = base;
+  const pick = !info
+    ? (pinnedEffort ?? SELECTION_DEFAULT_EFFORT)
+    : pinnedEffort && info.variants.includes(pinnedEffort)
+      ? pinnedEffort
+      : info.variants.includes(SELECTION_DEFAULT_EFFORT)
+        ? SELECTION_DEFAULT_EFFORT
+        : undefined;
+  return pick === undefined ? rest : { ...rest, variant: pick };
+}
+
 export function pickInitialModels(
   models: ModelInfo[],
   def: ModelInfo | null,
   connectionId: string,
 ): { pageModel: ModelRef | null; selectionModel: ModelRef | null } {
+  const pair = (m: ModelInfo, variant: string | undefined) => ({
+    pageModel: withVariant(m, variant, connectionId),
+    selectionModel: withVariant(
+      m,
+      m.variants.includes(SELECTION_DEFAULT_EFFORT) ? SELECTION_DEFAULT_EFFORT : variant,
+      connectionId,
+    ),
+  });
   const favorite = models.find((m) => m.providerID === FAVORITE.providerID && m.id === FAVORITE.id);
-  if (favorite) {
-    const variant = favorite.variants.includes("none") ? "none" : undefined;
-    return {
-      pageModel: withVariant(favorite, variant, connectionId),
-      selectionModel: withVariant(favorite, variant, connectionId),
-    };
-  }
+  if (favorite) return pair(favorite, favorite.variants.includes("none") ? "none" : undefined);
   if (!def) return { pageModel: null, selectionModel: null };
-  const variant = def.variants.includes("none") ? "none" : def.variants[0];
-  return {
-    pageModel: withVariant(def, variant, connectionId),
-    selectionModel: withVariant(def, variant, connectionId),
-  };
+  return pair(def, def.variants.includes("none") ? "none" : def.variants[0]);
 }

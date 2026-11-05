@@ -90,6 +90,7 @@
   });
   let active = $state<string>("connection");
   const animation = $derived(globals?.animation ?? DEFAULT_GLOBALS.animation);
+  const progressBar = $derived(globals?.progressBar ?? DEFAULT_GLOBALS.progressBar);
 
   const timers: Partial<Record<Section, ReturnType<typeof setTimeout>>> = {};
   const globalsQueue = createSerialQueue();
@@ -583,6 +584,14 @@
               value={animation}
               onpick={(picked) => patchGlobals("animation", { animation: picked })}
             />
+            <label class="check">
+              <input
+                type="checkbox"
+                checked={progressBar}
+                onchange={(e) => patchGlobals("animation", { progressBar: e.currentTarget.checked })}
+              />
+              {tr("opt.anim.progressBar")}
+            </label>
           </section>
 
           <section class="sec" id="cache">
@@ -723,6 +732,12 @@
   }
   .flag.bad {
     color: var(--er);
+  }
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
   }
   .lead {
     margin: 4px 0 0;

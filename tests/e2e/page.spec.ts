@@ -125,3 +125,50 @@ test("page prompt carries the generic language profile for a target without its 
     expect(prompt).not.toContain(firstLine("ru"));
   }
 });
+
+const watchProgressBar = (page: Page) =>
+  page.evaluate(() => {
+    const w = window as unknown as { __bar: boolean };
+    w.__bar = false;
+    new MutationObserver((records) => {
+      for (const r of records)
+        for (const n of r.addedNodes)
+          if ((n as Element).getAttribute?.("data-byoglot") === "progress") w.__bar = true;
+    }).observe(document.documentElement, { childList: true });
+  });
+
+const barSeen = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __bar: boolean }).__bar);
+
+test("shows a progress bar while translating and removes it afterwards", async ({
+  paired,
+  mock,
+}) => {
+  const page = await paired.context.newPage();
+  await page.goto(`${mock.url}/fixtures/article.html`);
+  await watchProgressBar(page);
+
+  const popup = await openPopup(paired, page);
+  await popup.getByRole("button", { name: "Translate page" }).click();
+  await expect(page.locator("#intro")).toContainText("[ru] ", { timeout: 15_000 });
+
+  await expect.poll(() => barSeen(page)).toBe(true);
+  await expect(page.locator('[data-byoglot="progress"]')).toHaveCount(0);
+});
+
+test("does not show the progress bar when it is turned off", async ({ paired, mock }) => {
+  await paired.worker.evaluate(async () => {
+    const { globals } = await chrome.storage.local.get("globals");
+    await chrome.storage.local.set({ globals: { ...(globals as object), progressBar: false } });
+  });
+  const page = await paired.context.newPage();
+  await page.goto(`${mock.url}/fixtures/article.html`);
+  await watchProgressBar(page);
+
+  const popup = await openPopup(paired, page);
+  await popup.getByRole("button", { name: "Translate page" }).click();
+  await expect(page.locator("#intro")).toContainText("[ru] ", { timeout: 15_000 });
+  await page.waitForTimeout(600);
+
+  expect(await barSeen(page)).toBe(false);
+});

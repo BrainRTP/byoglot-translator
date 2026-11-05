@@ -20,6 +20,7 @@ export const DEFAULT_GLOBALS: GlobalSettings = {
   targetLang: "en",
   displayMode: "replace",
   animation: "wave",
+  progressBar: true,
   pageModel: null,
   selectionModel: null,
   defaultTemplateId: BUILTIN_TEMPLATE_ID,

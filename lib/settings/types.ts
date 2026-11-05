@@ -23,6 +23,7 @@ export type GlobalSettings = {
   targetLang: string;
   displayMode: DisplayMode;
   animation: AnimationKind;
+  progressBar: boolean;
   pageModel: ModelRef | null;
   selectionModel: ModelRef | null;
   defaultTemplateId: string;

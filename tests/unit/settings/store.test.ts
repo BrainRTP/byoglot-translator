@@ -56,6 +56,12 @@ describe("settings store", () => {
     expect(g.targetLang).toBe("fr");
   });
 
+  it("defaults the progress bar to on for globals saved without it", async () => {
+    const { progressBar: _omit, ...old } = DEFAULT_GLOBALS;
+    await fakeBrowser.storage.local.set({ globals: old });
+    expect((await globalsItem.getValue()).progressBar).toBe(true);
+  });
+
   it("reads globals saved before the language prompt with its defaults", async () => {
     const { languagePromptEnabled: _on, languageProfile: _profile, ...old } = DEFAULT_GLOBALS;
     await fakeBrowser.storage.local.set({ globals: { ...old, targetLang: "fr" } });

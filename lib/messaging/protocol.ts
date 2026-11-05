@@ -34,6 +34,7 @@ export type ResolvedModel = { model: ModelRef | null; missing: boolean };
 export type TabView = {
   settings: EffectiveSettings;
   animation: AnimationKind;
+  progressBar: boolean;
   template: Template;
   modified: boolean;
   rule: SiteRule | undefined;

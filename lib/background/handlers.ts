@@ -23,7 +23,7 @@ import type {
   ModelRef,
   TranslationBackend,
 } from "../opencode/types";
-import { PRESETS } from "../provider/presets";
+import { needsKey, PRESETS } from "../provider/presets";
 import { BUILTIN_TEMPLATE_ID, builtinTemplate } from "../settings/defaults";
 import {
   applyTemplate,
@@ -346,8 +346,10 @@ export function createHandlers(deps: HandlerDeps) {
     } catch {
       return refuse("incompatible");
     }
+    if (!(i.preset in PRESETS)) return refuse("incompatible");
     const found = i.id ? list.find((rec) => rec.id === i.id) : undefined;
     const existing = found?.kind === "provider" ? found : undefined;
+    if (i.id && !existing) return refuse("incompatible");
     let existingOrigin: string | undefined;
     try {
       existingOrigin = existing && originOf(existing.baseUrl);
@@ -358,7 +360,7 @@ export function createHandlers(deps: HandlerDeps) {
       if (existing) {
         if (existingOrigin !== origin) return refuse("provider_auth");
         apiKey = existing.apiKey;
-      } else if (PRESETS[i.preset].needsKey) {
+      } else if (needsKey(i.preset, i.baseUrl)) {
         return refuse("provider_auth");
       }
     }
@@ -388,6 +390,7 @@ export function createHandlers(deps: HandlerDeps) {
     const fresh = await connectionsStore.getAll();
     const current = fresh.find((rec) => rec.id === candidate.id);
     if (existing && !current) {
+      await revokeOrigin(fresh, origin);
       return { status: problem(i.baseUrl, "incompatible"), connections: await views(fresh) };
     }
     await activate(
@@ -643,6 +646,7 @@ export function createHandlers(deps: HandlerDeps) {
       i: Parameters<ProtocolMap["translateSelection"]>[0],
       sender: Sender,
     ): Promise<SelectionResult> {
+      const kind = await activeKind();
       const controller = new AbortController();
       if (i.requestId) selectionJobs.set(i.requestId, { controller, tabId: sender.tab?.id });
       try {
@@ -672,7 +676,7 @@ export function createHandlers(deps: HandlerDeps) {
         };
       } catch (error) {
         const e = toBackendError(error);
-        return { error: e.kind, retryAfterMs: e.retryAfterMs, backend: await activeKind() };
+        return { error: e.kind, retryAfterMs: e.retryAfterMs, backend: kind };
       } finally {
         if (i.requestId && selectionJobs.get(i.requestId)?.controller === controller) {
           selectionJobs.delete(i.requestId);

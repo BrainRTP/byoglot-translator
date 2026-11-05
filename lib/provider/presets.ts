@@ -1,8 +1,9 @@
 import type { z } from "zod";
+import { isLocalOrigin, originOf } from "../connections/list";
 import type { ProviderPreset } from "../connections/types";
 import type { modelRawSchema } from "./schemas";
 
-type RawModel = z.infer<typeof modelRawSchema>;
+export type RawModel = z.infer<typeof modelRawSchema>;
 
 export const PRESETS: Record<ProviderPreset, { baseUrl: string; needsKey: boolean }> = {
   deepseek: { baseUrl: "https://api.deepseek.com", needsKey: true },
@@ -11,6 +12,17 @@ export const PRESETS: Record<ProviderPreset, { baseUrl: string; needsKey: boolea
   lmstudio: { baseUrl: "http://localhost:1234/v1", needsKey: false },
   custom: { baseUrl: "", needsKey: true },
 };
+
+export function needsKey(preset: ProviderPreset, baseUrl: string): boolean {
+  if (preset === "custom") {
+    try {
+      if (isLocalOrigin(originOf(baseUrl))) return false;
+    } catch {
+      return true;
+    }
+  }
+  return PRESETS[preset].needsKey;
+}
 
 export function effortVariants(preset: ProviderPreset, raw: RawModel): string[] {
   if (preset === "deepseek") return ["none", ...(raw.effort?.supported_levels ?? [])];

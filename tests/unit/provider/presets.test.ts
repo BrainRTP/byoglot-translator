@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { effortParams, effortVariants, PRESETS } from "../../../lib/provider/presets";
+import { effortParams, effortVariants, needsKey, PRESETS } from "../../../lib/provider/presets";
 
 describe("PRESETS", () => {
   it("has the base urls and key requirements", () => {
@@ -8,6 +8,15 @@ describe("PRESETS", () => {
     expect(PRESETS.ollama).toEqual({ baseUrl: "http://localhost:11434/v1", needsKey: false });
     expect(PRESETS.lmstudio).toEqual({ baseUrl: "http://localhost:1234/v1", needsKey: false });
     expect(PRESETS.custom).toEqual({ baseUrl: "", needsKey: true });
+  });
+});
+
+describe("needsKey", () => {
+  it("custom on a local origin does not need a key", () => {
+    expect(needsKey("custom", "http://localhost:8080/v1")).toBe(false);
+    expect(needsKey("custom", "https://api.example.com")).toBe(true);
+    expect(needsKey("custom", "not a url")).toBe(true);
+    expect(needsKey("deepseek", "http://localhost")).toBe(true);
   });
 });
 

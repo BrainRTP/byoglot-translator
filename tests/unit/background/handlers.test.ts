@@ -757,6 +757,31 @@ describe("background handlers", () => {
       expect(listModels.mock.calls.length).toBe(before + 1);
     });
 
+    it("a provider status check and tabView share one model list request", async () => {
+      await connectionsStore.setAll([
+        {
+          kind: "provider",
+          id: "p1",
+          preset: "deepseek",
+          name: "DeepSeek",
+          baseUrl: "https://api.deepseek.com",
+          apiKey: "k",
+          pageModel: null,
+          selectionModel: null,
+        },
+      ]);
+      await connectionsStore.setActiveId("p1");
+      const listModels = vi.fn(async () => [flash]);
+      const info = async () => {
+        await listModels();
+        return { version: "" };
+      };
+      const { handlers } = setup(fakeBackend({ listModels, info }));
+      expect(await handlers.status()).toMatchObject({ state: "connected", kind: "provider" });
+      await view(handlers);
+      expect(listModels).toHaveBeenCalledTimes(1);
+    });
+
     it("failed loads are not cached", async () => {
       const listModels = vi
         .fn<() => Promise<ModelInfo[]>>()

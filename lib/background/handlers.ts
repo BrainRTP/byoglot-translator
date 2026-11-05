@@ -259,13 +259,15 @@ export function createHandlers(deps: HandlerDeps) {
     if (!active) return { state: "disconnected" };
     const view = toView(active, active.id);
     try {
-      const info = await (await deps.getBackend()).info();
+      let version = "";
+      if (active.kind === "provider") await fetchModels();
+      else version = (await (await deps.getBackend()).info()).version;
       return {
         state: "connected",
         kind: active.kind,
         name: view.name,
         url: view.url,
-        version: info.version,
+        version,
       };
     } catch (error) {
       return errorStatus(view.url, error, active.kind);

@@ -40,19 +40,19 @@ test("the effort list opens under its field and stays inside the popup", async (
   expect(option.x + option.width).toBeLessThanOrEqual(width);
 });
 
-test("the popup shows its frame before a slow model list arrives", async ({ ext, mock }) => {
+test("the popup is usable before a slow status check returns", async ({ ext, mock }) => {
   const provider = await startMockProvider({ modelsDelayMs: 3000 });
   try {
     await seedProvider(ext.worker, provider);
     const page = await ext.context.newPage();
     await page.goto(`${mock.url}/fixtures/article.html`);
     const popup = await openPopup(ext, page);
-    const frame = popup.locator("main.pop");
-    await expect(frame).toBeVisible({ timeout: 1000 });
-    expect((await frame.boundingBox())?.width).toBe(360);
-    await expect(popup.getByRole("button", { name: "Translate page" })).toBeVisible({
-      timeout: 10_000,
+    await expect(popup.getByRole("button", { name: "Translate page" })).toBeEnabled({
+      timeout: 1000,
     });
+    expect((await popup.locator("main.pop").boundingBox())?.width).toBe(360);
+    await expect(popup.getByText("Checking...")).toBeVisible();
+    await expect(popup.getByText("Connected", { exact: true })).toBeVisible({ timeout: 10_000 });
   } finally {
     await provider.stop();
   }

@@ -1,4 +1,5 @@
 import { browser } from "wxt/browser";
+import { storage } from "wxt/utils/storage";
 import type { TranslationCache } from "../cache/cache";
 import { isLocalOrigin, originInUse, originOf, toView } from "../connections/list";
 import type { ConnectionKind, ConnectionRecord, ConnectionView } from "../connections/types";
@@ -132,6 +133,13 @@ function stampSettings(settings: TemplateSettings, activeId: string | null): Tem
 
 const MODELS_TTL_MS = 30_000;
 const MODELS_FETCH_TIMEOUT_MS = 8_000;
+const STATUS_TTL_MS = 5 * 60_000;
+
+// session storage outlives the service worker, so the popup does not hit the network on every open
+const lastStatusItem = storage.defineItem<{ key: string; at: number; status: Status } | null>(
+  "session:lastStatus",
+  { fallback: null },
+);
 const BADGE_TEXT: Record<PageState["state"], string> = {
   idle: "",
   translating: "...",
@@ -151,6 +159,11 @@ export function createHandlers(deps: HandlerDeps) {
     modelsCache = null;
     pending = null;
     modelsEpoch++;
+    void forgetStatus();
+  }
+
+  function forgetStatus(): Promise<void> {
+    return lastStatusItem.removeValue();
   }
 
   function fetchModels(): Promise<ModelInfo[]> {
@@ -176,6 +189,13 @@ export function createHandlers(deps: HandlerDeps) {
     } catch {
       return null;
     }
+  }
+
+  // the view must not wait for the network; the missing-model check runs once the list is cached
+  function knownModels(): ModelInfo[] | null {
+    if (modelsCache && Date.now() - modelsCache.at < MODELS_TTL_MS) return modelsCache.models;
+    fetchModels().catch(() => {});
+    return null;
   }
 
   async function rememberHost(tabId: number, hostname: string): Promise<void> {
@@ -231,7 +251,7 @@ export function createHandlers(deps: HandlerDeps) {
       settings = applyTemplate(template, g, activeId);
     }
 
-    const models = await loadModels();
+    const models = knownModels();
     return {
       settings,
       animation: g.animation,
@@ -259,9 +279,34 @@ export function createHandlers(deps: HandlerDeps) {
     return errorStatus(url, new BackendError(kind), "provider");
   }
 
-  async function status(): Promise<Status> {
+  async function lastStatus(): Promise<Status | null> {
     const active = await connectionsStore.getActive();
     if (!active) return { state: "disconnected" };
+    const last = await lastStatusItem.getValue();
+    return last?.key === statusKey(active) ? last.status : null;
+  }
+
+  const statusKey = (rec: ConnectionRecord) => `${rec.id}|${toView(rec, rec.id).url}`;
+
+  async function status(i?: { fresh?: boolean }): Promise<Status> {
+    const active = await connectionsStore.getActive();
+    if (!active) return { state: "disconnected" };
+    const key = statusKey(active);
+    const last = await lastStatusItem.getValue();
+    if (
+      !i?.fresh &&
+      last?.key === key &&
+      last.status.state === "connected" &&
+      Date.now() - last.at < STATUS_TTL_MS
+    ) {
+      return last.status;
+    }
+    const next = await checkStatus(active);
+    await lastStatusItem.setValue({ key, at: Date.now(), status: next });
+    return next;
+  }
+
+  async function checkStatus(active: ConnectionRecord): Promise<Status> {
     const view = toView(active, active.id);
     try {
       let version = "";
@@ -352,7 +397,7 @@ export function createHandlers(deps: HandlerDeps) {
   async function saveOpencode(conn: Connection): Promise<Status> {
     const list = await connectionsStore.getAll();
     await activate(opencodeRecord(conn, list), list);
-    return status();
+    return status({ fresh: true });
   }
 
   async function saveProvider(
@@ -540,6 +585,10 @@ export function createHandlers(deps: HandlerDeps) {
   const handlers = {
     status,
 
+    lastStatus,
+
+    forgetStatus,
+
     async pair(link: string): Promise<Status> {
       try {
         return await saveOpencode(await deps.pair(link));
@@ -574,7 +623,7 @@ export function createHandlers(deps: HandlerDeps) {
       resetModels();
       await connectionsStore.setActiveId(id);
       await initModels();
-      return status();
+      return status({ fresh: true });
     },
 
     async removeConnection(id: string): Promise<ConnectionView[]> {

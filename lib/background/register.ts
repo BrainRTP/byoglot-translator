@@ -51,7 +51,8 @@ export function registerBackground(deps: BackgroundDeps): void {
     });
   };
 
-  handle("status", () => handlers.status());
+  handle("status", (i) => handlers.status(i));
+  handle("lastStatus", () => handlers.lastStatus());
   handle("pair", (link) => handlers.pair(link));
   handle("connectManual", (conn) => handlers.connectManual(conn));
   handle("connections", () => handlers.connections());

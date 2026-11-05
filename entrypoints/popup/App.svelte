@@ -36,7 +36,7 @@
   import Segmented from "../../lib/ui/Segmented.svelte";
   import StatusDot from "../../lib/ui/StatusDot.svelte";
   import { createSerialQueue } from "../../lib/ui/serial-queue";
-  import { applyTheme } from "../../lib/ui/theme";
+  import { applyTheme, rememberLook } from "../../lib/ui/theme";
 
   const IDLE: PageState = { state: "idle", done: 0, total: 0, failed: 0 };
   const PROMPT_DEBOUNCE_MS = 250;
@@ -65,7 +65,8 @@
   let track: PageTrack = { state: IDLE, available: true, failures: 0 };
   const queue = createSerialQueue();
 
-  const connected = $derived(status?.state === "connected");
+  // unknown status counts as usable: a broken connection shows up as a page error instead
+  const usable = $derived(status?.state !== "disconnected");
   const pageFail = $derived(pageFailure(page, dismissed));
   const failure = $derived(
     status?.state === "error"
@@ -76,7 +77,7 @@
   const progress = $derived(progressView(page));
   const action = $derived(mainAction(page));
   const warning = $derived(view ? modelWarning(view) : null);
-  const mainDisabled = $derived(!connected || !tab?.web || !pageAvailable);
+  const mainDisabled = $derived(!usable || !tab?.web || !pageAvailable);
   const showSettings = $derived(status?.state !== "disconnected" && tab?.web === true && view);
   const ruleTemplate = $derived(
     view?.rule ? templates.find((t) => t.id === view?.rule?.templateId) : undefined,
@@ -102,14 +103,7 @@
   const queryPage = (tabId: number) =>
     askPage(() => sendTabMessage("pageState", undefined, tabId));
 
-  async function loadTab(current: { id: number; hostname: string }, canLoadModels: boolean) {
-    if (canLoadModels) {
-      sendMessage("models", undefined)
-        .then((ms) => {
-          models = ms;
-        })
-        .catch(() => {});
-    }
+  async function loadTab(current: { id: number; hostname: string }) {
     const [v, list, pr] = await Promise.all([
       sendMessage("tabView", { tabId: current.id, hostname: current.hostname }),
       sendMessage("templates", undefined),
@@ -121,27 +115,41 @@
     applyPage(pr, 1);
   }
 
-  async function loadAll() {
-    const g = await sendMessage("globals", undefined);
+  async function checkStatus(fresh: boolean) {
+    const st = await sendMessage("status", fresh ? { fresh } : undefined);
+    status = st;
+    if (st.state !== "connected" || !tab?.web) return;
+    models = await sendMessage("models", undefined);
+    // the first view skipped the missing-model check while the list was loading
+    if (view) await reloadView(false);
+  }
+
+  // renders from local data; the network check only updates the status when it returns
+  async function loadAll(fresh: boolean) {
+    const [g, [active], last] = await Promise.all([
+      sendMessage("globals", undefined),
+      browser.tabs.query({ active: true, currentWindow: true }),
+      sendMessage("lastStatus", undefined),
+    ]);
     changeUiLang(g.uiLang);
     applyTheme(document.documentElement, g.theme);
+    rememberLook(g);
     document.documentElement.lang = resolveLang();
-    const [active] = await browser.tabs.query({ active: true, currentWindow: true });
     tab = {
       id: active?.id ?? -1,
       hostname: pageHostname(active?.url),
       web: active?.id !== undefined && isTranslatableUrl(active.url),
     };
-    status = await sendMessage("status", undefined);
-    if (status.state !== "disconnected" && tab.web) {
-      await loadTab(tab, status.state === "connected");
-    }
+    status = last;
+    const check = checkStatus(fresh).catch(() => {});
+    if (last?.state !== "disconnected" && tab.web) await loadTab(tab);
+    if (fresh) await check;
   }
 
-  async function load() {
+  async function load(fresh = false) {
     loadFailed = false;
     try {
-      await withTimeout(loadAll(), LOAD_TIMEOUT_MS);
+      await withTimeout(loadAll(fresh), LOAD_TIMEOUT_MS);
     } catch {
       loadFailed = true;
     } finally {
@@ -196,10 +204,10 @@
         },
         (next) => setView(next, syncDraft),
       )
-      .catch(reloadView);
+      .catch(() => reloadView());
   }
 
-  function reloadView(): Promise<void> {
+  function reloadView(syncDraft = true): Promise<void> {
     const current = tab;
     if (!current) return Promise.resolve();
     return queue
@@ -209,7 +217,7 @@
           server = next;
           return next;
         },
-        (next) => setView(next, true),
+        (next) => setView(next, syncDraft),
       )
       .catch(() => {});
   }
@@ -323,7 +331,7 @@
     track = { state: IDLE, available: true, failures: 0 };
     page = IDLE;
     pageAvailable = true;
-    await load();
+    await load(true);
   }
 
   function onRetry() {
@@ -389,9 +397,13 @@
   <main class="pop">
     <div class="head">
       <div class="state">
-        <StatusDot tone={status?.state === "connected" ? "ok" : "er"} />
+        <StatusDot tone={status === null ? "wait" : status.state === "connected" ? "ok" : "er"} />
         <span class="strong">
-          {status?.state === "connected" ? tr("status.connected") : tr("status.disconnected")}
+          {status === null
+            ? tr("status.checking")
+            : status.state === "connected"
+              ? tr("status.connected")
+              : tr("status.disconnected")}
         </span>
         {#if status?.state === "connected"}
           <span class="mono muted">{status.kind === "provider" ? status.name : `opencode ${status.version}`}</span>
@@ -435,7 +447,7 @@
         </button>
         {#if tab && !tab.web}
           <div class="muted small">{tr("popup.unsupportedPage")}</div>
-        {:else if connected && !pageAvailable}
+        {:else if usable && !pageAvailable}
           <div class="muted small">{tr("popup.noReceiver")}</div>
           <div><button class="btn sm" type="button" onclick={reloadPage}>{tr("popup.reloadPage")}</button></div>
         {/if}

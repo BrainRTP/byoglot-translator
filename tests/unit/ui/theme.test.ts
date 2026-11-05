@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyTheme } from "../../../lib/ui/theme";
+import { applyTheme, recallLook, rememberLook } from "../../../lib/ui/theme";
 
 describe("applyTheme", () => {
   it("sets data-theme for light and dark and removes it for system", () => {
@@ -10,5 +10,14 @@ describe("applyTheme", () => {
     expect(el.hasAttribute("data-theme")).toBe(false);
     applyTheme(el, "light");
     expect(el.getAttribute("data-theme")).toBe("light");
+  });
+});
+
+describe("look cache", () => {
+  it("keeps theme and ui language for the next open", () => {
+    localStorage.clear();
+    expect(recallLook()).toBeNull();
+    rememberLook({ theme: "dark", uiLang: "ru" });
+    expect(recallLook()).toEqual({ theme: "dark", uiLang: "ru" });
   });
 });

@@ -79,7 +79,8 @@ export type PageState = {
 };
 
 export interface ProtocolMap {
-  status(): Status;
+  status(i?: { fresh?: boolean }): Status;
+  lastStatus(): Status | null;
   pair(link: string): Status;
   connectManual(c: Connection): Status;
   connections(): ConnectionView[];

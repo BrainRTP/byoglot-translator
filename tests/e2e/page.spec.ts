@@ -42,9 +42,12 @@ test("translates the page, keeps the link alive and restores the exact original"
   await expect(page.locator("li").first()).toContainText("[ru] Callbacks run");
 
   const link = page.locator("#docs-link");
+  await expect(page.locator("#pic")).toHaveAttribute("alt", "[ru] A sleeping cat");
+  await expect(page.locator("#q")).toHaveAttribute("placeholder", "[ru] Search the docs");
+  await expect(page.locator("#sel")).toHaveAttribute("title", "[ru] A sentence to select");
   await expect(link).toHaveText("the official docs");
   await expect(link).toHaveAttribute("href", "/fixtures/other.html");
-  await expect(link).toHaveAttribute("title", "More details");
+  await expect(link).toHaveAttribute("title", "[ru] More details");
   expect(
     await page.evaluate(
       () =>

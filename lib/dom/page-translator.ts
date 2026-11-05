@@ -1,7 +1,14 @@
 import type { PortToBackground, PortToContent } from "../messaging/page-port";
 import type { PageState } from "../messaging/protocol";
 import type { DisplayMode } from "../settings/types";
-import { applyBilingual, applyReplace, createJournal, parseTranslated } from "./apply";
+import {
+  applyAttribute,
+  applyBilingual,
+  applyReplace,
+  createJournal,
+  parseTranslated,
+} from "./apply";
+import { type AttrName, extractAttributes } from "./attributes";
 import { BLOCK_ID_ATTR, BLOCK_SELECTOR, BLOCK_TAGS } from "./constants";
 import { type Animator, createAnimator } from "./effects/animator";
 import type { AnimationKind } from "./effects/types";
@@ -73,6 +80,7 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
   const journal = createJournal();
   const status = new Map<Block, Status>();
   const handled = new Set<Element>();
+  let attrDone = new WeakMap<Element, Set<AttrName>>();
   const jobs = new Map<string, Job>();
   const retranslations = new WeakMap<Element, number[]>();
   const knownTexts = new WeakMap<Element, Set<string>>();
@@ -281,7 +289,7 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
       const fresh: Element[] = [];
       for (const r of results) {
         const block = job.blocks.get(r.id);
-        if (block && status.get(block) === "inflight" && r.text.trim() !== "") {
+        if (block && !block.attr && status.get(block) === "inflight" && r.text.trim() !== "") {
           fresh.push(block.element);
         }
       }
@@ -293,6 +301,15 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
         if (!block || status.get(block) !== "inflight") continue;
         if (result.text.trim() === "") {
           status.set(block, "failed");
+          continue;
+        }
+        if (block.attr) {
+          try {
+            applyAttribute(block, result.text, journal);
+            status.set(block, "applied");
+          } catch {
+            status.set(block, "failed");
+          }
           continue;
         }
         try {
@@ -393,20 +410,20 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
   function release(container: Element): boolean {
     let had = false;
     for (const block of status.keys()) {
-      if (block.element === container && journal.hasBlock(block)) {
+      if (!block.attr && block.element === container && journal.hasBlock(block)) {
         animator.finishWithin(container);
         break;
       }
     }
     quiet(() => {
       for (const block of [...status.keys()]) {
-        if (block.element !== container) continue;
+        if (block.attr || block.element !== container) continue;
         had = true;
         if (journal.hasBlock(block)) restoreKeepingPage(block);
         status.delete(block);
       }
     });
-    lanes.filter((b) => b.element !== container);
+    lanes.filter((b) => b.attr !== undefined || b.element !== container);
     return had;
   }
 
@@ -440,7 +457,16 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
       nextId,
     });
     for (const block of blocks) handled.add(block.element);
-    into.push(...blocks);
+    const attrs = extractAttributes(root, {
+      isDone: (el, attr) => attrDone.get(el)?.has(attr) ?? false,
+      nextId,
+    });
+    for (const block of attrs) {
+      const set = attrDone.get(block.element) ?? new Set<AttrName>();
+      set.add(block.attr as AttrName);
+      attrDone.set(block.element, set);
+    }
+    into.push(...blocks, ...attrs);
     watcher?.observeShadowRoots(root);
   }
 
@@ -457,7 +483,11 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
       flushFailures = 0;
     } catch {
       if (myGen !== gen) return;
-      for (const block of found) if (!status.has(block)) handled.delete(block.element);
+      for (const block of found) {
+        if (status.has(block)) continue;
+        if (block.attr) attrDone.get(block.element)?.delete(block.attr);
+        else handled.delete(block.element);
+      }
       if (++flushFailures >= MAX_FLUSH_FAILURES) {
         flushFailures = 0;
         settle();
@@ -523,6 +553,7 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
     }
     status.clear();
     handled.clear();
+    attrDone = new WeakMap();
     mainRoot = null;
     failure = undefined;
   }

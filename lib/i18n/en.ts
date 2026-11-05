@@ -237,6 +237,9 @@ export const en = {
   "opt.tpl.inheritValue": "Global: {value}",
   "opt.tpl.targetLang": "Target language",
   "opt.tpl.mode": "Display mode",
+  "opt.tpl.visibleOnly": "Translate only visible content",
+  "opt.tpl.visibleOnlyHint":
+    "Cheaper on paid providers: the rest is translated as you scroll or expand it.",
   "opt.tpl.pageModel": "Page model",
   "opt.tpl.pageEffort": "Page effort",
   "opt.tpl.selectionModel": "Selection model",

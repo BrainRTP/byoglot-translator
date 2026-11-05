@@ -40,6 +40,7 @@ describe("applyTemplate", () => {
       sourceLang: "en",
       targetLang: "de",
       displayMode: "bilingual",
+      visibleOnly: false,
       pageModel: { providerID: "g", id: "page" },
       selectionModel: { providerID: "g", id: "sel", variant: "low" },
     });

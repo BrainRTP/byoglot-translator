@@ -237,6 +237,9 @@ export const ru = {
   "opt.tpl.inheritValue": "Как в общих: {value}",
   "opt.tpl.targetLang": "Язык перевода",
   "opt.tpl.mode": "Режим отображения",
+  "opt.tpl.visibleOnly": "Переводить только видимое",
+  "opt.tpl.visibleOnlyHint":
+    "Дешевле на платных провайдерах: остальное переводится при прокрутке или раскрытии.",
   "opt.tpl.pageModel": "Модель страницы",
   "opt.tpl.pageEffort": "Effort страницы",
   "opt.tpl.selectionModel": "Модель выделения",

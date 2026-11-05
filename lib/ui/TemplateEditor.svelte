@@ -240,6 +240,12 @@
           </select>
         </label>
 
+        <label class="block">
+          <span class="lbl">{tr("opt.tpl.visibleOnly")}</span>
+          <input type="checkbox" bind:checked={form.visibleOnly} />
+          <span class="mu small hint">{tr("opt.tpl.visibleOnlyHint")}</span>
+        </label>
+
         <div class="block">
           <span class="lbl">{tr("opt.tpl.pageModel")}</span>
           <ModelSelect

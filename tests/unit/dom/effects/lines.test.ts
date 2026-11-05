@@ -79,9 +79,9 @@ describe("revealKeyframes", () => {
   const block = r(100, 50, 200, 80);
   const lines = [r(100, 50, 200, 20), r(100, 70, 100, 20), r(100, 90, 50, 20)];
 
-  it("gives two keyframes per line, six vertices each", () => {
+  it("gives two keyframes per line plus the final open one, six vertices each", () => {
     const frames = revealKeyframes(block, lines);
-    expect(frames).toHaveLength(6);
+    expect(frames).toHaveLength(7);
     for (const f of frames) expect(vertices(f.clipPath)).toHaveLength(6);
   });
 
@@ -112,7 +112,16 @@ describe("revealKeyframes", () => {
     for (let i = 1; i < offsets.length; i++) {
       expect(offsets[i] as number).toBeGreaterThanOrEqual(offsets[i - 1] as number);
     }
-    expect(offsets).toEqual([0, 200 / 350, 200 / 350, 300 / 350, 300 / 350, 1]);
+    expect(offsets).toEqual([0, 200 / 350, 200 / 350, 300 / 350, 300 / 350, 1, 1]);
+  });
+
+  it("reveals the last line only up to its right edge, in step with the pen", () => {
+    const frames = revealKeyframes(block, lines);
+    const last = lines.at(-1) as DOMRect;
+    expect(frames.at(-2)?.offset).toBe(1);
+    expect(vertices(frames.at(-2)?.clipPath)[3]).toBe(
+      `${last.right - block.left}px ${last.top - block.top}px`,
+    );
   });
 
   it("ends with the whole block open plus the padding", () => {
@@ -143,7 +152,7 @@ describe("revealKeyframes", () => {
     const wide = [r(0, 0, 500, 10), r(0, 10, 3, 10), r(0, 20, 120, 10), r(0, 30, 1, 10)];
     const frames = revealKeyframes(r(0, 0, 500, 40), wide);
     const offsets = frames.map((f) => f.offset as number);
-    expect(offsets).toHaveLength(8);
+    expect(offsets).toHaveLength(9);
     for (let i = 1; i < offsets.length; i++) {
       expect(offsets[i] as number).toBeGreaterThanOrEqual(offsets[i - 1] as number);
     }
@@ -181,7 +190,7 @@ describe("revealSpans", () => {
     const lines = [r(0, 0, 200, 20), r(0, 20, 60, 20)];
     const spans = revealSpans(lines);
     const offsets = revealKeyframes(r(0, 0, 200, 40), lines).map((f) => f.offset);
-    expect(offsets).toEqual([spans[0]?.start, spans[0]?.end, spans[1]?.start, 1]);
+    expect(offsets).toEqual([spans[0]?.start, spans[0]?.end, spans[1]?.start, spans[1]?.end, 1]);
   });
 });
 

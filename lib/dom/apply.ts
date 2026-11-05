@@ -407,7 +407,12 @@ function lastTopLevelNode(ctx: Ctx): Node | null {
   return last;
 }
 
-export function applyBilingual(block: Block, translated: string, journal: Journal): Element {
+export function applyBilingual(
+  block: Block,
+  translated: string,
+  journal: Journal,
+  inline = false,
+): Element {
   const { state, undos } = begin(journal, block);
   const { parents, byNode } = parentMap(block);
   const ctx = newCtx(block, state, undos, byNode);
@@ -419,7 +424,7 @@ export function applyBilingual(block: Block, translated: string, journal: Journa
   else el.append(doc.createTextNode(stripTags(translated)));
 
   const tag = block.element.localName;
-  const blockHost = BLOCK_TAGS.has(tag) && !INLINE_HOSTS.has(tag);
+  const blockHost = !inline && BLOCK_TAGS.has(tag) && !INLINE_HOSTS.has(tag);
   const added: Node[] = [el];
   if (blockHost) el.style.display = "block";
   else added.unshift(doc.createTextNode(" "));

@@ -16,14 +16,19 @@ export function encodeBlock(el: Element): Encoded {
   return encodeNodes(Array.from(el.childNodes));
 }
 
-export function encodeNodes(nodes: Node[]): Encoded {
+export function encodeNodes(nodes: Node[], keep?: (t: Text) => boolean): Encoded {
   const slots: Slot[] = [];
   const textNodes: Text[] = [];
-  const source = trimGaps(encode(nodes, slots, textNodes)).replaceAll(GAP, " ");
+  const source = trimGaps(encode(nodes, slots, textNodes, keep)).replaceAll(GAP, " ");
   return { source: source.replace(/ {2,}/g, " ").trim(), slots, textNodes };
 }
 
-function encode(nodes: Node[], slots: Slot[], textNodes: Text[]): string {
+function encode(
+  nodes: Node[],
+  slots: Slot[],
+  textNodes: Text[],
+  keep?: (t: Text) => boolean,
+): string {
   let out = "";
   for (const node of nodes) {
     if (node.nodeType === TEXT_NODE) {
@@ -32,6 +37,7 @@ function encode(nodes: Node[], slots: Slot[], textNodes: Text[]): string {
         out += GAP;
         continue;
       }
+      if (keep && !keep(text)) continue;
       textNodes.push(text);
       out += text.data.replace(/[ \t\r\n\f]+/g, " ");
       continue;
@@ -50,7 +56,7 @@ function encode(nodes: Node[], slots: Slot[], textNodes: Text[]): string {
     }
     const slot: Slot = { n: slots.length + 1, node: el, selfClosing: false };
     slots.push(slot);
-    const inner = trimGaps(encode(Array.from(el.childNodes), slots, textNodes));
+    const inner = trimGaps(encode(Array.from(el.childNodes), slots, textNodes, keep));
     if (inner === "") {
       slots.pop();
       continue;

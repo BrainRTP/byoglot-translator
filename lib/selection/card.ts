@@ -3,6 +3,7 @@ import { resolveLang, t } from "../i18n";
 import type { BackendErrorKind, ModelRef } from "../opencode/types";
 import type { Template } from "../settings/types";
 import { describeError } from "../ui/errors";
+import type { InsertOutcome } from "./insert";
 import { renderSafeMarkdown } from "./markdown";
 import { attachWindow, type WindowShell } from "./window";
 
@@ -21,11 +22,13 @@ export type CardDeps = {
   currentTemplateId?(): Promise<string | undefined>;
   openSettings?(): void;
   cancel?(): void;
+  insert?(range: Range): Promise<InsertOutcome>;
+  canInsert?(): boolean;
 };
 
 export type Anchor = { left: number; right: number; top: number; bottom: number };
 
-export type CardRequest = { text: string; context: string; anchor: Anchor };
+export type CardRequest = { text: string; context: string; anchor: Anchor; range?: Range };
 
 type State =
   | { kind: "loading" }
@@ -46,6 +49,16 @@ type Entry = {
 const PIN_ICON = [
   "M12 17v5",
   "M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z",
+];
+
+const INSERT_ICON = [
+  "M14 4a2 2 0 0 1 2-2",
+  "M16 10a2 2 0 0 1-2-2",
+  "M20 2a2 2 0 0 1 2 2",
+  "M22 8a2 2 0 0 1-2 2",
+  "m3 7 3 3 3-3",
+  "M6 10V5a3 3 0 0 1 3-3h1",
+  "M4 14h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z",
 ];
 
 const WIDTH = 380;
@@ -130,6 +143,8 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
   let select: HTMLSelectElement | null = null;
   let lang: HTMLElement | null = null;
   let pin: HTMLButtonElement | null = null;
+  let insertBtn: HTMLButtonElement | null = null;
+  let insertTimer: ReturnType<typeof setTimeout> | undefined;
   let shell: WindowShell | null = null;
   let entries: Entry[] = [];
   let anchor: Anchor | null = null;
@@ -325,11 +340,41 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
     };
   }
 
+  function syncInsert() {
+    if (!insertBtn) return;
+    insertBtn.hidden = !entries[0]?.req.range || !deps.insert || deps.canInsert?.() === false;
+  }
+
+  function flashInsert(title: string) {
+    if (!insertBtn) return;
+    insertBtn.title = title;
+    clearTimeout(insertTimer);
+    insertTimer = setTimeout(() => {
+      if (insertBtn) insertBtn.title = t("selection.insert");
+    }, COPIED_MS);
+  }
+
+  function insertTop() {
+    const range = entries[0]?.req.range;
+    const btn = insertBtn;
+    if (!range || !btn || !deps.insert || btn.disabled) return;
+    btn.disabled = true;
+    const settle = (outcome: InsertOutcome) => {
+      btn.disabled = false;
+      if (outcome === "empty") flashInsert(t("selection.insertEmpty"));
+      else if (outcome !== "done") {
+        flashInsert(errorView(outcome.error, outcome.retryAfterMs, outcome.backend).title);
+      }
+    };
+    deps.insert(range).then(settle, () => settle({ error: "provider_error" }));
+  }
+
   function syncChrome() {
     if (!card || !pin) return;
     const pinned = mode === "pinned";
     card.classList.toggle("pinned", pinned);
     card.classList.toggle("free", isFree());
+    syncInsert();
     pin.setAttribute("aria-pressed", String(pinned));
     const label = t(pinned ? "selection.unpin" : "selection.pin");
     pin.setAttribute("aria-label", label);
@@ -396,7 +441,14 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
     closeBtn.append(svgIcon(doc, 14, ["M6 6l12 12M18 6L6 18"]));
     closeBtn.addEventListener("click", close);
     lang = h(doc, "span", "lang");
-    head.append(select, lang, pin, closeBtn);
+    insertBtn = h(doc, "button", "btn ico flat");
+    insertBtn.type = "button";
+    insertBtn.hidden = true;
+    insertBtn.setAttribute("aria-label", t("selection.insert"));
+    insertBtn.title = t("selection.insert");
+    insertBtn.append(svgIcon(doc, 14, INSERT_ICON));
+    insertBtn.addEventListener("click", insertTop);
+    head.append(select, lang, insertBtn, pin, closeBtn);
 
     feed = h(doc, "div", "feed");
     card.append(head, feed);
@@ -419,6 +471,7 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
     if (!feed) return;
     const entry = newEntry(req);
     entries.unshift(entry);
+    syncInsert();
     feed.prepend(entry.el);
     if (mode === "pinned") feed.scrollTop = 0;
     run(entry);
@@ -433,10 +486,11 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
     // retired requests stay registered in the content script, so cancel even if none is pending
     if (card) deps.cancel?.();
     for (const entry of entries) retire(entry);
+    clearTimeout(insertTimer);
     doc.removeEventListener("keydown", onKeyDown, true);
     shell?.destroy();
     card?.remove();
-    card = feed = select = lang = pin = shell = null;
+    card = feed = select = lang = pin = insertBtn = shell = null;
     entries = [];
     anchor = placed = null;
     moved = false;

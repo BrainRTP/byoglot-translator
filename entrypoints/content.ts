@@ -4,6 +4,7 @@ import { createProgressBar } from "../lib/dom/progress-bar";
 import { setUiLang } from "../lib/i18n";
 import { PAGE_PORT_NAME } from "../lib/messaging/page-port";
 import { onTabMessage, sendMessage } from "../lib/messaging/protocol";
+import { createSelectionInserter } from "../lib/selection/insert";
 import { mountSelectionUi } from "../lib/selection/trigger";
 
 export default defineContentScript({
@@ -50,12 +51,22 @@ export default defineContentScript({
     // keeps them from shadowing the top frame
     const silent = () => new Promise<never>(() => {});
 
+    const inserter = createSelectionInserter({
+      doc: document,
+      connect: () => browser.runtime.connect({ name: PAGE_PORT_NAME }),
+      getDisplayMode: async () => (await loadView()).settings.displayMode,
+      theme: async () => (await loadView()).theme,
+    });
+
     onTabMessage("pageCommand", ({ data }) => {
       const { state } = translator.state();
       if (data === "stop") translator.stop();
       else if (data === "restore") translator.restore();
-      else if (state === "idle" || state === "error") void translator.start();
-      else translator.restore();
+      else if (state === "idle" || state === "error") {
+        // two journals must never write the same text nodes
+        inserter.restoreAll();
+        void translator.start();
+      } else translator.restore();
       return isTop ? translator.state() : silent();
     });
     if (isTop) onTabMessage("pageState", () => translator.state());
@@ -86,12 +97,18 @@ export default defineContentScript({
       openSettings: () => void sendMessage("openOptions", undefined).catch(() => {}),
       currentTemplateId: async () => (await loadView()).settings.templateId,
       theme: async () => (await loadView()).theme,
+      insert: inserter.insert,
+      canInsert: () => translator.state().state === "idle",
     });
 
     // every frame registers; only the one holding a selection answers
     onTabMessage("selectionCommand", () => {
       if (!selectionUi.hasSelection()) return silent();
       selectionUi.trigger();
+    });
+    onTabMessage("selectionInsertCommand", () => {
+      if (!selectionUi.hasSelection()) return silent();
+      selectionUi.insert();
     });
   },
 });

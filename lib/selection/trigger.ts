@@ -10,6 +10,7 @@ export type SelectionUiDeps = CardDeps & { theme?(): Promise<ThemeChoice> };
 export type SelectionUi = {
   trigger(): void;
   hasSelection(): boolean;
+  insert(): void;
   destroy(): void;
 };
 
@@ -21,7 +22,7 @@ const ICON_GAP = 4;
 const EDGE = 4;
 const EDITABLE_TAGS = new Set(["input", "textarea", "select"]);
 
-type Snapshot = { text: string; context: string; anchor: Anchor };
+type Snapshot = { text: string; context: string; anchor: Anchor; range?: Range };
 
 function isEditable(el: Element): boolean {
   if (EDITABLE_TAGS.has(el.localName)) return true;
@@ -99,6 +100,7 @@ export function readSelection(doc: Document, explicit = false): Snapshot | null 
     text,
     context: centerContext(collapse(block?.textContent ?? ""), text),
     anchor: { left, right, top, bottom },
+    range: range.cloneRange(),
   };
 }
 
@@ -235,6 +237,13 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
       card.add(snap);
     },
     hasSelection: () => readSelection(doc, true) !== null,
+    insert() {
+      clearTimeout(timer);
+      const range = readSelection(doc, true)?.range;
+      if (!range || deps.canInsert?.() === false) return;
+      hideIcon();
+      void deps.insert?.(range);
+    },
     destroy() {
       clearTimeout(timer);
       doc.removeEventListener("mouseup", onMouseUp, true);

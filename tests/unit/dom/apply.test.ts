@@ -513,3 +513,12 @@ describe("applyAttribute", () => {
     expect(block.element.getAttribute("title")).toBe("Open menu");
   });
 });
+
+describe("applyBilingual inline", () => {
+  it("applyBilingual inline keeps a block host inline", () => {
+    const block = firstBlock("<p>Hello</p>");
+    const el = applyBilingual(block, "x", createJournal(), true);
+    expect((el as HTMLElement).style.display).not.toBe("block");
+    expect(el.previousSibling?.nodeValue).toBe(" ");
+  });
+});

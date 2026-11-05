@@ -5,12 +5,19 @@ export const SELECTION_MENU_ID = "byoglot-translate-selection";
 
 export function registerCommands(): void {
   browser.commands.onCommand.addListener(async (command) => {
-    if (command !== "translate-page" && command !== "translate-selection") return;
+    if (
+      command !== "translate-page" &&
+      command !== "translate-selection" &&
+      command !== "insert-selection"
+    )
+      return;
     try {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
       if (tab?.id === undefined) return;
       if (command === "translate-page") await sendTabMessage("pageCommand", "toggle", tab.id);
-      else await sendTabMessage("selectionCommand", undefined, tab.id);
+      else if (command === "insert-selection") {
+        await sendTabMessage("selectionInsertCommand", undefined, tab.id);
+      } else await sendTabMessage("selectionCommand", undefined, tab.id);
     } catch {}
   });
 

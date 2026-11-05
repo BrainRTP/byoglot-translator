@@ -51,8 +51,11 @@ async function readBody(req: http.IncomingMessage): Promise<string> {
   return body;
 }
 
-export async function startMockProvider(opts: { mode?: ProviderMode } = {}): Promise<MockProvider> {
+export async function startMockProvider(
+  opts: { mode?: ProviderMode; modelsDelayMs?: number } = {},
+): Promise<MockProvider> {
   const mode = opts.mode ?? "ok";
+  const modelsDelayMs = opts.modelsDelayMs ?? 0;
   const key = randomBytes(12).toString("hex");
   const expected = `Bearer ${key}`;
   const requests: RecordedRequest[] = [];
@@ -77,7 +80,10 @@ export async function startMockProvider(opts: { mode?: ProviderMode } = {}): Pro
     if (mode === "bad_key" || req.headers.authorization !== expected) {
       return json(401, UNAUTHORIZED);
     }
-    if (pathname === "/v1/models" && req.method === "GET") return json(200, MODELS);
+    if (pathname === "/v1/models" && req.method === "GET") {
+      await new Promise((r) => setTimeout(r, modelsDelayMs));
+      return json(200, MODELS);
+    }
     if (pathname === "/v1/chat/completions" && req.method === "POST") {
       if (mode === "rate_limit") {
         return json(

@@ -85,7 +85,7 @@ export async function tabIdFor(worker: Worker, page: Page): Promise<number> {
 }
 
 /** The popup is opened as a regular tab, so tabs.query is pointed at the page under test. */
-export async function openPopup(ext: Extension, target: Page): Promise<Page> {
+export async function openPopup(ext: Extension, target: Page, init?: () => void): Promise<Page> {
   const tabId = await tabIdFor(ext.worker, target);
   const url = target.url();
   const popup = await ext.context.newPage();
@@ -96,6 +96,7 @@ export async function openPopup(ext: Extension, target: Page): Promise<Page> {
     },
     { id: tabId, u: url },
   );
+  if (init) await popup.addInitScript(init);
   await popup.goto(`chrome-extension://${ext.id}/popup.html`);
   return popup;
 }

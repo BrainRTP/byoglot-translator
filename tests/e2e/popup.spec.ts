@@ -1,5 +1,6 @@
-import { openPopup } from "./extension";
+import { openPopup, seedProvider } from "./extension";
 import { expect, test } from "./fixtures";
+import { startMockProvider } from "./mock-provider";
 
 test("model and mode rows share the same columns", async ({ paired, mock }) => {
   const page = await paired.context.newPage();
@@ -37,4 +38,34 @@ test("the effort list opens under its field and stays inside the popup", async (
   expect(below || above).toBe(true);
   expect(option.x).toBeGreaterThanOrEqual(field.x);
   expect(option.x + option.width).toBeLessThanOrEqual(width);
+});
+
+test("the popup shows its frame before a slow model list arrives", async ({ ext, mock }) => {
+  const provider = await startMockProvider({ modelsDelayMs: 3000 });
+  try {
+    await seedProvider(ext.worker, provider);
+    const page = await ext.context.newPage();
+    await page.goto(`${mock.url}/fixtures/article.html`);
+    const popup = await openPopup(ext, page);
+    const frame = popup.locator("main.pop");
+    await expect(frame).toBeVisible({ timeout: 1000 });
+    expect((await frame.boundingBox())?.width).toBe(360);
+    await expect(popup.getByRole("button", { name: "Translate page" })).toBeVisible({
+      timeout: 10_000,
+    });
+  } finally {
+    await provider.stop();
+  }
+});
+
+test("a failing model list still shows the settings", async ({ paired, mock }) => {
+  const page = await paired.context.newPage();
+  await page.goto(`${mock.url}/fixtures/article.html`);
+  const popup = await openPopup(paired, page, () => {
+    const send = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = ((msg: { type?: string }, ...rest: unknown[]) =>
+      msg?.type === "models" ? Promise.reject(new Error("e2e")) : send(msg, ...rest)) as never;
+  });
+  await expect(popup.getByRole("combobox", { name: "Translate to" })).toBeVisible();
+  await expect(popup.getByText("Could not load the popup")).toHaveCount(0);
 });

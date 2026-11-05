@@ -181,7 +181,7 @@ export const en = {
   "opt.lp.noProfileOther": "There is no {name} profile yet, the generic one is used.",
   "opt.lp.help": "Help write a profile",
   "opt.lp.otherLang":
-    'The "{name}" profile is written for another language, the translation may get worse.',
+    'The "{name}" profile applies only to translations into its own language. Other languages use "Auto".',
   "opt.lp.outdated": 'The built-in "{name}" profile was updated, your text is unchanged.',
   "opt.lp.openNew": "Open the new version",
   "opt.lp.keepMine": "Keep my text",

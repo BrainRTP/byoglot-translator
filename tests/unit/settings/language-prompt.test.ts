@@ -137,6 +137,12 @@ describe("languagePromptText", () => {
     expect(languagePromptText(g, "ru", builtins, {})).toBe("generic builtin");
   });
 
+  it("applies an explicit language profile only to its own language", () => {
+    const g = { languagePromptEnabled: true, languageProfile: "ru" };
+    expect(languagePromptText(g, "ru-RU", builtins, {})).toBe("ru builtin");
+    expect(languagePromptText(g, "de", builtins, {})).toBe("generic builtin");
+  });
+
   it("returns an empty string when the override is emptied", () => {
     const overrides = { ru: override("", "ru builtin") };
     expect(languagePromptText(on, "ru", builtins, overrides)).toBe("");

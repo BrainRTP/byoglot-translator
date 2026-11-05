@@ -111,7 +111,7 @@ describe("background handlers", () => {
 
   it("tabView carries the global animation setting", async () => {
     const { handlers } = setup();
-    expect((await handlers.tabView({ tabId: 1, hostname: "example.com" })).animation).toBe("fade");
+    expect((await handlers.tabView({ tabId: 1, hostname: "example.com" })).animation).toBe("wave");
     await handlers.setGlobals({ ...(await handlers.globals()), animation: "none" });
     expect((await handlers.tabView({ tabId: 1, hostname: "example.com" })).animation).toBe("none");
   });

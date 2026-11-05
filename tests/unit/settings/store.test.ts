@@ -32,9 +32,14 @@ describe("settings store", () => {
   });
 
   describe("animation", () => {
-    it("defaults to fade when nothing is stored", async () => {
+    it("defaults to wave when nothing is stored", async () => {
+      expect((await globalsItem.getValue()).animation).toBe("wave");
+      expect(DEFAULT_GLOBALS.animation).toBe("wave");
+    });
+
+    it("keeps a stored fade", async () => {
+      await fakeBrowser.storage.local.set({ globals: { ...DEFAULT_GLOBALS, animation: "fade" } });
       expect((await globalsItem.getValue()).animation).toBe("fade");
-      expect(DEFAULT_GLOBALS.animation).toBe("fade");
     });
 
     it("keeps a stored none after rereading", async () => {
@@ -47,7 +52,7 @@ describe("settings store", () => {
     const { animation: _omit, ...old } = DEFAULT_GLOBALS;
     await fakeBrowser.storage.local.set({ globals: { ...old, targetLang: "fr" } });
     const g = await globalsItem.getValue();
-    expect(g.animation).toBe("fade");
+    expect(g.animation).toBe("wave");
     expect(g.targetLang).toBe("fr");
   });
 

@@ -19,7 +19,7 @@ export const DEFAULT_GLOBALS: GlobalSettings = {
   sourceLang: "auto",
   targetLang: "en",
   displayMode: "replace",
-  animation: "fade",
+  animation: "wave",
   pageModel: null,
   selectionModel: null,
   defaultTemplateId: BUILTIN_TEMPLATE_ID,

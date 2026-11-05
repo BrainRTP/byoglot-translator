@@ -13,6 +13,7 @@
   import { toTemplateSettings } from "../../lib/settings/effective";
   import type { EffectiveSettings, Template } from "../../lib/settings/types";
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
+  import { applyTheme } from "../../lib/ui/theme";
   import { languageOptions } from "../../lib/ui/languages";
   import ModelPicker from "../../lib/ui/ModelPicker.svelte";
   import {
@@ -123,6 +124,7 @@
   async function loadAll() {
     const g = await sendMessage("globals", undefined);
     changeUiLang(g.uiLang);
+    applyTheme(document.documentElement, g.theme);
     document.documentElement.lang = resolveLang();
     const [active] = await browser.tabs.query({ active: true, currentWindow: true });
     tab = {

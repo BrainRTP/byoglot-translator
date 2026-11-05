@@ -4,6 +4,7 @@
   import { resolveLang, type UiLang } from "../../lib/i18n";
   import { type ProviderInput, type Status, sendMessage } from "../../lib/messaging/protocol";
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
+  import { applyTheme } from "../../lib/ui/theme";
   import ProviderForm from "../../lib/ui/ProviderForm.svelte";
   import { type PairErrorKind, pairErrorView } from "../../lib/ui/pair-errors";
   import Segmented from "../../lib/ui/Segmented.svelte";
@@ -40,6 +41,7 @@
   onMount(() => {
     void sendMessage("globals", undefined).then((g) => {
       changeUiLang(g.uiLang);
+      applyTheme(document.documentElement, g.theme);
       lang = resolveLang();
       document.documentElement.lang = lang;
     });

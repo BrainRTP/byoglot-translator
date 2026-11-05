@@ -740,6 +740,23 @@ describe("background handlers", () => {
       expect(listModels.mock.calls.length).toBe(afterConnect + 1);
     });
 
+    it("a connection change during a request leaves the cache empty", async () => {
+      const listModels = vi.fn(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return [flash];
+      });
+      const { handlers } = setup(fakeBackend({ listModels }));
+      await handlers.connectManual(conn);
+      vi.advanceTimersByTime(31_000);
+      const inFlight = handlers.models();
+      await handlers.removeConnection((await handlers.connections())[0]?.id as string);
+      await inFlight;
+      await seedOpencode(conn);
+      const before = listModels.mock.calls.length;
+      await view(handlers);
+      expect(listModels.mock.calls.length).toBe(before + 1);
+    });
+
     it("failed loads are not cached", async () => {
       const listModels = vi
         .fn<() => Promise<ModelInfo[]>>()

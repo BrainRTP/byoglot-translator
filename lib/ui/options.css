@@ -12,12 +12,14 @@ body {
 }
 
 .btn.sm {
+  font-size: 13px;
   min-height: 30px;
   padding: 3px 10px;
 }
 
 .btn.dng {
   color: var(--er);
+  border-color: var(--er);
 }
 
 .btn.pri.sm {

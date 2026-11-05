@@ -2,11 +2,11 @@ import type { z } from "zod";
 import type { ProviderData } from "../connections/types";
 import { BackendError, fromFetchFailure } from "../opencode/errors";
 import type { ModelInfo, ModelRef, TranslationBackend } from "../opencode/types";
-import { effortParams, effortVariants } from "./presets";
-import { chatSchema, errorBodySchema, modelListSchema, type modelRawSchema } from "./schemas";
+import { effortParams, effortVariants, type RawModel } from "./presets";
+import { chatSchema, errorBodySchema, modelListSchema } from "./schemas";
 
 function retryAfterMs(header: string | null): number | undefined {
-  if (!header) return undefined;
+  if (!header?.trim()) return undefined;
   const seconds = Number(header);
   if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1000);
   const date = Date.parse(header);
@@ -39,20 +39,18 @@ async function messageOf(response: Response): Promise<string | undefined> {
   return body?.success ? body.data.error?.message : undefined;
 }
 
-type RawModel = z.infer<typeof modelRawSchema>;
-
 export function createProviderBackend(
-  data: ProviderData,
+  provider: ProviderData,
   fetchImpl: typeof fetch = (input, init) => fetch(input, init),
 ): TranslationBackend {
-  const base = data.baseUrl.replace(/\/+$/, "");
+  const base = provider.baseUrl.replace(/\/+$/, "");
 
   function toModelInfo(raw: RawModel): ModelInfo {
     return {
-      providerID: data.preset,
+      providerID: provider.preset,
       id: raw.id,
       name: raw.name ?? raw.id,
-      variants: effortVariants(data.preset, raw),
+      variants: effortVariants(provider.preset, raw),
       contextLimit: raw.context_window ?? raw.context_length ?? 0,
       outputLimit: raw.max_output_tokens ?? 0,
     };
@@ -65,7 +63,7 @@ export function createProviderBackend(
     body?: unknown,
   ): Promise<z.infer<S>> {
     const headers: Record<string, string> = {};
-    if (data.apiKey) headers.authorization = `Bearer ${data.apiKey}`;
+    if (provider.apiKey) headers.authorization = `Bearer ${provider.apiKey}`;
     if (body !== undefined) headers["content-type"] = "application/json";
     let response: Response;
     try {
@@ -106,7 +104,8 @@ export function createProviderBackend(
     listModels,
     async defaultModel(signal) {
       const models = await listModels(signal);
-      if (data.preset === "deepseek") return models.find((m) => m.id === "deepseek-flash") ?? null;
+      if (provider.preset === "deepseek")
+        return models.find((m) => m.id === "deepseek-flash") ?? null;
       return models[0] ?? null;
     },
     async generate(prompt, model: ModelRef, signal) {
@@ -114,7 +113,7 @@ export function createProviderBackend(
         model: model.id,
         messages: [{ role: "user", content: prompt }],
         stream: false,
-        ...effortParams(data.preset, model.variant),
+        ...effortParams(provider.preset, model.variant),
       });
       const content = choices[0]?.message.content;
       if (!content) throw new BackendError("bad_response", { detail: "empty completion" });

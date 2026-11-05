@@ -27,6 +27,14 @@ const pr: ConnectionRecord = {
   ...models,
 };
 
+describe("origin helpers", () => {
+  it("originOf, originPattern and isLocalOrigin throw on invalid URLs", () => {
+    expect(() => originOf("not a url")).toThrow();
+    expect(() => originPattern("not a url")).toThrow();
+    expect(() => isLocalOrigin("not a url")).toThrow();
+  });
+});
+
 describe("connection list helpers", () => {
   it("originPattern drops port and path", () => {
     expect(originPattern("http://localhost:11434/v1")).toBe("http://localhost/*");

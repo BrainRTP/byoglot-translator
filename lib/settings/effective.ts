@@ -7,9 +7,14 @@ function copyModel(m: ModelRef | null | undefined): ModelRef | null {
   return m ? { ...m } : null;
 }
 
-function sameModel(a: ModelRef | null, b: ModelRef | null): boolean {
+function sameModel(a: ModelRef | null, b: ModelRef | null, activeId: string | null): boolean {
   if (!a || !b) return a === b;
-  return a.providerID === b.providerID && a.id === b.id && a.variant === b.variant;
+  return (
+    a.providerID === b.providerID &&
+    a.id === b.id &&
+    a.variant === b.variant &&
+    (a.connectionId ?? activeId) === (b.connectionId ?? activeId)
+  );
 }
 
 export function ownModel(
@@ -53,8 +58,8 @@ export function isModified(
     e.sourceLang === base.sourceLang &&
     e.targetLang === base.targetLang &&
     e.displayMode === base.displayMode &&
-    sameModel(e.pageModel, base.pageModel) &&
-    sameModel(e.selectionModel, base.selectionModel)
+    sameModel(e.pageModel, base.pageModel, activeId) &&
+    sameModel(e.selectionModel, base.selectionModel, activeId)
   );
 }
 

@@ -224,6 +224,11 @@ describe("errors", () => {
     }
   });
 
+  it("ignores a blank Retry-After", async () => {
+    const error = await call(async () => json({}, 429, { "retry-after": "   " }));
+    expect(error.retryAfterMs).toBeUndefined();
+  });
+
   it("429 without the header has no retryAfterMs", async () => {
     const error = await call(async () => json({}, 429));
     expect(error.kind).toBe("rate_limit");

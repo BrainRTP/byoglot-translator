@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { formatRetryAfter, setUiLang, t } from "../../../lib/i18n";
 import { en } from "../../../lib/i18n/en";
 import { ru } from "../../../lib/i18n/ru";
+import { PRESETS } from "../../../lib/provider/presets";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -11,6 +12,13 @@ afterEach(() => {
 describe("i18n", () => {
   it("ru and en have the same keys", () => {
     expect(Object.keys(ru).sort()).toEqual(Object.keys(en).sort());
+  });
+
+  it("every preset has a name in both languages", () => {
+    for (const id of Object.keys(PRESETS)) {
+      expect(en).toHaveProperty(`conn.preset.${id}`);
+      expect(ru).toHaveProperty(`conn.preset.${id}`);
+    }
   });
 
   it("ru has no letter yo", () => {

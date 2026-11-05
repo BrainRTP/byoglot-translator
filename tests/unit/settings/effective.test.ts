@@ -143,6 +143,20 @@ describe("ownModel and stampModel", () => {
   });
 });
 
+describe("isModified and connectionId", () => {
+  it("a model of another connection counts as a change, an unstamped one does not", () => {
+    const t = builtinTemplate();
+    const base = applyTemplate(t, globals, "a");
+    const m = base.pageModel as NonNullable<typeof base.pageModel>;
+    expect(isModified({ ...base, pageModel: { ...m, connectionId: "b" } }, t, globals, "a")).toBe(
+      true,
+    );
+    expect(
+      isModified({ ...base, pageModel: { ...m, connectionId: undefined } }, t, globals, "a"),
+    ).toBe(false);
+  });
+});
+
 describe("isModified", () => {
   it("is false for a fresh copy, true after editing, false after reverting", () => {
     const t = builtinTemplate();

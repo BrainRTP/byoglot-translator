@@ -6,7 +6,7 @@ import {
   type HandlerDeps,
   resolveStoredModel,
 } from "../../../lib/background/handlers";
-import type { ConnectionRecord } from "../../../lib/connections/types";
+import type { ConnectionRecord, ProviderPreset } from "../../../lib/connections/types";
 import { BackendError } from "../../../lib/opencode/errors";
 import type {
   Connection,
@@ -525,6 +525,23 @@ describe("background handlers", () => {
           { tab: { id: 5, url: "https://example.com/" } },
         ),
       ).toEqual({ error: "rate_limit", retryAfterMs: 1500, backend: "opencode" });
+    });
+
+    it("captures the connection kind before the request", async () => {
+      const { handlers, translateSelection } = setup();
+      await globalsItem.setValue({ ...DEFAULT_GLOBALS, selectionModel });
+      translateSelection.mockImplementationOnce(async () => {
+        await connectionsStore.setAll([
+          { kind: "opencode", id: "other", ...conn, pageModel: null, selectionModel: null },
+        ]);
+        await connectionsStore.setActiveId("other");
+        throw new BackendError("rate_limit");
+      });
+      const res = await handlers.translateSelection(
+        { text: "hello", context: "", hostname: "example.com" },
+        { tab: { id: 5, url: "https://example.com/" } },
+      );
+      expect(res).toMatchObject({ error: "rate_limit", backend: "opencode" });
     });
 
     it("returns unauthorized when not paired", async () => {
@@ -1127,6 +1144,55 @@ describe("connection operations", () => {
     expect(info).not.toHaveBeenCalled();
     expect(removeOrigin).not.toHaveBeenCalled();
     expect(await saved()).toEqual(before);
+  });
+
+  it("rejects an unknown id and the id of the opencode record", async () => {
+    const { handlers } = multi();
+    await handlers.connectManual(conn);
+    const before = await saved();
+    const ocId = before[0]?.id as string;
+    for (const id of ["nope", ocId]) {
+      const res = await handlers.saveProvider({ ...deepseek, id });
+      expect(res.status).toMatchObject({ state: "error", kind: "incompatible" });
+      expect(res.connections).toHaveLength(1);
+    }
+    expect(await saved()).toEqual(before);
+  });
+
+  it("rejects an unknown preset without throwing", async () => {
+    const { handlers } = multi();
+    const res = await handlers.saveProvider({ ...deepseek, preset: "foo" as ProviderPreset });
+    expect(res.status).toMatchObject({ state: "error", kind: "incompatible" });
+    expect(await saved()).toHaveLength(0);
+  });
+
+  it("revokes the origin when the edited record was deleted during the key check", async () => {
+    let remove: (() => Promise<void>) | undefined;
+    const { handlers, removeOrigin } = multi(async () => {
+      await remove?.();
+      return { version: "9.9" };
+    });
+    const { connections } = await handlers.saveProvider(deepseek);
+    const id = connections[0]?.id as string;
+    remove = () => connectionsStore.setAll([]);
+    const res = await handlers.saveProvider({
+      ...deepseek,
+      id,
+      baseUrl: "https://other.example/v1",
+    });
+    expect(res.status).toMatchObject({ state: "error", kind: "incompatible" });
+    expect(removeOrigin).toHaveBeenCalledWith("https://other.example");
+  });
+
+  it("custom on localhost does not need a key", async () => {
+    const { handlers } = multi();
+    const res = await handlers.saveProvider({
+      preset: "custom",
+      name: "Local",
+      baseUrl: "http://localhost:8080/v1",
+      apiKey: "",
+    });
+    expect(res.status).toMatchObject({ state: "connected" });
   });
 
   it("an empty key on edit keeps the stored key and models", async () => {

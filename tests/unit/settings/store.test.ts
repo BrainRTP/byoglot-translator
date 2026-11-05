@@ -69,6 +69,13 @@ describe("settings store", () => {
     expect((await globalsItem.getValue()).progressBar).toBe(true);
   });
 
+  it("reads globals saved before pinnedEffort with null", async () => {
+    const { pinnedEffort: _p, ...old } = DEFAULT_GLOBALS;
+    await fakeBrowser.storage.local.set({ globals: old });
+    expect(DEFAULT_GLOBALS.pinnedEffort).toBeNull();
+    expect((await globalsItem.getValue()).pinnedEffort).toBeNull();
+  });
+
   it("reads globals saved before the language prompt with its defaults", async () => {
     const { languagePromptEnabled: _on, languageProfile: _profile, ...old } = DEFAULT_GLOBALS;
     await fakeBrowser.storage.local.set({ globals: { ...old, targetLang: "fr" } });

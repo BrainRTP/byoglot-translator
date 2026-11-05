@@ -28,6 +28,7 @@ export type GlobalSettings = {
   progressBar: boolean;
   pageModel: ModelRef | null;
   selectionModel: ModelRef | null;
+  pinnedEffort: string | null;
   defaultTemplateId: string;
   uiLang: "auto" | "ru" | "en";
   languagePromptEnabled: boolean;

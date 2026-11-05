@@ -78,6 +78,7 @@ test("a failing model list still shows the settings", async ({ paired, mock }) =
     () => (window as unknown as { modelsRejected?: boolean }).modelsRejected,
   );
   await expect(popup.getByRole("combobox", { name: "Translate to" })).toBeVisible();
+  await expect(popup.getByRole("combobox", { name: "Model" })).toBeVisible();
   await expect(popup.getByRole("combobox", { name: "Model" }).locator("optgroup")).toHaveCount(0);
   await expect(popup.getByText("Could not load the popup")).toHaveCount(0);
 });

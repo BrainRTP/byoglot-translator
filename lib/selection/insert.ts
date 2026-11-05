@@ -27,7 +27,15 @@ export type InserterDeps = {
 type Insertion = { restore(): void };
 
 const REVERT_ICON = ["M9 14 4 9l5-5", "M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"];
-const HOST_CSS = "display:inline-block;position:relative;width:0;height:0;vertical-align:top";
+const HOST_CSS =
+  "pointer-events:auto;display:inline-block;position:relative;width:0;height:0;vertical-align:top";
+
+// a site style (pointer-events:none on a ref link) or a link click must not reach the button
+function outermostInline(node: ChildNode, block: Element): ChildNode {
+  let cur = node;
+  while (cur.parentElement && cur.parentElement !== block) cur = cur.parentElement;
+  return cur.parentElement ? cur : node;
+}
 
 export function createSelectionInserter(deps: InserterDeps) {
   const { doc } = deps;
@@ -67,7 +75,7 @@ export function createSelectionInserter(deps: InserterDeps) {
 
     const mount = () => {
       const lastSpan = spans.get(last);
-      (lastSpan ?? lastText).after(host);
+      outermostInline(lastSpan ?? lastText, last.element).after(host);
     };
     mount();
 

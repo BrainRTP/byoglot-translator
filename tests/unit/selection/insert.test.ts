@@ -126,6 +126,29 @@ describe("createSelectionInserter", () => {
     expect(p.innerHTML).toBe("Hello world");
   });
 
+  it("mounts the revert button outside links and inline wrappers", async () => {
+    document.body.innerHTML =
+      '<p id=p>Text<sup><a href="#r"><span style="pointer-events:none">[1]</span></a></sup> tail</p>';
+    const p = document.getElementById("p") as Element;
+    const range = document.createRange();
+    range.setStart(p.firstChild as Text, 0);
+    range.setEnd(p.querySelector("span")?.firstChild as Text, 3);
+    const { inserter, emit, job } = setup();
+    const done = inserter.insert(range);
+    const m = await job();
+    emit({
+      type: "results",
+      jobId: m.jobId,
+      results: [{ id: m.segments[0]?.id ?? "", text: m.segments[0]?.text ?? "", cached: false }],
+    });
+    emit({ type: "done", jobId: m.jobId });
+    expect(await done).toBe("done");
+    const host = p.querySelector("[data-byoglot]") as HTMLElement;
+    expect(host.parentElement).toBe(p);
+    expect(host.previousSibling).toBe(p.querySelector("sup"));
+    expect(host.style.pointerEvents).toBe("auto");
+  });
+
   it("detached range resolves empty", async () => {
     document.body.innerHTML = "<p id=p>Hello</p>";
     const p = document.getElementById("p") as Element;

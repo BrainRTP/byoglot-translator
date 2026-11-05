@@ -1,5 +1,6 @@
 import { fadeEffect } from "./fade";
 import { flapEffect } from "./flap";
+import { meteorEffect } from "./meteor";
 import { noneEffect } from "./none";
 import { penEffect } from "./pen";
 import { scrambleEffect } from "./scramble";
@@ -26,6 +27,7 @@ export const registry: Partial<Record<AnimationKind, Effect>> = {
   typewriter: typewriterEffect,
   pen: penEffect,
   wave: waveEffect,
+  meteor: meteorEffect,
 };
 
 export function availableKinds(): AnimationKind[] {

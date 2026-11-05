@@ -30,6 +30,7 @@ import {
   isModified,
   ownModel,
   pickInitialModels,
+  pinnedModel,
   resolveModel,
   stampModel,
 } from "../settings/effective";
@@ -675,12 +676,20 @@ export function createHandlers(deps: HandlerDeps) {
       if (i.requestId) selectionJobs.set(i.requestId, { controller, tabId: sender.tab?.id });
       try {
         const hostname = hostnameOf(sender.tab?.url) || i.hostname;
-        const { view, model } = await requireModel(
+        const required = await requireModel(
           sender.tab?.id,
           hostname,
           "selectionModel",
           i.templateId,
         );
+        const view = required.view;
+        let model = required.model;
+        if (i.window === "pinned") {
+          const info = (await loadModels())?.find(
+            (m) => m.providerID === model.providerID && m.id === model.id,
+          );
+          model = pinnedModel(model, info, (await globalsItem.getValue()).pinnedEffort);
+        }
         const text = await deps.service.translateSelection(
           {
             text: i.text,

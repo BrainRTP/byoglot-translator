@@ -320,7 +320,12 @@ describe("selection card", () => {
     expect(ui?.hasSelection()).toBe(true);
     ui?.trigger();
     await vi.advanceTimersByTimeAsync(0);
-    expect(translate).toHaveBeenCalledWith("hello world", "write hello world now");
+    expect(translate).toHaveBeenCalledWith(
+      "hello world",
+      "write hello world now",
+      undefined,
+      "oneshot",
+    );
   });
 
   it("trigger() in a textarea translates the selected slice", async () => {
@@ -332,7 +337,7 @@ describe("selection card", () => {
     ta.setSelectionRange(6, 10);
     ui?.trigger();
     await vi.advanceTimersByTimeAsync(0);
-    expect(translate).toHaveBeenCalledWith("beta", "alpha beta gamma");
+    expect(translate).toHaveBeenCalledWith("beta", "alpha beta gamma", undefined, "oneshot");
   });
 
   it("trigger() never reads a password field", async () => {
@@ -422,6 +427,8 @@ describe("selection card", () => {
     expect(translate).toHaveBeenCalledWith(
       selected,
       "Many historians describe serendipity as luck.",
+      undefined,
+      "oneshot",
     );
     expect(card()?.querySelector(".md strong")?.textContent).toBe("привет");
     expect(icon()).toBeNull();
@@ -534,6 +541,7 @@ describe("selection card", () => {
       expect.any(String),
       expect.any(String),
       "builtin-default",
+      "oneshot",
     );
 
     const retranslate = [...(card()?.querySelectorAll("button") ?? [])].find(
@@ -546,6 +554,7 @@ describe("selection card", () => {
       expect.any(String),
       expect.any(String),
       "builtin-default",
+      "oneshot",
     );
   });
 
@@ -561,7 +570,12 @@ describe("selection card", () => {
     retranslate?.click();
     await vi.advanceTimersByTimeAsync(0);
     expect(translate).toHaveBeenCalledTimes(2);
-    expect(translate).toHaveBeenLastCalledWith(expect.any(String), expect.any(String));
+    expect(translate).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.any(String),
+      undefined,
+      "oneshot",
+    );
   });
 
   it("closing the card while the request is in flight cancels it", async () => {
@@ -616,6 +630,8 @@ describe("selection card", () => {
     expect(translate).toHaveBeenCalledWith(
       range.toString().trim(),
       "Many historians describe serendipity.",
+      undefined,
+      "oneshot",
     );
     expect(card()).not.toBeNull();
   });
@@ -683,6 +699,17 @@ describe("pinned card", () => {
     expect(entries()[0]?.querySelector(".src")?.textContent).toBe("alpha");
   });
 
+  it("passes the card mode to translate", async () => {
+    const { translate, resolvers } = setup();
+    cardApi.open(req("alpha"));
+    expect(translate).toHaveBeenLastCalledWith("alpha", "ctx", undefined, "oneshot");
+    resolvers[0]?.({ text: "one" });
+    await flush();
+    cardApi.setMode("pinned");
+    cardApi.add(req("beta"));
+    expect(translate).toHaveBeenLastCalledWith("beta", "ctx", undefined, "pinned");
+  });
+
   it("add three times gives three entries, newest first, each with its source and own Copy", async () => {
     const { resolvers } = setup();
     cardApi.open(req("a"));
@@ -724,7 +751,7 @@ describe("pinned card", () => {
     expect(entries()[0]?.querySelector(".spin")).not.toBeNull();
     btn(failed, "Retry")?.click();
     expect(translate).toHaveBeenCalledTimes(3);
-    expect(translate).toHaveBeenLastCalledWith("a", "ctx");
+    expect(translate).toHaveBeenLastCalledWith("a", "ctx", undefined, "pinned");
     expect(entries()[0]?.querySelector(".spin")).not.toBeNull();
     resolvers[1]?.({ text: "rb" });
     resolvers[2]?.({ text: "ra" });
@@ -745,7 +772,7 @@ describe("pinned card", () => {
     await flush();
     expect(translate).toHaveBeenCalledTimes(1);
     cardApi.add(req("b"));
-    expect(translate).toHaveBeenLastCalledWith("b", "ctx", "t2");
+    expect(translate).toHaveBeenLastCalledWith("b", "ctx", "t2", "pinned");
   });
 
   it("pressing the pin again returns to oneshot with only the top entry", async () => {
@@ -783,7 +810,7 @@ describe("pinned card", () => {
     pinBtn()?.click();
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(translate).toHaveBeenCalledTimes(3);
-    expect(translate).toHaveBeenLastCalledWith("b", "ctx");
+    expect(translate).toHaveBeenLastCalledWith("b", "ctx", undefined, "oneshot");
     resolvers[0]?.({ text: "late-a" });
     resolvers[1]?.({ text: "late-b" });
     await flush();
@@ -967,7 +994,7 @@ describe("selection window events", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(entries()).toHaveLength(1);
     expect(translate).toHaveBeenCalledTimes(2);
-    expect(translate).toHaveBeenLastCalledWith("Many", TEXT);
+    expect(translate).toHaveBeenLastCalledWith("Many", TEXT, undefined, "oneshot");
   });
 
   it("pinned: mousedown outside and Escape keep the card", async () => {
@@ -982,7 +1009,7 @@ describe("selection window events", () => {
     translate.mockClear();
     await selectAndRelease(p, 0, 4);
     expect(translate).toHaveBeenCalledTimes(1);
-    expect(translate).toHaveBeenCalledWith("Many", TEXT);
+    expect(translate).toHaveBeenCalledWith("Many", TEXT, undefined, "pinned");
     expect(icon()).toBeNull();
     expect(entries()).toHaveLength(2);
     expect(entries()[0]?.querySelector(".src")?.textContent).toBe("Many");
@@ -1016,7 +1043,7 @@ describe("selection window events", () => {
     const host = document.querySelector(`[${MARK_ATTR}]`) as HTMLElement;
     host.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
     await vi.advanceTimersByTimeAsync(300);
-    expect(translate).toHaveBeenCalledWith("Many", TEXT);
+    expect(translate).toHaveBeenCalledWith("Many", TEXT, undefined, "pinned");
     expect(entries()).toHaveLength(2);
   });
 
@@ -1093,7 +1120,7 @@ describe("selection window events", () => {
     expect(translate).not.toHaveBeenCalled();
     ui?.trigger();
     await vi.advanceTimersByTimeAsync(0);
-    expect(translate).toHaveBeenCalledWith("beta", "alpha beta gamma");
+    expect(translate).toHaveBeenCalledWith("beta", "alpha beta gamma", undefined, "pinned");
     expect(entries()).toHaveLength(2);
   });
 

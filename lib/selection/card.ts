@@ -11,7 +11,12 @@ export type SelectionTranslation =
   | { error: BackendErrorKind; retryAfterMs?: number; backend?: ConnectionKind };
 
 export type CardDeps = {
-  translate(text: string, context: string, templateId?: string): Promise<SelectionTranslation>;
+  translate(
+    text: string,
+    context: string,
+    templateId: string | undefined,
+    window: CardMode,
+  ): Promise<SelectionTranslation>;
   listTemplates(): Promise<Template[]>;
   currentTemplateId?(): Promise<string | undefined>;
   openSettings?(): void;
@@ -264,10 +269,7 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
       select && !select.hidden && select.value !== initialTemplateId ? select.value : undefined;
     render(entry, { kind: "loading" });
     entry.pending = true;
-    const response =
-      templateId === undefined
-        ? deps.translate(text, context)
-        : deps.translate(text, context, templateId);
+    const response = deps.translate(text, context, templateId, mode);
     response.then(
       (res) => {
         if (mine !== entry.seq) return;

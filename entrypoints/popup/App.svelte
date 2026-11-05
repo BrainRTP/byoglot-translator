@@ -11,7 +11,7 @@
   } from "../../lib/messaging/protocol";
   import type { ModelInfo } from "../../lib/opencode/types";
   import { toTemplateSettings } from "../../lib/settings/effective";
-  import type { EffectiveSettings, Template } from "../../lib/settings/types";
+  import type { EffectiveSettings, SelectionMode, Template } from "../../lib/settings/types";
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
   import { languageOptions } from "../../lib/ui/languages";
   import ModelPicker from "../../lib/ui/ModelPicker.svelte";
@@ -239,6 +239,18 @@
     void run(() => {
       const base = (server as TabView).settings;
       return sendMessage("setTabSettings", { tabId, settings: { ...base, ...patch } });
+    });
+  }
+
+  async function setSelectionMode(selectionMode: SelectionMode) {
+    if (!tab || !view) return;
+    const { id: tabId, hostname } = tab;
+    view = { ...view, selectionMode };
+    // re-read so a stale popup copy does not overwrite a change made on the options page
+    void run(async () => {
+      const current = await sendMessage("globals", undefined);
+      await sendMessage("setGlobals", { ...current, selectionMode });
+      return sendMessage("tabView", { tabId, hostname });
     });
   }
 
@@ -577,6 +589,18 @@
               {/each}
             </select>
           </div>
+        </div>
+        <div class="cell">
+          <div class="lbl">{tr("opt.selectionMode")}</div>
+          <Segmented
+            label={tr("opt.selectionMode")}
+            value={view.selectionMode}
+            options={[
+              { value: "card", label: tr("mode.card") },
+              { value: "inPlace", label: tr("mode.inPlace") },
+            ]}
+            onchange={setSelectionMode}
+          />
         </div>
       {/if}
     {/if}

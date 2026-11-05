@@ -10,6 +10,7 @@ import type { BackendErrorKind } from "../opencode/types";
 import type { DisplayMode, ThemeChoice } from "../settings/types";
 import { applyTheme } from "../ui/theme";
 import { svgIcon } from "./card";
+import { pulseText } from "./pulse";
 import { STYLES } from "./styles";
 
 export type InsertOutcome =
@@ -47,6 +48,11 @@ export function createSelectionInserter(deps: InserterDeps) {
     if (blocks.length === 0) return "empty";
     doc.getSelection()?.removeAllRanges();
     const mode = await deps.getDisplayMode();
+    // after the await, so a failing getDisplayMode cannot leave the text dimmed
+    const stopPulse = pulseText(
+      doc,
+      blocks.flatMap((b) => b.textNodes),
+    );
     const last = blocks[blocks.length - 1] as Block;
     const lastText = last.textNodes[last.textNodes.length - 1] as Text;
 
@@ -81,6 +87,7 @@ export function createSelectionInserter(deps: InserterDeps) {
 
     const insertion: Insertion = {
       restore() {
+        stopPulse();
         journal.restoreAll();
         host.remove();
         live.delete(insertion);
@@ -94,6 +101,7 @@ export function createSelectionInserter(deps: InserterDeps) {
       let settled = false;
       const finish = (outcome: InsertOutcome) => {
         settled = true;
+        stopPulse();
         try {
           port.disconnect();
         } catch {}

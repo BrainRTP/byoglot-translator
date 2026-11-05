@@ -5,6 +5,7 @@ import type { BackendErrorKind, Connection, ModelInfo, ModelRef } from "../openc
 import type {
   EffectiveSettings,
   GlobalSettings,
+  SelectionMode,
   SiteRule,
   Template,
   TemplateSettings,
@@ -37,6 +38,7 @@ export type TabView = {
   animation: AnimationKind;
   progressBar: boolean;
   theme: ThemeChoice;
+  selectionMode: SelectionMode;
   template: Template;
   modified: boolean;
   rule: SiteRule | undefined;

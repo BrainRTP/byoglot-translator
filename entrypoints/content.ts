@@ -97,6 +97,7 @@ export default defineContentScript({
       openSettings: () => void sendMessage("openOptions", undefined).catch(() => {}),
       currentTemplateId: async () => (await loadView()).settings.templateId,
       theme: async () => (await loadView()).theme,
+      selectionMode: async () => (await loadView()).selectionMode,
       insert: inserter.insert,
       canInsert: () => translator.state().state === "idle",
     });

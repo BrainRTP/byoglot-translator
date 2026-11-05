@@ -29,6 +29,7 @@ export const DEFAULT_GLOBALS: GlobalSettings = {
   languagePromptEnabled: true,
   languageProfile: "auto",
   theme: "system",
+  selectionMode: "card",
 };
 
 export function initialGlobals(browserLanguage: string | undefined): GlobalSettings {

@@ -15,7 +15,7 @@
   import type { ModelInfo, ModelRef } from "../../lib/opencode/types";
   import { DEFAULT_GLOBALS } from "../../lib/settings/defaults";
   import { pinnedModel } from "../../lib/settings/effective";
-  import type { GlobalSettings, SiteRule, Template, ThemeChoice } from "../../lib/settings/types";
+  import type { GlobalSettings, SelectionMode, SiteRule, Template, ThemeChoice } from "../../lib/settings/types";
   import AnimationSection from "../../lib/ui/AnimationSection.svelte";
   import ConnectionList from "../../lib/ui/ConnectionList.svelte";
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
@@ -108,6 +108,10 @@
     { value: "en", label: "English" },
   ]);
 
+  const selectionModeOptions = $derived<{ value: SelectionMode; label: string }[]>([
+    { value: "card", label: tr("mode.card") },
+    { value: "inPlace", label: tr("mode.inPlace") },
+  ]);
   const themeOptions = $derived<{ value: ThemeChoice; label: string }[]>([
     { value: "system", label: tr("opt.theme.system") },
     { value: "light", label: tr("opt.theme.light") },
@@ -557,6 +561,15 @@
                   options={themeOptions}
                   label={tr("opt.theme")}
                   onchange={pickTheme}
+                />
+              </div>
+              <div>
+                <span class="lbl">{tr("opt.selectionMode")}</span>
+                <Segmented
+                  value={globals.selectionMode}
+                  options={selectionModeOptions}
+                  label={tr("opt.selectionMode")}
+                  onchange={(selectionMode) => patchGlobals("language", { selectionMode })}
                 />
               </div>
               <label class="block">

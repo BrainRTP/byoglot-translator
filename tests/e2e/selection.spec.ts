@@ -172,3 +172,32 @@ test("revert button restores the original html", async ({ paired, mock }) => {
 
   await expect.poll(() => intro.innerHTML()).toBe(original);
 });
+
+test("in place mode translates the selection from the icon", async ({ paired, mock }) => {
+  const options = await paired.context.newPage();
+  await options.goto(`chrome-extension://${paired.id}/options.html`);
+  const group = options.getByRole("group", { name: "Selection translation" });
+  await group.getByRole("button", { name: "In place" }).click();
+  await expect(options.locator("#language .flag")).toHaveText("Saved");
+
+  const page = await paired.context.newPage();
+  await page.goto(`${mock.url}/fixtures/article.html`);
+  const intro = page.locator("#intro");
+  const original = await intro.innerHTML();
+
+  await selectInIntro(page);
+  await expect.poll(() => queryClosedShadow(page, "button.icon")).not.toBeNull();
+  const icon = await queryClosedShadow(page, "button.icon");
+  if (!icon) throw new Error("icon disappeared");
+  await page.mouse.click(icon.center.x, icon.center.y);
+
+  await expect.poll(async () => (await intro.textContent())?.includes("[ru] ")).toBe(true);
+  expect(await countClosedShadow(page, ".card")).toBe(0);
+  await expect
+    .poll(() => queryClosedShadow(page, "button.revert[aria-label]", "revert"))
+    .not.toBeNull();
+  const revert = await queryClosedShadow(page, "button.revert", "revert");
+  if (!revert) throw new Error("revert button missing");
+  await page.mouse.click(revert.center.x, revert.center.y);
+  await expect.poll(() => intro.innerHTML()).toBe(original);
+});

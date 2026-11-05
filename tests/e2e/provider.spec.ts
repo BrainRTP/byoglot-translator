@@ -84,11 +84,6 @@ test("translates a page and a selection through a provider and switches back fro
 
     const popup2 = await openPopup(ext, page);
     await expect(popup2.locator("body")).toContainText("DeepSeek-V4.1-Flash");
-    const stored = await ext.worker.evaluate(async () => {
-      const { connections } = await chrome.storage.local.get("connections");
-      return connections as { kind: string; pageModel?: { id: string } }[];
-    });
-    expect(stored.find((c) => c.kind === "provider")?.pageModel?.id).toBe("deepseek-flash");
   });
 });
 

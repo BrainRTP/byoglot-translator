@@ -199,6 +199,7 @@ export const en = {
   "opt.anim.group": "Animation effect",
   "opt.anim.mode": "Display mode",
   "opt.anim.repeat": "Repeat",
+  "opt.anim.progressBar": "Show progress at the top of the page",
   "opt.anim.scene": "Preview article",
   "models.lead": "Global defaults. A template can override them for a single tab or site.",
   "models.thinkingTitle": "Thinking slows translation down 5-7 times.",

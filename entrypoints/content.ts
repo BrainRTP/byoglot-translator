@@ -1,5 +1,6 @@
 import { browser } from "wxt/browser";
 import { createPageTranslator, shareInFlight } from "../lib/dom/page-translator";
+import { createProgressBar } from "../lib/dom/progress-bar";
 import { setUiLang } from "../lib/i18n";
 import { PAGE_PORT_NAME } from "../lib/messaging/page-port";
 import { onTabMessage, sendMessage } from "../lib/messaging/protocol";
@@ -14,6 +15,9 @@ export default defineContentScript({
     const loadView = shareInFlight(() => sendMessage("tabView", { tabId: -1 }));
 
     const isTop = window === window.top;
+    const bar = createProgressBar(document);
+    let barOn = false;
+    let lastState = "idle";
 
     const translator = createPageTranslator({
       doc: document,
@@ -26,7 +30,19 @@ export default defineContentScript({
         return { lang: result.languages[0]?.language ?? "und", reliable: result.isReliable };
       },
       onState: (state) => {
-        if (isTop) void sendMessage("pageBadge", state.state).catch(() => {});
+        if (!isTop) return;
+        void sendMessage("pageBadge", state.state).catch(() => {});
+        const entering = state.state === "translating" && lastState !== "translating";
+        lastState = state.state;
+        if (state.state === "idle") bar.update(state);
+        else if (entering) {
+          void loadView()
+            .then((v) => {
+              barOn = v.progressBar;
+              if (barOn) bar.update(state);
+            })
+            .catch(() => {});
+        } else if (barOn) bar.update(state);
       },
     });
 

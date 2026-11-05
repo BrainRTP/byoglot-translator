@@ -116,6 +116,13 @@ describe("background handlers", () => {
     expect((await handlers.tabView({ tabId: 1, hostname: "example.com" })).animation).toBe("none");
   });
 
+  it("tabView carries the progress bar setting", async () => {
+    const { handlers } = setup();
+    expect((await handlers.tabView({ tabId: 1, hostname: "example.com" })).progressBar).toBe(true);
+    await handlers.setGlobals({ ...(await handlers.globals()), progressBar: false });
+    expect((await handlers.tabView({ tabId: 1, hostname: "example.com" })).progressBar).toBe(false);
+  });
+
   it("setTabSettings keeps the stored template unchanged and marks the view modified", async () => {
     const { handlers } = setup();
     const before = await handlers.templates();

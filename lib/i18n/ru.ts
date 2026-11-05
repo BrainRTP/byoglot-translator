@@ -199,6 +199,7 @@ export const ru = {
   "opt.anim.group": "Эффект анимации",
   "opt.anim.mode": "Режим отображения",
   "opt.anim.repeat": "Повторить",
+  "opt.anim.progressBar": "Показывать прогресс вверху страницы",
   "opt.anim.scene": "Пример статьи",
   "models.lead": "Общие значения. Шаблон может переопределить их для отдельной вкладки или сайта.",
   "models.thinkingTitle": "Thinking замедляет перевод в 5-7 раз.",

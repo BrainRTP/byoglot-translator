@@ -1,6 +1,6 @@
 import type { ConnectionKind } from "../connections/types";
 import { t } from "../i18n";
-import type { PageState, TabView } from "../messaging/protocol";
+import type { PageState, Status, TabView } from "../messaging/protocol";
 import type { BackendErrorKind, ModelInfo } from "../opencode/types";
 import { describeError, type ErrorPresentation } from "./errors";
 
@@ -26,6 +26,12 @@ export function errorView(
   backend: ConnectionKind = "opencode",
 ): ErrorView | null {
   return kind === "aborted" ? null : describeError(kind, "popup", retryAfterMs, now, backend);
+}
+
+export function statusFailure(status: Status | null, now: number = Date.now()): ErrorView | null {
+  return status?.state === "error"
+    ? errorView(status.kind, status.retryAfterMs, now, status.backend)
+    : null;
 }
 
 export function pageFailure(

@@ -5,6 +5,7 @@
   import { describeError } from "./errors";
   import { requestOrigin } from "./host-permission";
   import { tr } from "./i18n.svelte";
+  import { statusFailure } from "./popup-logic";
 
   const PRESETS: ProviderPreset[] = ["deepseek", "openrouter", "ollama", "lmstudio", "custom"];
 
@@ -83,8 +84,8 @@
         ondone(status);
         return;
       }
-      const kind = status.state === "error" ? status.kind : "bad_response";
-      const view = describeError(kind === "aborted" ? "bad_response" : kind, "popup", status.state === "error" ? status.retryAfterMs : undefined, Date.now(), "provider");
+      const view =
+        statusFailure(status) ?? describeError("bad_response", "popup", undefined, Date.now(), "provider");
       failed = { title: view.title, body: view.body };
     } catch {
       const view = describeError("offline", "popup", undefined, Date.now(), "provider");

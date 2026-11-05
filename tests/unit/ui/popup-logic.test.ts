@@ -10,8 +10,28 @@ import {
   pageFailure,
   pageHostname,
   progressView,
+  statusFailure,
   variantFor,
 } from "../../../lib/ui/popup-logic";
+
+describe("statusFailure", () => {
+  it("matches errorView for every error kind and ignores other states", () => {
+    for (const kind of ["provider_auth", "rate_limit", "offline", "incompatible"] as const) {
+      const status = {
+        state: "error",
+        url: "",
+        kind,
+        backend: "provider",
+        retryAfterMs: 5000,
+      } as const;
+      expect(statusFailure(status, 1000)).toEqual(errorView(kind, 5000, 1000, "provider"));
+    }
+    expect(statusFailure({ state: "disconnected" })).toBeNull();
+    expect(
+      statusFailure({ state: "error", url: "", kind: "aborted", backend: "provider" }),
+    ).toBeNull();
+  });
+});
 
 beforeEach(() => setUiLang("en"));
 afterEach(() => setUiLang("auto"));

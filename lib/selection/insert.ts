@@ -16,7 +16,7 @@ import { STYLES } from "./styles";
 export type InsertOutcome =
   | "done"
   | "empty"
-  | { error: BackendErrorKind; retryAfterMs?: number; backend?: ConnectionKind };
+  | { error: BackendErrorKind; retryAfterMs?: number; backend?: ConnectionKind; source?: string };
 
 export type InserterDeps = {
   doc: Document;
@@ -133,6 +133,7 @@ export function createSelectionInserter(deps: InserterDeps) {
             error: m.kind,
             ...(m.retryAfterMs !== undefined && { retryAfterMs: m.retryAfterMs }),
             ...(m.backend !== undefined && { backend: m.backend }),
+            ...(m.source !== undefined && { source: m.source }),
           });
         } else if (m.type === "done") {
           if (applied === 0) {

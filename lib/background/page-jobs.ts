@@ -29,6 +29,7 @@ export function attachPagePort(port: PagePort, handlers: Handlers, service: Serv
       const job = await handlers.pageJob(port.sender ?? {}, msg);
       if (controller.signal.aborted) return;
       const backend = await handlers.activeKind();
+      const sourceOf = await handlers.errorSource(job.model);
       await service.translatePage(
         job,
         {
@@ -36,7 +37,15 @@ export function attachPagePort(port: PagePort, handlers: Handlers, service: Serv
           onFailed: (ids) => post({ type: "failed", jobId, ids }),
           onFatal: (e) => {
             void handlers.forgetStatus();
-            post({ type: "fatal", jobId, kind: e.kind, retryAfterMs: e.retryAfterMs, backend });
+            const source = sourceOf(e);
+            post({
+              type: "fatal",
+              jobId,
+              kind: e.kind,
+              retryAfterMs: e.retryAfterMs,
+              backend,
+              ...(source !== undefined && { source }),
+            });
           },
         },
         controller.signal,
@@ -46,12 +55,14 @@ export function attachPagePort(port: PagePort, handlers: Handlers, service: Serv
       if (controller.signal.aborted) return;
       const e = toBackendError(error);
       void handlers.forgetStatus();
+      const source = (await handlers.errorSource())(e);
       post({
         type: "fatal",
         jobId,
         kind: e.kind,
         retryAfterMs: e.retryAfterMs,
         backend: await handlers.activeKind(),
+        ...(source !== undefined && { source }),
       });
     } finally {
       if (jobs.get(jobId) === controller) jobs.delete(jobId);

@@ -22,5 +22,6 @@ export type PortToContent =
       kind: BackendErrorKind;
       retryAfterMs?: number;
       backend?: ConnectionKind;
+      source?: string;
     }
   | { type: "done"; jobId: string };

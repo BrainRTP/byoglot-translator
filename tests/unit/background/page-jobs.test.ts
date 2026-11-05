@@ -37,7 +37,12 @@ function fakePort() {
 
 const forgetStatus = vi.fn(async () => {});
 const handlersWith = (pageJob: () => Promise<PageJob>, kind?: "opencode" | "provider") =>
-  ({ pageJob, activeKind: async () => kind, forgetStatus }) as unknown as Handlers;
+  ({
+    pageJob,
+    activeKind: async () => kind,
+    forgetStatus,
+    errorSource: async () => (e: BackendError) => (e.status ? `Crow, HTTP ${e.status}` : undefined),
+  }) as unknown as Handlers;
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 describe("attachPagePort", () => {
@@ -151,7 +156,7 @@ describe("attachPagePort", () => {
   it("posts a service fatal with its backend before done", async () => {
     const { port, sent, send } = fakePort();
     const translatePage = vi.fn(async (_j: PageJob, cb: PageCallbacks) => {
-      cb.onFatal(new BackendError("rate_limit"));
+      cb.onFatal(new BackendError("rate_limit", { status: 429 }));
     });
     attachPagePort(
       port,
@@ -161,7 +166,11 @@ describe("attachPagePort", () => {
     send(translate);
     await tick();
     expect(sent.map((m) => m.type)).toEqual(["fatal", "done"]);
-    expect(sent[0]).toMatchObject({ kind: "rate_limit", backend: "provider" });
+    expect(sent[0]).toMatchObject({
+      kind: "rate_limit",
+      backend: "provider",
+      source: "Crow, HTTP 429",
+    });
   });
 
   it("aborts on abort message and skips done", async () => {

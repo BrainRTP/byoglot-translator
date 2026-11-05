@@ -163,7 +163,6 @@ The stack: WXT, Svelte 5, TypeScript 7 (svelte-check runs on TypeScript 6 throug
 
 - Text inside closed shadow DOM is not reachable and is not translated.
 - The `>_` mark in the icon is not readable at 16 px.
-- Popup errors do not name the provider or HTTP status behind a limit or key error.
 
 ## License
 

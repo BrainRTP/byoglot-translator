@@ -123,6 +123,17 @@ describe("background handlers", () => {
     expect((await handlers.tabView({ tabId: 1, hostname: "example.com" })).animation).toBe("none");
   });
 
+  it("tabView exposes the selection mode", async () => {
+    const { handlers } = setup();
+    expect((await handlers.tabView({ tabId: 1, hostname: "example.com" })).selectionMode).toBe(
+      "card",
+    );
+    await handlers.setGlobals({ ...(await handlers.globals()), selectionMode: "inPlace" });
+    expect((await handlers.tabView({ tabId: 1, hostname: "example.com" })).selectionMode).toBe(
+      "inPlace",
+    );
+  });
+
   it("tabView carries the progress bar setting", async () => {
     const { handlers } = setup();
     expect((await handlers.tabView({ tabId: 1, hostname: "example.com" })).progressBar).toBe(true);

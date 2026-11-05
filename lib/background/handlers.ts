@@ -257,6 +257,7 @@ export function createHandlers(deps: HandlerDeps) {
       animation: g.animation,
       progressBar: g.progressBar,
       theme: g.theme,
+      selectionMode: g.selectionMode,
       template,
       modified: isModified(settings, template, g, activeId),
       rule,

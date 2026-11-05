@@ -20,6 +20,8 @@ export type Template = {
 
 export type ThemeChoice = "system" | "light" | "dark";
 
+export type SelectionMode = "card" | "inPlace";
+
 export type GlobalSettings = {
   sourceLang: "auto" | string;
   targetLang: string;
@@ -34,6 +36,7 @@ export type GlobalSettings = {
   languagePromptEnabled: boolean;
   languageProfile: "auto" | string;
   theme: ThemeChoice;
+  selectionMode: SelectionMode;
 };
 
 export type ProfileOverride = { text: string; base: string; savedAt: number };

@@ -82,3 +82,23 @@ test("a failing model list still shows the settings", async ({ paired, mock }) =
   await expect(popup.getByRole("combobox", { name: "Model" }).locator("optgroup")).toHaveCount(0);
   await expect(popup.getByText("Could not load the popup")).toHaveCount(0);
 });
+
+test("popup switches the selection mode", async ({ paired, mock }) => {
+  const page = await paired.context.newPage();
+  await page.goto(`${mock.url}/fixtures/article.html`);
+  const popup = await openPopup(paired, page);
+  const group = popup.getByRole("group", { name: "Selection translation" });
+  await group.getByRole("button", { name: "In place" }).click();
+  await expect(group.getByRole("button", { name: "In place" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  const options = await paired.context.newPage();
+  await options.goto(`chrome-extension://${paired.id}/options.html`);
+  const saved = options.getByRole("group", { name: "Selection translation" });
+  await expect(saved.getByRole("button", { name: "In place" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});

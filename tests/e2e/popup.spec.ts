@@ -63,9 +63,21 @@ test("a failing model list still shows the settings", async ({ paired, mock }) =
   await page.goto(`${mock.url}/fixtures/article.html`);
   const popup = await openPopup(paired, page, () => {
     const send = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = ((msg: { type?: string }, ...rest: unknown[]) =>
-      msg?.type === "models" ? Promise.reject(new Error("e2e")) : send(msg, ...rest)) as never;
+    chrome.runtime.sendMessage = ((msg: { type?: string }, cb: (r: unknown) => void) => {
+      if (msg?.type !== "models") return send(msg, cb);
+      Object.defineProperty(chrome.runtime, "lastError", {
+        configurable: true,
+        get: () => ({ message: "e2e" }),
+      });
+      cb(undefined);
+      Reflect.deleteProperty(chrome.runtime, "lastError");
+      (window as unknown as { modelsRejected: boolean }).modelsRejected = true;
+    }) as never;
   });
+  await popup.waitForFunction(
+    () => (window as unknown as { modelsRejected?: boolean }).modelsRejected,
+  );
   await expect(popup.getByRole("combobox", { name: "Translate to" })).toBeVisible();
+  await expect(popup.getByRole("combobox", { name: "Model" }).locator("optgroup")).toHaveCount(0);
   await expect(popup.getByText("Could not load the popup")).toHaveCount(0);
 });

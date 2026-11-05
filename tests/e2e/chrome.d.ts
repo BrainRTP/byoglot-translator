@@ -9,7 +9,8 @@ declare const chrome: {
     };
   };
   runtime: {
-    sendMessage(msg: { type?: string }, ...rest: unknown[]): Promise<unknown>;
+    sendMessage(msg: { type?: string }, callback: (response: unknown) => void): void;
+    lastError?: { message: string };
   };
   tabs: {
     query(info: { active?: boolean; lastFocusedWindow?: boolean }): Promise<ChromeTab[]>;

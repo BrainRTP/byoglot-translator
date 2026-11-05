@@ -3,6 +3,8 @@
   import { browser } from "wxt/browser";
   import { resolveLang, type UiLang } from "../../lib/i18n";
   import { type ProviderInput, type Status, sendMessage } from "../../lib/messaging/protocol";
+  import { parsePairingLink } from "../../lib/opencode/pairing";
+  import { requestOrigin } from "../../lib/ui/host-permission";
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
   import ProviderForm from "../../lib/ui/ProviderForm.svelte";
   import { type PairErrorKind, pairErrorView } from "../../lib/ui/pair-errors";
@@ -57,8 +59,20 @@
 
   async function connect() {
     if (!canConnect) return;
+    let target = "";
+    let granted = true;
+    try {
+      target = mode === "link" ? parsePairingLink(link).origin : url.trim();
+      // first await in the handler, so the click still counts as a user gesture
+      granted = await requestOrigin(target);
+    } catch {}
     phase = "connecting";
     failure = null;
+    if (!granted) {
+      phase = "idle";
+      failure = { kind: "unreachable", host: hostOf(target) };
+      return;
+    }
     let result: Status;
     try {
       result =

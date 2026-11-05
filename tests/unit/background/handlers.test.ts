@@ -325,6 +325,17 @@ describe("background handlers", () => {
       expect(await storedOpencode()).toEqual(conn);
     });
 
+    it("connectManual rejects non-http schemes and invalid URLs", async () => {
+      const { handlers } = setup();
+      for (const url of ["ftp://host:21", "not a url"]) {
+        expect(await handlers.connectManual({ ...conn, url })).toMatchObject({
+          state: "error",
+          kind: "incompatible",
+        });
+      }
+      expect(await storedOpencode()).toBeNull();
+    });
+
     it("status reports disconnected, connected and mapped errors", async () => {
       const { handlers } = setup();
       expect(await handlers.status()).toEqual({ state: "disconnected" });
@@ -1283,6 +1294,18 @@ describe("connection operations", () => {
     expect(JSON.stringify(res.connections)).not.toContain("sk-secret");
     expect(JSON.stringify(await handlers.connections())).not.toContain("sk-secret");
     expect((await handlers.connections()).find((c) => c.kind === "provider")?.hasKey).toBe(true);
+  });
+
+  it("saveProvider stores the base URL without query, hash, credentials and trailing slash", async () => {
+    const { handlers } = multi();
+    const res = await handlers.saveProvider({
+      ...deepseek,
+      baseUrl: "https://u:p@api.deepseek.com/v1/?x=1#h",
+    });
+    expect(res.status).toMatchObject({ state: "connected", url: "https://api.deepseek.com/v1" });
+    expect((await saved()).find((r) => r.kind === "provider")).toMatchObject({
+      baseUrl: "https://api.deepseek.com/v1",
+    });
   });
 
   it("switching connections keeps each pageModel", async () => {

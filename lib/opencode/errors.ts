@@ -21,7 +21,14 @@ export function isFatal(kind: BackendErrorKind): boolean {
   return kind !== "bad_response";
 }
 
+export function isTimeout(error: unknown): boolean {
+  return error instanceof Error && error.name === "TimeoutError";
+}
+
 export function fromFetchFailure(error: unknown, signal?: AbortSignal): BackendError {
+  if (isTimeout(error) || isTimeout(signal?.reason)) {
+    return new BackendError("offline", { cause: error });
+  }
   if (signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
     return new BackendError("aborted", { cause: error });
   }

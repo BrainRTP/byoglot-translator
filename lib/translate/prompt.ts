@@ -36,7 +36,7 @@ export function buildPagePrompt(i: {
     ].join("\n"),
     ...languageBlock(i.languagePrompt),
     userInstructions(i.prePrompt),
-    `Page: "${i.pageTitle}" on ${i.hostname}.`,
+    `Page: ${JSON.stringify(i.pageTitle)} on ${i.hostname}.`,
     "Remember: reply with the JSON object only.",
     `INPUT:\n${JSON.stringify(i.segments)}`,
   ].join("\n\n");

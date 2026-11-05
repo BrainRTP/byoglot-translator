@@ -1,5 +1,5 @@
 import { cacheKey, type TranslationCache } from "../cache/cache";
-import { BackendError, isFatal } from "../opencode/errors";
+import { BackendError, isFatal, isTimeout } from "../opencode/errors";
 import type { ModelRef, TranslationBackend } from "../opencode/types";
 import type { EffectiveSettings } from "../settings/types";
 import { parsePageResponse } from "./parse";
@@ -25,8 +25,13 @@ export interface PageCallbacks {
 type Limits = { maxBlocks: number; maxChars: number; concurrency: number };
 const DEFAULT_LIMITS: Limits = { maxBlocks: 25, maxChars: 4000, concurrency: 4 };
 
+const GENERATE_TIMEOUT_MS = 180_000;
+
 function toBackendError(error: unknown, signal: AbortSignal): BackendError {
   if (error instanceof BackendError) return error;
+  if (isTimeout(error) || isTimeout(signal.reason)) {
+    return new BackendError("offline", { cause: error });
+  }
   if (signal.aborted) return new BackendError("aborted", { cause: error });
   return new BackendError("incompatible", {
     detail: error instanceof Error ? error.message : String(error),
@@ -67,7 +72,8 @@ export function createTranslationService(deps: {
       return await semaphore.run(async () => {
         const backend = await deps.getBackend();
         signal.throwIfAborted();
-        return backend.generate(prompt, model, signal);
+        const limited = AbortSignal.any([signal, AbortSignal.timeout(GENERATE_TIMEOUT_MS)]);
+        return backend.generate(prompt, model, limited);
       }, signal);
     } catch (error) {
       throw toBackendError(error, signal);

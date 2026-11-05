@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { TranslationCache } from "../../../lib/cache/cache";
 import { cacheKey } from "../../../lib/cache/cache";
-import { BackendError } from "../../../lib/opencode/errors";
+import { BackendError, fromFetchFailure } from "../../../lib/opencode/errors";
 import type { BackendErrorKind, ModelRef, TranslationBackend } from "../../../lib/opencode/types";
 import type { EffectiveSettings } from "../../../lib/settings/types";
 import { createSemaphore } from "../../../lib/translate/semaphore";
@@ -713,6 +713,21 @@ describe("translateSelection", () => {
     await until(() => fake.prompts.length === 1);
     ac.abort();
     await expect(p).rejects.toMatchObject({ name: "BackendError", kind: "aborted" });
+  });
+
+  it("maps a generate timeout to offline, not aborted", async () => {
+    const timeout = AbortSignal.abort(new DOMException("timed out", "TimeoutError"));
+    const spy = vi.spyOn(AbortSignal, "timeout").mockReturnValue(timeout);
+    try {
+      const fake = fakeBackend(async (_p, signal) => {
+        throw fromFetchFailure(signal?.reason, signal);
+      });
+      await expect(
+        service(fake).translateSelection(input, new AbortController().signal),
+      ).rejects.toMatchObject({ kind: "offline" });
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("shares the concurrency limit with page jobs", async () => {

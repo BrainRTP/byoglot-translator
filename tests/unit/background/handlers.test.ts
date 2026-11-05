@@ -1514,7 +1514,7 @@ describe("connection operations", () => {
     expect(await saved()).toEqual([]);
   });
 
-  it("a failed check saves nothing and revokes a remote origin", async () => {
+  it("a failed check saves nothing and keeps the granted origin", async () => {
     const { handlers, removeOrigin } = multi(async () => {
       throw new BackendError("provider_auth");
     });
@@ -1526,7 +1526,7 @@ describe("connection operations", () => {
     });
     expect(res.connections).toEqual([]);
     expect(await saved()).toEqual([]);
-    expect(removeOrigin).toHaveBeenCalledWith("https://api.deepseek.com");
+    expect(removeOrigin).not.toHaveBeenCalled();
   });
 
   it("a failed check on a local origin does not revoke anything", async () => {

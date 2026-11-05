@@ -4,6 +4,7 @@
   import { resolveLang, type UiLang } from "../../lib/i18n";
   import { type ProviderInput, type Status, sendMessage } from "../../lib/messaging/protocol";
   import { parsePairingLink } from "../../lib/opencode/pairing";
+  import { cleartextSecret } from "../../lib/ui/connection-logic";
   import { requestOrigin } from "../../lib/ui/host-permission";
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
   import ProviderForm from "../../lib/ui/ProviderForm.svelte";
@@ -27,6 +28,7 @@
   let failure = $state<Failure | null>(null);
   let connected = $state<{ label: string; host: string } | null>(null);
   let copied = $state(false);
+  const cleartext = $derived(cleartextSecret(url, password));
 
   const canConnect = $derived(
     phase !== "connecting" && (mode === "link" ? link.trim() !== "" : url.trim() !== ""),
@@ -255,6 +257,7 @@
             <label class="field">
               <span class="strong">{tr("onboarding.password")} <span class="muted plain">{tr("onboarding.ifSet")}</span></span>
               <input class="fld mono big" type="password" autocomplete="current-password" bind:value={password} oninput={clearFailure} />
+              {#if cleartext}<span class="muted hint">{tr("conn.form.cleartext")}</span>{/if}
             </label>
             {#if failure}
               {@render alert(failure)}

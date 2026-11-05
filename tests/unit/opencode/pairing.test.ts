@@ -14,6 +14,11 @@ const pasted = `
 `;
 
 describe("parsePairingLink", () => {
+  it("does not take the origin from a redirect-style prefix", () => {
+    const tricky = "https://evil.com/r?u=https://127.0.0.1:4096/auth/connect/ABC123";
+    expect(parsePairingLink(tricky).origin).not.toBe("https://evil.com");
+  });
+
   it("parses a bare link", () => {
     expect(parsePairingLink(link)).toEqual({ origin: "http://127.0.0.1:49374", code });
   });

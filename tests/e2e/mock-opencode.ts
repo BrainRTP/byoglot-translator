@@ -18,6 +18,7 @@ export type MockOpencode = {
   url: string;
   pairCode: string;
   token: string;
+  pairDelayMs: number;
   stop(): Promise<void>;
   requests: RecordedRequest[];
 };
@@ -74,6 +75,7 @@ export async function startMockOpencode(opts: { mode?: MockMode } = {}): Promise
     if (pathname === `/auth/connect/${pairCode}`) {
       if (codeUsed) return json(401, {});
       codeUsed = true;
+      if (mock.pairDelayMs > 0) await new Promise((r) => setTimeout(r, mock.pairDelayMs));
       return json(200, { token });
     }
     if (pathname.startsWith("/auth/connect/")) return json(401, {});
@@ -100,8 +102,9 @@ export async function startMockOpencode(opts: { mode?: MockMode } = {}): Promise
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
 
-  return {
+  const mock: MockOpencode = {
     url: `http://127.0.0.1:${port}`,
+    pairDelayMs: 0,
     pairCode,
     token,
     requests,
@@ -111,4 +114,5 @@ export async function startMockOpencode(opts: { mode?: MockMode } = {}): Promise
         server.close(() => resolve());
       }),
   };
+  return mock;
 }

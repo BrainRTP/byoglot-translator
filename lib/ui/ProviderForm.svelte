@@ -1,10 +1,12 @@
 <script lang="ts">
   import type { ConnectionView, ProviderPreset } from "../connections/types";
   import type { ProviderInput, Status } from "../messaging/protocol";
+  import { needsKey } from "../provider/presets";
   import { presetDefaults, validateProviderForm } from "./connection-logic";
   import { describeError } from "./errors";
   import { requestOrigin } from "./host-permission";
   import { tr } from "./i18n.svelte";
+  import { statusFailure } from "./popup-logic";
 
   const PRESETS: ProviderPreset[] = ["deepseek", "openrouter", "ollama", "lmstudio", "custom"];
 
@@ -32,9 +34,9 @@
   let failed = $state<{ title: string; body: string } | null>(null);
   let previous = first;
 
-  const needsKey = $derived(presetDefaults(preset).needsKey);
+  const keyRequired = $derived(needsKey(preset, baseUrl));
   const keyHint = $derived(
-    existing?.hasKey ? tr("conn.form.keyKeep") : needsKey ? "" : tr("conn.form.keyOptional"),
+    existing?.hasKey ? tr("conn.form.keyKeep") : keyRequired ? "" : tr("conn.form.keyOptional"),
   );
 
   function resetFeedback() {
@@ -83,8 +85,8 @@
         ondone(status);
         return;
       }
-      const kind = status.state === "error" ? status.kind : "bad_response";
-      const view = describeError(kind === "aborted" ? "bad_response" : kind, "popup", status.state === "error" ? status.retryAfterMs : undefined, Date.now(), "provider");
+      const view =
+        statusFailure(status) ?? describeError("bad_response", "popup", undefined, Date.now(), "provider");
       failed = { title: view.title, body: view.body };
     } catch {
       const view = describeError("offline", "popup", undefined, Date.now(), "provider");

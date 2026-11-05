@@ -2,7 +2,7 @@
   import type { ConnectionView } from "../connections/types";
   import type { Status } from "../messaging/protocol";
   import { tr } from "./i18n.svelte";
-  import { errorView } from "./popup-logic";
+  import { statusFailure } from "./popup-logic";
   import StatusDot from "./StatusDot.svelte";
 
   let {
@@ -21,11 +21,7 @@
     onremove: (view: ConnectionView) => void;
   } = $props();
 
-  const failure = $derived(
-    status?.state === "error"
-      ? errorView(status.kind, status.retryAfterMs, Date.now(), status.backend)
-      : null,
-  );
+  const failure = $derived(statusFailure(status));
 </script>
 
 <ul class="list">

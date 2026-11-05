@@ -305,11 +305,15 @@
 
   async function refreshStatus(known?: Status) {
     status = known ?? (await sendMessage("status", undefined));
-    const [g, list] = await Promise.all([
-      sendMessage("globals", undefined),
+    const [, list] = await Promise.all([
+      globalsQueue.enqueue(
+        () => sendMessage("globals", undefined),
+        (g) => {
+          globals = g;
+        },
+      ),
       status.state === "connected" ? loadModels() : Promise.resolve([] as ModelInfo[]),
     ]);
-    globals = g;
     models = list;
   }
 

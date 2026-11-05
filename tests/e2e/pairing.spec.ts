@@ -30,3 +30,14 @@ test("pairs through onboarding and rejects the same link the second time", async
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Link expired");
 });
+
+test("kind switch is disabled while opencode connects", async ({ ext, mock }) => {
+  mock.pairDelayMs = 1500;
+  const page = await ext.context.newPage();
+  await page.goto(`chrome-extension://${ext.id}/onboarding.html`);
+
+  await page.getByLabel("Connection link").fill(`${mock.url}/auth/connect/${mock.pairCode}`);
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(page.getByRole("button", { name: "My provider" })).toBeDisabled();
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible();
+});

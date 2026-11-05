@@ -78,9 +78,9 @@
       return;
     }
     phase = "idle";
-    const kind = result.state === "error" ? result.kind : "bad_response";
+    const chosen = result.state === "error" ? result.kind : "bad_response";
     failure = {
-      kind: pairErrorView(kind, mode).kind,
+      kind: pairErrorView(chosen, mode).kind,
       host: hostOf(result.state === "error" && result.url ? result.url : url),
     };
   }
@@ -176,6 +176,7 @@
           <Segmented
             label={tr("conn.choice")}
             value={kind}
+            disabled={phase === "connecting"}
             options={[
               { value: "opencode", label: tr("conn.kind.opencode") },
               { value: "provider", label: tr("conn.kind.provider") },

@@ -55,6 +55,27 @@ describe("createSerialQueue", () => {
     expect(applied).toEqual(["fast"]);
   });
 
+  it("a read queued behind a pending write sees the written value", async () => {
+    const q = createSerialQueue();
+    let stored = "old";
+    let shown = "";
+    const write = q.enqueue(
+      async () => {
+        await delay(10);
+        stored = "new";
+      },
+      () => {},
+    );
+    const read = q.enqueue(
+      async () => stored,
+      (v) => {
+        shown = v;
+      },
+    );
+    await Promise.all([write, read]);
+    expect(shown).toBe("new");
+  });
+
   it("applies the reply when nothing newer was issued", async () => {
     const q = createSerialQueue();
     const applied: string[] = [];

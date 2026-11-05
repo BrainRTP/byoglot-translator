@@ -5,12 +5,14 @@
     options,
     label,
     size = "md",
+    disabled = false,
     onchange,
   }: {
     value: V;
     options: Option[];
     label: string;
     size?: "md" | "sm" | "fit";
+    disabled?: boolean;
     onchange: (value: V) => void;
   } = $props();
 </script>
@@ -20,6 +22,7 @@
   {#each options as option (option.value)}
     <button
       type="button"
+      {disabled}
       class:on={option.value === value}
       aria-pressed={option.value === value}
       onclick={() => onchange(option.value)}
@@ -36,6 +39,10 @@
     border-radius: 6px;
     padding: 2px;
     gap: 2px;
+  }
+  button:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
   button {
     font: inherit;

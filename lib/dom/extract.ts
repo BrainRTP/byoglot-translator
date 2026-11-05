@@ -16,7 +16,10 @@ export type Block = {
   source: string;
   slots: Slot[];
   textNodes: Text[];
+  attr?: AttrName;
 };
+
+export type AttrName = "title" | "alt" | "placeholder";
 
 export type ExtractOpts = {
   isTranslated(el: Element): boolean;
@@ -28,18 +31,18 @@ const TEXT_NODE = 3;
 const DOCUMENT_NODE = 9;
 const FRAGMENT_NODE = 11;
 
+export function hasLetters(value: string): boolean {
+  const text = value
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/www\.\S+/gi, " ")
+    .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, " ");
+  return /\p{L}/u.test(text);
+}
+
 export function extractBlocks(root: Node, opts: ExtractOpts): Block[] {
   const blocks: Block[] = [];
 
-  const hasText = (textNodes: Text[]) => {
-    const text = textNodes
-      .map((t) => t.data)
-      .join(" ")
-      .replace(/https?:\/\/\S+/gi, " ")
-      .replace(/www\.\S+/gi, " ")
-      .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, " ");
-    return /\p{L}/u.test(text);
-  };
+  const hasText = (textNodes: Text[]) => hasLetters(textNodes.map((t) => t.data).join(" "));
 
   const emitRun = (container: Element, run: Node[], own: Block[]) => {
     if (opts.isTranslated(container)) return;
@@ -108,7 +111,7 @@ export function extractBlocks(root: Node, opts: ExtractOpts): Block[] {
   return blocks;
 }
 
-function insideSkipped(el: Element): boolean {
+export function insideSkipped(el: Element): boolean {
   let cur: Node | null = el;
   while (cur) {
     if (cur.nodeType === ELEMENT_NODE && isSkippable(cur as Element)) return true;

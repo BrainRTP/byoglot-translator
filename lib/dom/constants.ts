@@ -81,8 +81,8 @@ function isNoTranslate(el: Element): boolean {
   );
 }
 
-export function isSkippable(el: Element): boolean {
-  if (SKIP_TAGS.has(el.localName)) return true;
+export function isSkippable(el: Element, ignoreTag = false): boolean {
+  if (!ignoreTag && SKIP_TAGS.has(el.localName)) return true;
   if (el.hasAttribute(MARK_ATTR)) return true;
   const editable = el.getAttribute("contenteditable");
   if (editable !== null && editable.toLowerCase() !== "false") return true;

@@ -345,6 +345,21 @@ function begin(journal: Journal, block: Block) {
   return { state, undos };
 }
 
+export function applyAttribute(block: Block, translated: string, journal: Journal): void {
+  const attr = block.attr;
+  if (!attr) throw new Error("not an attribute block");
+  const { undos } = begin(journal, block);
+  const el = block.element;
+  const original = el.getAttribute(attr);
+  const written = stripTags(translated);
+  el.setAttribute(attr, written);
+  undos.push(() => {
+    if (el.getAttribute(attr) !== written) return;
+    if (original === null) el.removeAttribute(attr);
+    else el.setAttribute(attr, original);
+  });
+}
+
 function fallbackReplace(ctx: Ctx, translated: string) {
   const text = stripTags(translated);
   ctx.block.textNodes.forEach((t, i) => {

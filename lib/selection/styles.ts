@@ -11,9 +11,9 @@ export const HOST_STYLE = [
   .map((d) => `${d} !important`)
   .join("; ");
 
-const LIGHT =
+export const LIGHT =
   "--bg:#FFFFFF;--sf:#F5F6F7;--bd:#D9DCE0;--bd2:#8A929C;--tx:#14171A;--mu:#566070;--ac:#1D5BD1;--er:#B3261E;--wn:#8A5300;--sh:0 6px 20px rgba(20,23,26,.16)";
-const DARK =
+export const DARK =
   "--bg:#16181B;--sf:#1D2024;--bd:#33373D;--bd2:#6C737D;--tx:#ECEEF0;--mu:#A3AAB4;--ac:#7AA7FF;--er:#FF8F86;--wn:#F0B84A;--sh:0 6px 20px rgba(0,0,0,.55)";
 
 export const STYLES = `

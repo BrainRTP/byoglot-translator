@@ -379,7 +379,7 @@
 {#snippet heading(id: Section | "hotkeys", flag: Flag)}
   <div class="h">
     <h2>{tr(NAV_KEYS[id])}</h2>
-    <span class="flag" class:bad={flag === "failed"} role="status">{flag ? flagText(flag) : ""}</span>
+    <span class="flag" class:bad={flag === "failed"} role="status">{#if flag === "saved"}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10" /></svg>{/if}{flag ? flagText(flag) : ""}</span>
   </div>
 {/snippet}
 
@@ -711,6 +711,9 @@
     gap: 12px;
   }
   .flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font-size: 12px;
     color: var(--ok);
   }

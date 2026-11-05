@@ -36,6 +36,7 @@
   import Segmented from "../../lib/ui/Segmented.svelte";
   import StatusDot from "../../lib/ui/StatusDot.svelte";
   import { createSerialQueue } from "../../lib/ui/serial-queue";
+  import { applyTheme } from "../../lib/ui/theme";
 
   const IDLE: PageState = { state: "idle", done: 0, total: 0, failed: 0 };
   const PROMPT_DEBOUNCE_MS = 250;
@@ -123,6 +124,7 @@
   async function loadAll() {
     const g = await sendMessage("globals", undefined);
     changeUiLang(g.uiLang);
+    applyTheme(document.documentElement, g.theme);
     document.documentElement.lang = resolveLang();
     const [active] = await browser.tabs.query({ active: true, currentWindow: true });
     tab = {

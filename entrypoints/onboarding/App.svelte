@@ -7,6 +7,7 @@
   import ProviderForm from "../../lib/ui/ProviderForm.svelte";
   import { type PairErrorKind, pairErrorView } from "../../lib/ui/pair-errors";
   import Segmented from "../../lib/ui/Segmented.svelte";
+  import { applyTheme } from "../../lib/ui/theme";
 
   type Failure = { kind: PairErrorKind; host: string };
 
@@ -40,6 +41,7 @@
   onMount(() => {
     void sendMessage("globals", undefined).then((g) => {
       changeUiLang(g.uiLang);
+      applyTheme(document.documentElement, g.theme);
       lang = resolveLang();
       document.documentElement.lang = lang;
     });

@@ -14,7 +14,7 @@
   } from "../../lib/messaging/protocol";
   import type { ModelInfo, ModelRef } from "../../lib/opencode/types";
   import { DEFAULT_GLOBALS } from "../../lib/settings/defaults";
-  import type { GlobalSettings, SiteRule, Template } from "../../lib/settings/types";
+  import type { GlobalSettings, SiteRule, Template, ThemeChoice } from "../../lib/settings/types";
   import AnimationSection from "../../lib/ui/AnimationSection.svelte";
   import ConnectionList from "../../lib/ui/ConnectionList.svelte";
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
@@ -28,6 +28,7 @@
   import SiteRules from "../../lib/ui/SiteRules.svelte";
   import { createSerialQueue } from "../../lib/ui/serial-queue";
   import TemplateEditor from "../../lib/ui/TemplateEditor.svelte";
+  import { applyTheme } from "../../lib/ui/theme";
 
   type Section =
     | "connection"
@@ -105,6 +106,12 @@
     { value: "en", label: "English" },
   ]);
 
+  const themeOptions = $derived<{ value: ThemeChoice; label: string }[]>([
+    { value: "system", label: tr("opt.theme.system") },
+    { value: "light", label: tr("opt.theme.light") },
+    { value: "dark", label: tr("opt.theme.dark") },
+  ]);
+
   function mark(section: Section, ok: boolean) {
     clearTimeout(timers[section]);
     flags[section] = ok ? "saved" : "failed";
@@ -162,6 +169,7 @@
       status = st;
       cacheEntries = cache.entries;
       applyLang(g.uiLang);
+      applyTheme(document.documentElement, g.theme);
       void loadShortcuts();
       models = st.state === "connected" ? await loadModels() : [];
     } catch {
@@ -220,6 +228,16 @@
     if (!ok && previous && globals) {
       globals = { ...globals, uiLang: previous };
       applyLang(previous);
+    }
+  }
+
+  async function pickTheme(choice: ThemeChoice) {
+    const previous = globals?.theme;
+    applyTheme(document.documentElement, choice);
+    const ok = await patchGlobals("language", { theme: choice });
+    if (!ok && previous && globals) {
+      globals = { ...globals, theme: previous };
+      applyTheme(document.documentElement, previous);
     }
   }
 
@@ -496,6 +514,15 @@
                   options={uiOptions}
                   label={tr("opt.lang.ui")}
                   onchange={pickUiLang}
+                />
+              </div>
+              <div>
+                <span class="lbl">{tr("opt.theme")}</span>
+                <Segmented
+                  value={globals.theme}
+                  options={themeOptions}
+                  label={tr("opt.theme")}
+                  onchange={pickTheme}
                 />
               </div>
               <label class="block">

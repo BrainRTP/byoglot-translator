@@ -18,7 +18,9 @@ export const DARK =
 
 export const STYLES = `
 .root{${LIGHT};color-scheme:light dark;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:13px;line-height:1.45;color:var(--tx)}
-@media (prefers-color-scheme: dark){.root{${DARK}}}
+.root[data-theme="dark"]{${DARK};color-scheme:dark}
+.root[data-theme="light"]{color-scheme:light}
+@media (prefers-color-scheme: dark){.root:not([data-theme="light"]){${DARK}}}
 *,*::before,*::after{box-sizing:border-box}
 .btn{font:inherit;height:36px;padding:0 14px;border-radius:6px;border:1px solid var(--bd2);background:var(--bg);color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-align:center}
 .btn.sm{min-height:28px;height:auto;padding:3px 10px;font-size:12px;line-height:1.3}

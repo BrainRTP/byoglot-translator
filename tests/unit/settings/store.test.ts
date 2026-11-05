@@ -21,6 +21,13 @@ describe("settings store", () => {
     fakeBrowser.reset();
   });
 
+  it("defaults theme to system, also for stored globals without it", async () => {
+    expect(DEFAULT_GLOBALS.theme).toBe("system");
+    const { theme: _theme, ...legacy } = DEFAULT_GLOBALS;
+    await globalsItem.setValue(legacy as never);
+    expect((await globalsItem.getValue()).theme).toBe("system");
+  });
+
   it("returns fallbacks when nothing is stored", async () => {
     expect(await connectionsStore.getAll()).toEqual([]);
     expect(await connectionsStore.getActive()).toBeNull();

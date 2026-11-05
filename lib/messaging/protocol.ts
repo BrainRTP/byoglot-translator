@@ -118,6 +118,7 @@ export interface TabProtocolMap {
   pageCommand(c: "toggle" | "stop" | "restore"): PageState;
   pageState(): PageState;
   selectionCommand(): void;
+  selectionInsertCommand(): void;
 }
 
 export const { sendMessage, onMessage, removeAllListeners } =

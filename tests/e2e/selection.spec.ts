@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { countClosedShadow, queryClosedShadow } from "./shadow";
 
@@ -107,4 +108,67 @@ test("one-shot card drags by its head, survives a click in the safe zone and clo
 
   await page.mouse.click(5, 5);
   await expect.poll(() => countClosedShadow(page, ".card")).toBe(0);
+});
+
+async function selectInIntro(page: Page) {
+  await page.evaluate(() => {
+    const link = document.getElementById("docs-link") as HTMLElement;
+    const after = link.nextSibling as Text;
+    const range = document.createRange();
+    range.setStart(link.firstChild as Text, 4);
+    range.setEnd(after, after.data.indexOf("before") + "before".length);
+    const sel = getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  });
+}
+
+async function insertFromCard(page: Page) {
+  await selectInIntro(page);
+  await expect.poll(() => queryClosedShadow(page, "button.icon")).not.toBeNull();
+  const icon = await queryClosedShadow(page, "button.icon");
+  if (!icon) throw new Error("icon disappeared");
+  await page.mouse.click(icon.center.x, icon.center.y);
+  await expect.poll(() => queryClosedShadow(page, ".card .scroll")).not.toBeNull();
+  const insert = await queryClosedShadow(page, "button[aria-label='Insert into the page']");
+  if (!insert) throw new Error("insert button missing");
+  await page.mouse.click(insert.center.x, insert.center.y);
+}
+
+test("insert button translates the selection in place and keeps the link", async ({
+  paired,
+  mock,
+}) => {
+  const page = await paired.context.newPage();
+  await page.goto(`${mock.url}/fixtures/article.html`);
+  const intro = page.locator("#intro");
+
+  await insertFromCard(page);
+
+  await expect.poll(async () => (await intro.innerText()).includes("[ru] ")).toBe(true);
+  await expect(page.locator("#intro a")).toHaveCount(1);
+  await expect(page.locator("#docs-link")).toHaveAttribute("href", "/fixtures/other.html");
+  expect(await intro.innerText()).toContain(
+    "The event loop lets the runtime handle many connections at once.",
+  );
+});
+
+test("revert button restores the original html", async ({ paired, mock }) => {
+  const page = await paired.context.newPage();
+  await page.goto(`${mock.url}/fixtures/article.html`);
+  const intro = page.locator("#intro");
+  const original = await intro.innerHTML();
+
+  await insertFromCard(page);
+  await expect.poll(async () => (await intro.innerText()).includes("[ru] ")).toBe(true);
+
+  await expect
+    .poll(() => queryClosedShadow(page, "button.revert[aria-label]", "revert"))
+    .not.toBeNull();
+  const revert = await queryClosedShadow(page, "button.revert", "revert");
+  if (!revert) throw new Error("revert button missing");
+  await page.mouse.click(revert.center.x, revert.center.y);
+
+  await expect.poll(() => intro.innerHTML()).toBe(original);
 });

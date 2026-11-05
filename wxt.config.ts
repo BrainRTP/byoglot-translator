@@ -30,6 +30,10 @@ export default defineConfig({
         suggested_key: { default: "Alt+Shift+S", mac: "Alt+X" },
         description: "__MSG_cmdTranslateSelection__",
       },
+      "insert-selection": {
+        suggested_key: { default: "Alt+Shift+I", mac: "Alt+I" },
+        description: "__MSG_cmdInsertSelection__",
+      },
     },
     ...(browser === "firefox" && {
       browser_specific_settings: {

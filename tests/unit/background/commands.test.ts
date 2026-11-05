@@ -52,6 +52,11 @@ describe("registerCommands", () => {
     expect(sent()).toMatchObject([{ tabId: 7, type: "selectionCommand" }]);
   });
 
+  it("insert-selection sends selectionInsertCommand to the active tab", async () => {
+    await (onCommand as (c: string) => Promise<void>)("insert-selection");
+    expect(sent()).toMatchObject([{ tabId: 7, type: "selectionInsertCommand" }]);
+  });
+
   it("ignores unknown commands and tabs without a content script", async () => {
     await (onCommand as (c: string) => Promise<void>)("other");
     expect(sendMessage).not.toHaveBeenCalled();

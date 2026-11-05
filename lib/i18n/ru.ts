@@ -281,6 +281,7 @@ export const ru = {
   "opt.hotkeys.notSet": "не задано",
   "opt.hotkeys.translatePage": "Перевести страницу / показать оригинал",
   "opt.hotkeys.translateSelection": "Перевести выделенный текст",
+  "opt.hotkeys.insertSelection": "Перевести выделенный текст на странице",
   "opt.hotkeys.closeCard": "Закрыть карточку перевода",
   "opt.hotkeys.noteChrome":
     "Браузер не дает назначить уже занятые сочетания. Менять их можно на chrome://extensions/shortcuts.",

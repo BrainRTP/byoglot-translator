@@ -282,6 +282,7 @@ export const en = {
   "opt.hotkeys.notSet": "not set",
   "opt.hotkeys.translatePage": "Translate page / show original",
   "opt.hotkeys.translateSelection": "Translate selected text",
+  "opt.hotkeys.insertSelection": "Translate selected text in place",
   "opt.hotkeys.closeCard": "Close translation card",
   "opt.hotkeys.noteChrome":
     "The browser will not assign shortcuts that are already taken. Change them at chrome://extensions/shortcuts.",

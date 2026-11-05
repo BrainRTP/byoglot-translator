@@ -110,6 +110,22 @@ describe("createSelectionInserter", () => {
     expect(document.body.innerHTML).toBe('<p id="a">One</p><p id="b">Two</p>');
   });
 
+  it("restoreAll during a pending job drops late results", async () => {
+    document.body.innerHTML = "<p id=p>Hello world</p>";
+    const p = document.getElementById("p") as Element;
+    const { inserter, emit, job } = setup();
+    const done = inserter.insert(rangeOf(p));
+    const m = await job();
+    inserter.restoreAll();
+    emit({
+      type: "results",
+      jobId: m.jobId,
+      results: [{ id: m.segments[0]?.id ?? "", text: "Привет мир", cached: false }],
+    });
+    expect(await done).toBe("empty");
+    expect(p.innerHTML).toBe("Hello world");
+  });
+
   it("detached range resolves empty", async () => {
     document.body.innerHTML = "<p id=p>Hello</p>";
     const p = document.getElementById("p") as Element;

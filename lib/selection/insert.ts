@@ -94,6 +94,11 @@ export function createSelectionInserter(deps: InserterDeps) {
       };
       port.onMessage.addListener((m: PortToContent) => {
         if (settled || m.jobId !== jobId) return;
+        // restoreAll ran while the job was in flight, late results must not write again
+        if (!live.has(insertion)) {
+          finish("empty");
+          return;
+        }
         if (m.type === "results") {
           host.remove();
           for (const r of m.results) {

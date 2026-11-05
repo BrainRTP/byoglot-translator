@@ -126,7 +126,7 @@ afterEach(() => {
 });
 
 describe("registry", () => {
-  it("lists only registered kinds in fixed order", () => {
+  it("lists registered kinds in fixed order", () => {
     expect(availableKinds()).toEqual([
       "none",
       "fade",
@@ -135,21 +135,14 @@ describe("registry", () => {
       "typewriter",
       "pen",
       "wave",
+      "meteor",
     ]);
-    registry.meteor = { ...probe.effect, kind: "meteor" };
+    const meteor = registry.meteor;
+    delete registry.meteor;
     try {
-      expect(availableKinds()).toEqual([
-        "none",
-        "fade",
-        "scramble",
-        "flap",
-        "typewriter",
-        "pen",
-        "wave",
-        "meteor",
-      ]);
+      expect(availableKinds()).not.toContain("meteor");
     } finally {
-      delete registry.meteor;
+      registry.meteor = meteor;
     }
   });
 });
@@ -161,8 +154,14 @@ describe("prepare", () => {
   });
 
   it("returns null for a kind missing in the registry", () => {
-    const h = harness("meteor");
-    expect(h.animator.prepare(makeBlock("<p>Hello</p>"))).toBeNull();
+    const meteor = registry.meteor;
+    delete registry.meteor;
+    try {
+      const h = harness("meteor");
+      expect(h.animator.prepare(makeBlock("<p>Hello</p>"))).toBeNull();
+    } finally {
+      registry.meteor = meteor;
+    }
   });
 
   it("returns null under reduced motion", () => {

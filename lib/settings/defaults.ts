@@ -27,6 +27,7 @@ export const DEFAULT_GLOBALS: GlobalSettings = {
   uiLang: "auto",
   languagePromptEnabled: true,
   languageProfile: "auto",
+  theme: "system",
 };
 
 export function initialGlobals(browserLanguage: string | undefined): GlobalSettings {

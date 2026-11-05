@@ -18,6 +18,8 @@ export type Template = {
   settings: TemplateSettings;
 };
 
+export type ThemeChoice = "system" | "light" | "dark";
+
 export type GlobalSettings = {
   sourceLang: "auto" | string;
   targetLang: string;
@@ -30,6 +32,7 @@ export type GlobalSettings = {
   uiLang: "auto" | "ru" | "en";
   languagePromptEnabled: boolean;
   languageProfile: "auto" | string;
+  theme: ThemeChoice;
 };
 
 export type ProfileOverride = { text: string; base: string; savedAt: number };

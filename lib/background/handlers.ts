@@ -130,6 +130,7 @@ function stampSettings(settings: TemplateSettings, activeId: string | null): Tem
 }
 
 const MODELS_TTL_MS = 30_000;
+const MODELS_FETCH_TIMEOUT_MS = 8_000;
 const BADGE_TEXT: Record<PageState["state"], string> = {
   idle: "",
   translating: "...",
@@ -154,7 +155,8 @@ export function createHandlers(deps: HandlerDeps) {
   function fetchModels(): Promise<ModelInfo[]> {
     if (pending) return pending;
     const epoch = modelsEpoch;
-    const request: Promise<ModelInfo[]> = (async () => (await deps.getBackend()).listModels())()
+    const request: Promise<ModelInfo[]> = (async () =>
+      (await deps.getBackend()).listModels(AbortSignal.timeout(MODELS_FETCH_TIMEOUT_MS)))()
       .then((models) => {
         if (epoch === modelsEpoch) modelsCache = { at: Date.now(), models };
         return models;

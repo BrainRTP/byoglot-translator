@@ -782,6 +782,18 @@ describe("background handlers", () => {
       expect(listModels).toHaveBeenCalledTimes(1);
     });
 
+    it("the shared model list request carries an 8 second timeout signal", async () => {
+      const timeout = vi.spyOn(AbortSignal, "timeout");
+      const listModels = vi.fn(async (_signal?: AbortSignal) => [flash]);
+      const { handlers } = setup(fakeBackend({ listModels }));
+      await view(handlers);
+      expect(timeout).toHaveBeenCalledWith(8_000);
+      const signal = listModels.mock.calls[0]?.[0];
+      expect(signal).toBeInstanceOf(AbortSignal);
+      expect(signal?.aborted).toBe(false);
+      timeout.mockRestore();
+    });
+
     it("failed loads are not cached", async () => {
       const listModels = vi
         .fn<() => Promise<ModelInfo[]>>()

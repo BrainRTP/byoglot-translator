@@ -18,7 +18,6 @@
   import AnimationSection from "../../lib/ui/AnimationSection.svelte";
   import ConnectionList from "../../lib/ui/ConnectionList.svelte";
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
-  import { applyTheme } from "../../lib/ui/theme";
   import LanguagePrompt from "../../lib/ui/LanguagePrompt.svelte";
   import { languageOptions } from "../../lib/ui/languages";
   import ModelSelect from "../../lib/ui/ModelSelect.svelte";
@@ -29,6 +28,7 @@
   import SiteRules from "../../lib/ui/SiteRules.svelte";
   import { createSerialQueue } from "../../lib/ui/serial-queue";
   import TemplateEditor from "../../lib/ui/TemplateEditor.svelte";
+  import { applyTheme } from "../../lib/ui/theme";
 
   type Section =
     | "connection"

@@ -13,7 +13,6 @@
   import { toTemplateSettings } from "../../lib/settings/effective";
   import type { EffectiveSettings, Template } from "../../lib/settings/types";
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
-  import { applyTheme } from "../../lib/ui/theme";
   import { languageOptions } from "../../lib/ui/languages";
   import ModelPicker from "../../lib/ui/ModelPicker.svelte";
   import {
@@ -37,6 +36,7 @@
   import Segmented from "../../lib/ui/Segmented.svelte";
   import StatusDot from "../../lib/ui/StatusDot.svelte";
   import { createSerialQueue } from "../../lib/ui/serial-queue";
+  import { applyTheme } from "../../lib/ui/theme";
 
   const IDLE: PageState = { state: "idle", done: 0, total: 0, failed: 0 };
   const PROMPT_DEBOUNCE_MS = 250;

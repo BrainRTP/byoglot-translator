@@ -122,7 +122,7 @@ Missing your language, or want to improve a profile? See [CONTRIBUTING.md](CONTR
 
 The background service worker holds the connection data (the opencode address and token, or the provider URL and key) and is the only part that talks to the backend. For a provider it sends one `POST {baseUrl}/chat/completions` request per batch, without streaming. For opencode it uses opencode's HTTP API: `GET /api/model` for the model list and `POST /api/experimental/generate/text` for one-shot generation without an agent session, so nothing appears in your opencode history.
 
-The content script walks the page and collects text blocks. Inline markup (links, bold, code) is replaced with numbered placeholders such as `<x1>docs</x1>`, so the model sees whole sentences. Blocks go to the background in batches (25 blocks or 4000 characters, up to 4 requests at once). The model answers with JSON keyed by block id, and the translation is written back into the original text nodes, so links and event handlers keep working. A MutationObserver picks up new content.
+The content script walks the page and collects text blocks. Inline markup (links, bold, code) is replaced with numbered placeholders such as `<x1>docs</x1>`, so the model sees whole sentences. Blocks go to the background in batches (25 blocks or 4000 characters, up to 4 requests at once). The model answers with JSON keyed by block id, and the translation is written back into the original text nodes, so links and event handlers keep working. The `title`, `alt` and `placeholder` attributes are translated the same way and are always replaced, also in the bilingual mode. A MutationObserver picks up new content.
 
 The opencode endpoint is marked experimental, so all calls go through one adapter in `lib/opencode/`.
 
@@ -162,7 +162,6 @@ The stack: WXT, Svelte 5, TypeScript 7 (svelte-check runs on TypeScript 6 throug
 ## Known limitations
 
 - Text inside closed shadow DOM is not reachable and is not translated.
-- `title`, `alt` and `placeholder` attributes are not translated yet.
 - The `>_` mark in the icon is not readable at 16 px.
 - Popup errors do not name the provider or HTTP status behind a limit or key error.
 

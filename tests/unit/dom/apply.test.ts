@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  applyAttribute,
   applyBilingual,
   applyReplace,
   createJournal,
@@ -447,5 +448,68 @@ describe("journal resilience", () => {
     });
     expect(() => journal.restoreAll()).not.toThrow();
     expect(a.element.textContent).toBe("One");
+  });
+});
+
+describe("applyAttribute", () => {
+  function attrBlock(attr: "title" | "alt" | "placeholder", html: string, tag: string): Block {
+    document.body.innerHTML = html;
+    const element = document.querySelector(tag) as Element;
+    const source = element.getAttribute(attr) as string;
+    return { id: "a1", element, source, slots: [], textNodes: [], attr };
+  }
+  const TITLE = '<p title="Open menu">Hello</p>';
+
+  it("sets the attribute and restoreBlock brings the original back", () => {
+    const block = attrBlock("title", TITLE, "p");
+    const journal = createJournal();
+    applyAttribute(block, "Открыть меню", journal);
+    expect(block.element.getAttribute("title")).toBe("Открыть меню");
+    journal.restoreBlock(block);
+    expect(block.element.getAttribute("title")).toBe("Open menu");
+  });
+
+  it("restoreAll restores attributes together with text blocks", () => {
+    document.body.innerHTML = '<p id="p" title="Open menu">Hello world</p>';
+    const [text] = extractBlocks(document.body, { isTranslated: () => false, nextId: () => "t1" });
+    const element = document.getElementById("p") as Element;
+    const attr: Block = {
+      id: "a1",
+      element,
+      source: "Open menu",
+      slots: [],
+      textNodes: [],
+      attr: "title",
+    };
+    const journal = createJournal();
+    applyReplace(text as Block, "Привет мир", journal);
+    applyAttribute(attr, "Открыть меню", journal);
+    journal.restoreAll();
+    expect(element.textContent).toBe("Hello world");
+    expect(element.getAttribute("title")).toBe("Open menu");
+  });
+
+  it("strips placeholder tags from an attribute translation", () => {
+    const block = attrBlock("placeholder", '<input placeholder="Open menu">', "input");
+    applyAttribute(block, "<x1>Открыть</x1> меню", createJournal());
+    expect(block.element.getAttribute("placeholder")).toBe("Открыть меню");
+  });
+
+  it("keeps a value the page wrote after the translation", () => {
+    const block = attrBlock("title", TITLE, "p");
+    const journal = createJournal();
+    applyAttribute(block, "Открыть меню", journal);
+    block.element.setAttribute("title", "Page value");
+    journal.restoreBlock(block);
+    expect(block.element.getAttribute("title")).toBe("Page value");
+  });
+
+  it("applying twice keeps the first original", () => {
+    const block = attrBlock("title", TITLE, "p");
+    const journal = createJournal();
+    applyAttribute(block, "Первый", journal);
+    applyAttribute(block, "Второй", journal);
+    journal.restoreBlock(block);
+    expect(block.element.getAttribute("title")).toBe("Open menu");
   });
 });

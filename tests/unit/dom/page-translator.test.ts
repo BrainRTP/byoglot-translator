@@ -1025,3 +1025,75 @@ describe("animation", () => {
     expect(text("#a")).toBe("Альфа еще");
   });
 });
+
+describe("attributes", () => {
+  const ATTRS =
+    '<p id="p" title="Open menu">Hello world</p><img id="i" alt="A cat"><input id="f" placeholder="Search docs">';
+  const attr = (sel: string, name: string) => document.querySelector(sel)?.getAttribute(name);
+
+  it("translates attributes in the same jobs as text", async () => {
+    const t = setup('<p id="p" title="Open menu">Hello world</p>');
+    await t.translator.start();
+    await settle();
+    expect(t.translates()).toHaveLength(1);
+    expect(texts(t.translates()[0])).toEqual(["Hello world", "Open menu"]);
+    expect(attr("#p", "title")).toBe("[ru] Open menu");
+    expect(t.translator.state()).toMatchObject({ state: "translated", done: 2, total: 2 });
+  });
+
+  it("restore brings attributes back", async () => {
+    const t = setup(ATTRS);
+    await t.translator.start();
+    await settle();
+    expect(attr("#i", "alt")).toBe("[ru] A cat");
+    expect(attr("#f", "placeholder")).toBe("[ru] Search docs");
+    t.translator.restore();
+    expect(document.body.innerHTML).toBe(ATTRS);
+  });
+
+  it("bilingual mode replaces attributes", async () => {
+    const t = setup('<p id="p" title="Open menu">Hello world</p>', { mode: "bilingual" });
+    await t.translator.start();
+    await settle();
+    expect(attr("#p", "title")).toBe("[ru] Open menu");
+    expect(document.querySelectorAll("span")).toHaveLength(1);
+  });
+
+  it("does not translate an attribute twice when its container becomes dirty", async () => {
+    const t = setup('<p id="p" title="Open menu">Hello world</p>');
+    await t.translator.start();
+    await settle();
+    (document.getElementById("p") as HTMLElement).textContent = "Other";
+    await vi.advanceTimersByTimeAsync(300);
+    await settle();
+    expect(t.translates()).toHaveLength(2);
+    expect(texts(t.translates()[1])).toEqual(["Other"]);
+    expect(attr("#p", "title")).toBe("[ru] Open menu");
+  });
+
+  it("new element with title is translated", async () => {
+    const t = setup(FOUR);
+    await t.translator.start();
+    await settle();
+    document.body.insertAdjacentHTML("beforeend", '<img alt="A new cat">');
+    await vi.advanceTimersByTimeAsync(300);
+    await settle();
+    expect(texts(t.translates()[1])).toEqual(["A new cat"]);
+    expect(document.querySelector("img")?.getAttribute("alt")).toBe("[ru] A new cat");
+  });
+
+  it("empty result marks the attribute block failed and keeps the value", async () => {
+    const t = setup('<img id="i" alt="A cat">', { auto: false });
+    await t.translator.start();
+    await settle();
+    const job = t.translates()[0] as Translate;
+    t.emit({
+      type: "results",
+      jobId: job.jobId,
+      results: [{ id: job.segments[0]?.id ?? "", text: "  ", cached: false }],
+    });
+    t.emit({ type: "done", jobId: job.jobId });
+    expect(attr("#i", "alt")).toBe("A cat");
+    expect(t.translator.state()).toEqual({ state: "translated", done: 0, total: 1, failed: 1 });
+  });
+});

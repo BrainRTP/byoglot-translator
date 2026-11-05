@@ -37,6 +37,7 @@ export type PageTranslatorDeps = {
   doc: Document;
   connect(): PortLike;
   getDisplayMode(): Promise<DisplayMode>;
+  getVisibleOnly(): Promise<boolean>;
   getAnimation(): Promise<AnimationKind>;
   detectLanguage(text: string): Promise<{ lang: string; reliable: boolean }>;
   targetLang(): Promise<string>;
@@ -89,6 +90,9 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
   let port: PortLike | null = null;
   let watcher: Watcher | null = null;
   let visibility: Visibility | null = null;
+  let seen = new WeakSet<Element>();
+  // set only while visible-only gating is on: blocks never reported visible stay queued
+  let ready: ((block: Block) => boolean) | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let flushChain: Promise<void> = Promise.resolve();
   let changes: Changes = newChanges();
@@ -104,16 +108,20 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
   let flushFailures = 0;
 
   const nextId = () => `b${++counter}`;
-  const busy = () => jobs.size > 0 || lanes.size() > 0 || preparing > 0;
+  const busy = () => jobs.size > 0 || lanes.size(ready) > 0 || preparing > 0;
 
   function snapshot(): PageState {
     let done = 0;
     let failed = 0;
-    for (const s of status.values()) {
+    let total = 0;
+    for (const [block, s] of status) {
+      // blocks still waiting to become visible are not part of the progress
+      if (s === "queued" && ready && !ready(block)) continue;
+      total++;
       if (s === "applied") done++;
       else if (s === "failed") failed++;
     }
-    const result: PageState = { state: phase, done, total: status.size, failed };
+    const result: PageState = { state: phase, done, total, failed };
     if (phase === "error" && failure) result.error = failure;
     return result;
   }
@@ -185,7 +193,13 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
   function ensureVisibility(): Visibility {
     visibility ??= createVisibility({
       onVisible: (visible) => {
+        for (const el of visible) seen.add(el);
         lanes.reorder((items) => prioritize(items, visible));
+        if (ready && lanes.size(ready) > 0) {
+          if (phase === "translated") phase = "translating";
+          pump();
+          settle();
+        }
       },
     });
     return visibility;
@@ -253,7 +267,7 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
 
   function pump() {
     while (phase === "translating" && jobs.size < MAX_JOBS) {
-      const next = lanes.take(inflightByLane());
+      const next = lanes.take(inflightByLane(), ready);
       if (!next) break;
       const chunk = next.items;
       const jobId = crypto.randomUUID();
@@ -394,6 +408,7 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
     }
     watcher?.disconnect();
     watcher = null;
+    seen = new WeakSet();
     visibility?.disconnect();
     visibility = null;
     closePort();
@@ -566,13 +581,16 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
     preparing++;
     publish();
     try {
-      const [mode, lang, kind] = await Promise.all([
+      const [mode, only, lang, kind] = await Promise.all([
         deps.getDisplayMode(),
+        deps.getVisibleOnly(),
         deps.targetLang(),
         deps.getAnimation().catch((): AnimationKind => "none"),
       ]);
       if (myGen !== gen) return;
       displayMode = mode;
+      // without IntersectionObserver nothing would ever be reported visible
+      ready = only && globalThis.IntersectionObserver ? (b) => seen.has(b.element) : undefined;
       animation = kind;
       target = lang;
       const blocks: Block[] = [];
@@ -586,6 +604,7 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
       mainRoot = findMainRoot(deps.doc, blocks, rectOf, deps.doc.defaultView?.innerWidth ?? 0);
       const visible = await ensureVisibility().initial(blocks.map((b) => b.element));
       if (myGen !== gen) return;
+      for (const el of visible) seen.add(el);
       await enqueue(prioritize(orderByPosition(blocks, rectOf, isRtl()), visible), myGen);
     } catch {
       if (myGen !== gen) return;

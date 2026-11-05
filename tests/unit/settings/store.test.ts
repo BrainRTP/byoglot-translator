@@ -122,6 +122,7 @@ describe("settings store", () => {
       sourceLang: "auto",
       targetLang: "ru",
       displayMode: "replace" as const,
+      visibleOnly: false,
       pageModel: null,
       selectionModel: null,
     };

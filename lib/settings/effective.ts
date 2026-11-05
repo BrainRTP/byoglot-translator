@@ -43,6 +43,7 @@ export function applyTemplate(
     sourceLang: g.sourceLang,
     targetLang: s.targetLang ?? g.targetLang,
     displayMode: s.displayMode ?? g.displayMode,
+    visibleOnly: s.visibleOnly ?? false,
     pageModel: copyModel(ownModel(s.pageModel, activeId) ?? g.pageModel),
     selectionModel: copyModel(ownModel(s.selectionModel, activeId) ?? g.selectionModel),
   };
@@ -60,6 +61,7 @@ export function isModified(
     e.sourceLang === base.sourceLang &&
     e.targetLang === base.targetLang &&
     e.displayMode === base.displayMode &&
+    e.visibleOnly === base.visibleOnly &&
     sameModel(e.pageModel, base.pageModel, activeId) &&
     sameModel(e.selectionModel, base.selectionModel, activeId)
   );
@@ -71,6 +73,7 @@ export function toTemplateSettings(e: EffectiveSettings): TemplateSettings {
     targetLang: e.targetLang,
     displayMode: e.displayMode,
   };
+  if (e.visibleOnly) out.visibleOnly = true;
   if (e.pageModel) out.pageModel = { ...e.pageModel };
   if (e.selectionModel) out.selectionModel = { ...e.selectionModel };
   return out;

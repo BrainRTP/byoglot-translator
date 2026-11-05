@@ -113,6 +113,7 @@ function setup(
   opts: {
     auto?: boolean;
     mode?: DisplayMode;
+    visibleOnly?: boolean;
     detect?: (t: string) => string;
     animation?: AnimationKind;
   } = {},
@@ -130,6 +131,7 @@ function setup(
     doc: document,
     connect,
     getDisplayMode: async () => opts.mode ?? "replace",
+    getVisibleOnly: async () => opts.visibleOnly ?? false,
     getAnimation,
     detectLanguage,
     targetLang: async () => "ru-RU",
@@ -1095,5 +1097,57 @@ describe("attributes", () => {
     t.emit({ type: "done", jobId: job.jobId });
     expect(attr("#i", "alt")).toBe("A cat");
     expect(t.translator.state()).toEqual({ state: "translated", done: 0, total: 1, failed: 1 });
+  });
+});
+
+describe("visibleOnly", () => {
+  it("sends only the blocks that were reported visible and keeps progress to those", async () => {
+    const t = setup(FOUR, { visibleOnly: true });
+    MockIO.visible = (el) => el.id === "a" || el.id === "b";
+    await t.translator.start();
+    await settle();
+
+    expect(t.translates().flatMap((m) => texts(m))).toEqual(["Alpha one", "Beta two"]);
+    expect(text("#c")).toBe("Gamma three");
+    expect(t.translator.state()).toEqual({ state: "translated", done: 2, total: 2, failed: 0 });
+  });
+
+  it("sends a waiting block once it is revealed", async () => {
+    const t = setup(FOUR, { visibleOnly: true });
+    MockIO.visible = (el) => el.id === "a";
+    await t.translator.start();
+    await settle();
+    expect(t.translates().flatMap((m) => texts(m))).toEqual(["Alpha one"]);
+
+    MockIO.instances[0]?.fire([document.querySelector("#d") as Element]);
+    await settle();
+    expect(t.translates().flatMap((m) => texts(m))).toEqual(["Alpha one", "Delta four"]);
+    expect(text("#d")).toBe("[ru] Delta four");
+    expect(text("#b")).toBe("Beta two");
+    expect(t.translator.state()).toEqual({ state: "translated", done: 2, total: 2, failed: 0 });
+  });
+
+  it("drops the waiting blocks on restore", async () => {
+    const t = setup(FOUR, { visibleOnly: true });
+    await t.translator.start();
+    await settle();
+    t.translator.restore();
+    expect(t.translator.state()).toEqual({ state: "idle", done: 0, total: 0, failed: 0 });
+    expect(t.translates()).toHaveLength(0);
+  });
+
+  it("translates everything when the setting is off", async () => {
+    const t = setup(FOUR);
+    await t.translator.start();
+    await settle();
+    expect(t.translates().flatMap((m) => texts(m))).toHaveLength(4);
+  });
+
+  it("translates everything without IntersectionObserver", async () => {
+    vi.stubGlobal("IntersectionObserver", undefined);
+    const t = setup(FOUR, { visibleOnly: true });
+    await t.translator.start();
+    await settle();
+    expect(t.translates().flatMap((m) => texts(m))).toHaveLength(4);
   });
 });

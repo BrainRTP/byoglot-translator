@@ -7,6 +7,7 @@ export type TemplateSettings = {
   prePrompt?: string;
   targetLang?: string;
   displayMode?: DisplayMode;
+  visibleOnly?: boolean;
   pageModel?: ModelRef;
   selectionModel?: ModelRef;
 };
@@ -50,6 +51,7 @@ export type EffectiveSettings = {
   sourceLang: string;
   targetLang: string;
   displayMode: DisplayMode;
+  visibleOnly: boolean;
   pageModel: ModelRef | null;
   selectionModel: ModelRef | null;
 };

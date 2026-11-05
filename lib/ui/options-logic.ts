@@ -10,6 +10,7 @@ export type TemplateForm = {
   prePrompt: string;
   targetLang: string;
   displayMode: "" | DisplayMode;
+  visibleOnly: boolean;
   pageModel: ModelId | null;
   pageVariant: string;
   selectionModel: ModelId | null;
@@ -30,6 +31,7 @@ export function templateToForm(t: Template): TemplateForm {
     prePrompt: s.prePrompt ?? "",
     targetLang: s.targetLang ?? "",
     displayMode: s.displayMode ?? "",
+    visibleOnly: s.visibleOnly ?? false,
     pageModel: page.model,
     pageVariant: page.variant,
     selectionModel: selection.model,
@@ -49,6 +51,7 @@ export function formToSettings(form: TemplateForm): TemplateSettings {
   if (form.prePrompt.trim() !== "") out.prePrompt = form.prePrompt;
   if (form.targetLang !== "") out.targetLang = form.targetLang;
   if (form.displayMode !== "") out.displayMode = form.displayMode;
+  if (form.visibleOnly) out.visibleOnly = true;
   const page = joinModel(form.pageModel, form.pageVariant);
   if (page) out.pageModel = page;
   const selection = joinModel(form.selectionModel, form.selectionVariant);

@@ -24,6 +24,7 @@ export default defineContentScript({
       doc: document,
       connect: () => browser.runtime.connect({ name: PAGE_PORT_NAME }),
       getDisplayMode: async () => (await loadView()).settings.displayMode,
+      getVisibleOnly: async () => (await loadView()).settings.visibleOnly === true,
       getAnimation: async () => (await loadView()).animation,
       targetLang: async () => (await loadView()).settings.targetLang,
       detectLanguage: async (text) => {

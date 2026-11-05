@@ -20,6 +20,7 @@ const settings: EffectiveSettings = {
   sourceLang: "auto",
   targetLang: "ru",
   displayMode: "replace",
+  visibleOnly: false,
   pageModel: model,
   selectionModel: model,
 };

@@ -1,11 +1,14 @@
 import { BLOCK_SELECTOR, MARK_ATTR } from "../dom/constants";
 import { t } from "../i18n";
-import type { ThemeChoice } from "../settings/types";
+import type { SelectionMode, ThemeChoice } from "../settings/types";
 import { applyTheme } from "../ui/theme";
 import { type Anchor, type CardDeps, createCard, svgIcon } from "./card";
 import { HOST_STYLE, STYLES } from "./styles";
 
-export type SelectionUiDeps = CardDeps & { theme?(): Promise<ThemeChoice> };
+export type SelectionUiDeps = CardDeps & {
+  theme?(): Promise<ThemeChoice>;
+  selectionMode?(): Promise<SelectionMode>;
+};
 
 export type SelectionUi = {
   trigger(): void;
@@ -126,6 +129,16 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
   let icon: HTMLButtonElement | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
+  // the snapshot is read before the await: the inserter clears the page selection itself
+  async function act(snap: Snapshot, open: (snap: Snapshot) => void) {
+    const mode = await deps.selectionMode?.().catch(() => "card");
+    if (mode === "inPlace" && snap.range && deps.insert && deps.canInsert?.() !== false) {
+      void deps.insert(snap.range);
+    } else {
+      open(snap);
+    }
+  }
+
   function hideIcon() {
     icon?.remove();
     icon = null;
@@ -162,7 +175,7 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
     btn.addEventListener("mousedown", (e) => e.preventDefault());
     btn.addEventListener("click", () => {
       hideIcon();
-      card.open(snap);
+      void act(snap, card.open);
     });
     root.append(btn);
     icon = btn;
@@ -234,7 +247,7 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
       if (!snap) return;
       hideIcon();
       refreshTheme();
-      card.add(snap);
+      void act(snap, card.add);
     },
     hasSelection: () => readSelection(doc, true) !== null,
     insert() {

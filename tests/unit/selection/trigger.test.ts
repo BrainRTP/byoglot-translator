@@ -1246,3 +1246,82 @@ describe("insert into the page", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 });
+
+describe("in place selection mode", () => {
+  const inPlace = () => Promise.resolve("inPlace" as const);
+
+  function select() {
+    const p = paragraph("Many historians describe serendipity.");
+    selectText(p.firstChild as Text, 5, 15);
+    return p;
+  }
+
+  it("icon click inserts without opening the card", async () => {
+    const insert = vi.fn().mockResolvedValue("done");
+    mount({ insert, selectionMode: inPlace });
+    const p = select();
+    p.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(150);
+    icon()?.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(insert).toHaveBeenCalledOnce();
+    expect(String(insert.mock.calls[0]?.[0])).toBe("historians");
+    expect(card()).toBeNull();
+    expect(icon()).toBeNull();
+  });
+
+  it("trigger() inserts without opening the card", async () => {
+    const insert = vi.fn().mockResolvedValue("done");
+    const { translate } = mount({ insert, selectionMode: inPlace });
+    select();
+    ui?.trigger();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(insert).toHaveBeenCalledOnce();
+    expect(String(insert.mock.calls[0]?.[0])).toBe("historians");
+    expect(card()).toBeNull();
+    expect(translate).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the card for a form field selection", async () => {
+    const insert = vi.fn().mockResolvedValue("done");
+    const { translate } = mount({ insert, selectionMode: inPlace });
+    const ta = document.createElement("textarea");
+    ta.value = "alpha beta gamma";
+    document.body.append(ta);
+    ta.focus();
+    ta.setSelectionRange(6, 10);
+    ui?.trigger();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(insert).not.toHaveBeenCalled();
+    expect(translate).toHaveBeenCalled();
+  });
+
+  it("falls back to the card when canInsert is false", async () => {
+    const insert = vi.fn().mockResolvedValue("done");
+    const { translate } = mount({ insert, canInsert: () => false, selectionMode: inPlace });
+    select();
+    ui?.trigger();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(insert).not.toHaveBeenCalled();
+    expect(translate).toHaveBeenCalled();
+  });
+
+  it("card mode keeps opening the card, also without the dep or when it rejects", async () => {
+    for (const selectionMode of [
+      () => Promise.resolve("card" as const),
+      undefined,
+      () => Promise.reject(new Error("gone")),
+    ]) {
+      const insert = vi.fn().mockResolvedValue("done");
+      const { translate } = mount({ insert, ...(selectionMode && { selectionMode }) });
+      select();
+      ui?.trigger();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(insert).not.toHaveBeenCalled();
+      expect(translate).toHaveBeenCalled();
+      ui?.destroy();
+      ui = undefined;
+      document.body.replaceChildren();
+    }
+  });
+});

@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PortLike } from "../../../lib/dom/page-translator";
 import type { PortToBackground, PortToContent } from "../../../lib/messaging/page-port";
 import { createSelectionInserter } from "../../../lib/selection/insert";
+import { pulseText } from "../../../lib/selection/pulse";
 import type { DisplayMode } from "../../../lib/settings/types";
+
+vi.mock("../../../lib/selection/pulse", () => ({ pulseText: vi.fn(() => () => {}) }));
 
 type Translate = Extract<PortToBackground, { type: "translate" }>;
 
@@ -46,6 +49,56 @@ beforeEach(() => {
 });
 
 describe("createSelectionInserter", () => {
+  describe("pulse", () => {
+    const stop = vi.fn();
+    const p = () => document.getElementById("p") as Element;
+    beforeEach(() => {
+      stop.mockClear();
+      vi.mocked(pulseText).mockReset().mockReturnValue(stop);
+      document.body.innerHTML = "<p id=p>Hello</p>";
+    });
+
+    it("starts on the selected text and stops when the insertion is done", async () => {
+      const { inserter, emit, job } = setup();
+      const done = inserter.insert(rangeOf(p()));
+      const m = await job();
+      expect(pulseText).toHaveBeenCalledTimes(1);
+      expect(stop).not.toHaveBeenCalled();
+      emit({
+        type: "results",
+        jobId: m.jobId,
+        results: [{ id: m.segments[0]?.id ?? "", text: "Privet", cached: false }],
+      });
+      emit({ type: "done", jobId: m.jobId });
+      await done;
+      expect(stop).toHaveBeenCalled();
+    });
+
+    it("stops on a fatal error", async () => {
+      const { inserter, emit, job } = setup();
+      const done = inserter.insert(rangeOf(p()));
+      const m = await job();
+      emit({ type: "fatal", jobId: m.jobId, kind: "offline" });
+      await done;
+      expect(stop).toHaveBeenCalled();
+    });
+
+    it("stops when done arrives with nothing applied", async () => {
+      const { inserter, emit, job } = setup();
+      const done = inserter.insert(rangeOf(p()));
+      const m = await job();
+      emit({ type: "done", jobId: m.jobId });
+      expect(await done).toEqual({ error: "bad_response" });
+      expect(stop).toHaveBeenCalled();
+    });
+
+    it("never starts for an empty selection", async () => {
+      document.body.innerHTML = "<p id=p></p>";
+      expect(await setup().inserter.insert(rangeOf(p()))).toBe("empty");
+      expect(pulseText).not.toHaveBeenCalled();
+    });
+  });
+
   it("inserts the translation in place and reverts it", async () => {
     document.body.innerHTML = "<p id=p>Hello <b>big</b> world</p>";
     const p = document.getElementById("p") as Element;

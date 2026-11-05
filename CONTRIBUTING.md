@@ -104,4 +104,4 @@ The judge steps between `build` and `verify-list`, and the check of meaning flag
 
 The procedure is the same, except that the baseline is the current version of the profile instead of `generic`. The old version stays in `tests/quality/prompts/lang/`, so the baseline run uses it, for example `--set languagePrompt=lang/ru-v4.md`, and the candidate uses your new draft, for example `--set languagePrompt=lang/ru-v5.md`. Name the runs so that the candidate sorts first alphabetically, as above.
 
-`tests/unit/translate/profiles.test.ts` pins `ru.md` to `ru-v4.md` and `generic.md` to `default-v1.md`. When you ship a new version of one of them, change the file name in that test.
+`tests/unit/translate/profiles.test.ts` requires every file in `lib/translate/profiles/` to match one of the versions `tests/quality/prompts/lang/<code>-v<N>.md` (for `generic.md` that is `default-v<N>.md`). Put the new version on the stand first, then copy it into the profile; the test needs no edit.

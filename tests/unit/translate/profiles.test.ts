@@ -1,8 +1,17 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LANGUAGE_CODES } from "../../../lib/settings/languages";
 import { BUILTIN_PROFILES, GENERIC_PROFILE, PROFILE_IDS } from "../../../lib/translate/profiles";
+
+const STAND_DIR = join(process.cwd(), "tests/quality/prompts/lang");
+
+function standVersions(stem: string): string[] {
+  const pattern = new RegExp(`^${stem}-v\\d+\\.md$`);
+  return readdirSync(STAND_DIR)
+    .filter((name) => pattern.test(name))
+    .map((name) => readFileSync(join(STAND_DIR, name), "utf8").trim());
+}
 
 describe("built-in profiles", () => {
   it("ships generic and ru", () => {
@@ -37,16 +46,15 @@ describe("built-in profiles", () => {
     expect(languageIds).toEqual([...languageIds].sort());
   });
 
-  it("serves ru as the trimmed ru-v4 file", () => {
-    const file = readFileSync(join(process.cwd(), "tests/quality/prompts/lang/ru-v4.md"), "utf8");
-    expect(BUILTIN_PROFILES.get("ru")).toBe(file.trim());
-  });
-
-  it("serves generic as the trimmed default-v1 file", () => {
-    const file = readFileSync(
-      join(process.cwd(), "tests/quality/prompts/lang/default-v1.md"),
-      "utf8",
-    );
-    expect(BUILTIN_PROFILES.get(GENERIC_PROFILE)).toBe(file.trim());
+  it("serves every profile as one of its versions on the stand", () => {
+    for (const [id, text] of BUILTIN_PROFILES) {
+      const stem = id === GENERIC_PROFILE ? "default" : id;
+      const versions = standVersions(stem);
+      expect(
+        versions.length,
+        `no tests/quality/prompts/lang/${stem}-v*.md for ${id}`,
+      ).toBeGreaterThan(0);
+      expect(versions.includes(text), `${id} matches none of ${stem}-v*.md`).toBe(true);
+    }
   });
 });

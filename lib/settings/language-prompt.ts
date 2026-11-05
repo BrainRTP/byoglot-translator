@@ -35,6 +35,9 @@ export function languagePromptText(
   overrides: ProfileOverrides,
 ): string {
   if (!g.languagePromptEnabled) return "";
-  const id = chosenProfile(g.languageProfile, targetLang, [...builtins.keys()]);
+  // an explicit language profile applies only to its own language, other languages fall back to auto
+  const own =
+    g.languageProfile === GENERIC_PROFILE || g.languageProfile === primaryLang(targetLang);
+  const id = chosenProfile(own ? g.languageProfile : "auto", targetLang, [...builtins.keys()]);
   return profileText(builtins.get(id) ?? "", overrides[id]);
 }

@@ -56,6 +56,20 @@ describe("validateProviderForm", () => {
     expect(validateProviderForm(form)).toEqual({ ok: true });
   });
 
+  it("does not require a key for custom on localhost", () => {
+    const form = {
+      preset: "custom" as const,
+      name: "Local",
+      baseUrl: "http://localhost:8080/v1",
+      apiKey: "",
+    };
+    expect(validateProviderForm(form)).toEqual({ ok: true });
+    expect(validateProviderForm({ ...form, baseUrl: "https://example.com/v1" })).toMatchObject({
+      ok: false,
+      field: "apiKey",
+    });
+  });
+
   it("requires a key when an edit changes the origin", () => {
     const form = { ...deepseek, baseUrl: "https://example.com/v1" };
     expect(validateProviderForm(form, existing)).toEqual({

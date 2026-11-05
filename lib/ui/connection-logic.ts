@@ -1,5 +1,6 @@
 import { originOf } from "../connections/list";
 import type { ConnectionView, ProviderPreset } from "../connections/types";
+import { needsKey } from "../provider/presets";
 
 export type ProviderForm = {
   preset: ProviderPreset;
@@ -40,7 +41,7 @@ export function validateProviderForm(
 ): FormValidation {
   const origin = parseHttpOrigin(form.baseUrl);
   if (origin === null) return { ok: false, field: "baseUrl", reason: "invalid" };
-  if (form.apiKey.trim() !== "" || !PRESETS[form.preset].needsKey) return { ok: true };
+  if (form.apiKey.trim() !== "" || !needsKey(form.preset, form.baseUrl)) return { ok: true };
   const keepsKey = existing?.hasKey === true && parseHttpOrigin(existing.url) === origin;
   return keepsKey ? { ok: true } : { ok: false, field: "apiKey", reason: "required" };
 }

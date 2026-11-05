@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ConnectionView, ProviderPreset } from "../connections/types";
   import type { ProviderInput, Status } from "../messaging/protocol";
+  import { needsKey } from "../provider/presets";
   import { presetDefaults, validateProviderForm } from "./connection-logic";
   import { describeError } from "./errors";
   import { requestOrigin } from "./host-permission";
@@ -33,9 +34,9 @@
   let failed = $state<{ title: string; body: string } | null>(null);
   let previous = first;
 
-  const needsKey = $derived(presetDefaults(preset).needsKey);
+  const keyRequired = $derived(needsKey(preset, baseUrl));
   const keyHint = $derived(
-    existing?.hasKey ? tr("conn.form.keyKeep") : needsKey ? "" : tr("conn.form.keyOptional"),
+    existing?.hasKey ? tr("conn.form.keyKeep") : keyRequired ? "" : tr("conn.form.keyOptional"),
   );
 
   function resetFeedback() {

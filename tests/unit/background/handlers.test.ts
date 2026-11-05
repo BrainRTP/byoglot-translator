@@ -693,6 +693,16 @@ describe("background handlers", () => {
     const view = (h: ReturnType<typeof setup>["handlers"]) =>
       h.tabView({ tabId: 1, hostname: "example.com" });
 
+    it("concurrent tabView and models() share one request", async () => {
+      const listModels = vi.fn(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return [flash];
+      });
+      const { handlers } = setup(fakeBackend({ listModels }));
+      await Promise.all([view(handlers), handlers.models()]);
+      expect(listModels).toHaveBeenCalledTimes(1);
+    });
+
     it("reuses the model list for 30 seconds", async () => {
       const listModels = vi.fn(async () => [flash]);
       const { handlers } = setup(fakeBackend({ listModels }));

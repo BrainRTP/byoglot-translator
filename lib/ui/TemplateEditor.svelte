@@ -21,6 +21,7 @@
     templates,
     globals,
     models,
+    modelsLoading = false,
     rules,
     onop,
     onsetdefault,
@@ -28,6 +29,7 @@
     templates: Template[];
     globals: GlobalSettings;
     models: ModelInfo[];
+    modelsLoading?: boolean;
     rules: SiteRule[];
     onop: (op: TemplateOp) => Promise<Template[] | null>;
     onsetdefault: (id: string) => void;
@@ -242,6 +244,7 @@
           <span class="lbl">{tr("opt.tpl.pageModel")}</span>
           <ModelSelect
             {models}
+            loading={modelsLoading}
             value={form.pageModel}
             label={tr("opt.tpl.pageModel")}
             inheritLabel={inheritWith(modelLabel(globals.pageModel))}
@@ -267,6 +270,7 @@
           <span class="lbl">{tr("opt.tpl.selectionModel")}</span>
           <ModelSelect
             {models}
+            loading={modelsLoading}
             value={form.selectionModel}
             label={tr("opt.tpl.selectionModel")}
             inheritLabel={inheritWith(modelLabel(globals.selectionModel))}

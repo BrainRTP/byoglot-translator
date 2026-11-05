@@ -7,12 +7,14 @@
     value,
     label,
     inheritLabel,
+    loading = false,
     onchange,
   }: {
     models: ModelInfo[];
     value: ModelId | null;
     label: string;
     inheritLabel?: string;
+    loading?: boolean;
     onchange: (model: ModelId | null) => void;
   } = $props();
 
@@ -26,10 +28,12 @@
   }
 </script>
 
+<div class="ms" class:loading aria-busy={loading}>
 <select
   class="fld"
   class:inh={inheritLabel !== undefined && !value}
   aria-label={label}
+  disabled={loading}
   value={value ? modelKey(value) : ""}
   onchange={pick}
 >
@@ -47,3 +51,22 @@
     </optgroup>
   {/each}
 </select>
+{#if loading}<span class="spin"></span>{/if}
+</div>
+
+<style>
+  .ms {
+    position: relative;
+  }
+  .loading select {
+    filter: blur(1.5px);
+    opacity: 0.6;
+  }
+  .ms .spin {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin: -7px 0 0 -7px;
+    pointer-events: none;
+  }
+</style>

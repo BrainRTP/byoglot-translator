@@ -102,16 +102,21 @@
     askPage(() => sendTabMessage("pageState", undefined, tabId));
 
   async function loadTab(current: { id: number; hostname: string }, canLoadModels: boolean) {
-    const [v, list, ms, pr] = await Promise.all([
+    if (canLoadModels) {
+      sendMessage("models", undefined)
+        .then((ms) => {
+          models = ms;
+        })
+        .catch(() => {});
+    }
+    const [v, list, pr] = await Promise.all([
       sendMessage("tabView", { tabId: current.id, hostname: current.hostname }),
       sendMessage("templates", undefined),
-      canLoadModels ? sendMessage("models", undefined).catch(() => []) : Promise.resolve([]),
       queryPage(current.id),
     ]);
     server = v;
     setView(v, true);
     templates = list;
-    models = ms;
     applyPage(pr, 1);
   }
 
@@ -374,7 +379,11 @@
       <div><button class="btn sm" type="button" onclick={refresh}>{tr("common.retry")}</button></div>
     </div>
   </main>
-{:else if loaded}
+{:else if !loaded}
+  <main class="pop" aria-busy="true">
+    <span class="spin" role="status" aria-label={tr("popup.loading")}></span>
+  </main>
+{:else}
   <main class="pop">
     <div class="head">
       <div class="state">

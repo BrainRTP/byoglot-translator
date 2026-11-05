@@ -710,6 +710,16 @@ describe("background handlers", () => {
     const view = (h: ReturnType<typeof setup>["handlers"]) =>
       h.tabView({ tabId: 1, hostname: "example.com" });
 
+    it("concurrent tabView and models() share one request", async () => {
+      const listModels = vi.fn(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return [flash];
+      });
+      const { handlers } = setup(fakeBackend({ listModels }));
+      await Promise.all([view(handlers), handlers.models()]);
+      expect(listModels).toHaveBeenCalledTimes(1);
+    });
+
     it("reuses the model list for 30 seconds", async () => {
       const listModels = vi.fn(async () => [flash]);
       const { handlers } = setup(fakeBackend({ listModels }));
@@ -745,6 +755,60 @@ describe("background handlers", () => {
       await seedOpencode(conn);
       await view(handlers);
       expect(listModels.mock.calls.length).toBe(afterConnect + 1);
+    });
+
+    it("a connection change during a request leaves the cache empty", async () => {
+      const listModels = vi.fn(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return [flash];
+      });
+      const { handlers } = setup(fakeBackend({ listModels }));
+      await handlers.connectManual(conn);
+      vi.advanceTimersByTime(31_000);
+      const inFlight = handlers.models();
+      await handlers.removeConnection((await handlers.connections())[0]?.id as string);
+      await inFlight;
+      await seedOpencode(conn);
+      const before = listModels.mock.calls.length;
+      await view(handlers);
+      expect(listModels.mock.calls.length).toBe(before + 1);
+    });
+
+    it("a provider status check and tabView share one model list request", async () => {
+      await connectionsStore.setAll([
+        {
+          kind: "provider",
+          id: "p1",
+          preset: "deepseek",
+          name: "DeepSeek",
+          baseUrl: "https://api.deepseek.com",
+          apiKey: "k",
+          pageModel: null,
+          selectionModel: null,
+        },
+      ]);
+      await connectionsStore.setActiveId("p1");
+      const listModels = vi.fn(async () => [flash]);
+      const info = async () => {
+        await listModels();
+        return { version: "" };
+      };
+      const { handlers } = setup(fakeBackend({ listModels, info }));
+      expect(await handlers.status()).toMatchObject({ state: "connected", kind: "provider" });
+      await view(handlers);
+      expect(listModels).toHaveBeenCalledTimes(1);
+    });
+
+    it("the shared model list request carries an 8 second timeout signal", async () => {
+      const timeout = vi.spyOn(AbortSignal, "timeout");
+      const listModels = vi.fn(async (_signal?: AbortSignal) => [flash]);
+      const { handlers } = setup(fakeBackend({ listModels }));
+      await view(handlers);
+      expect(timeout).toHaveBeenCalledWith(8_000);
+      const signal = listModels.mock.calls[0]?.[0];
+      expect(signal).toBeInstanceOf(AbortSignal);
+      expect(signal?.aborted).toBe(false);
+      timeout.mockRestore();
     });
 
     it("failed loads are not cached", async () => {

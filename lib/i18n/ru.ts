@@ -45,6 +45,7 @@ export const ru = {
   "common.settings": "Настройки",
   "common.retry": "Повторить",
   "common.cancel": "Отмена",
+  "popup.loading": "Загрузка…",
   "popup.translatePage": "Перевести страницу",
   "popup.showOriginal": "Показать оригинал",
   "popup.stop": "Остановить",

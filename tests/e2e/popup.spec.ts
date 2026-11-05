@@ -1,5 +1,6 @@
-import { openPopup } from "./extension";
+import { openPopup, seedProvider } from "./extension";
 import { expect, test } from "./fixtures";
+import { startMockProvider } from "./mock-provider";
 
 test("model and mode rows share the same columns", async ({ paired, mock }) => {
   const page = await paired.context.newPage();
@@ -37,4 +38,47 @@ test("the effort list opens under its field and stays inside the popup", async (
   expect(below || above).toBe(true);
   expect(option.x).toBeGreaterThanOrEqual(field.x);
   expect(option.x + option.width).toBeLessThanOrEqual(width);
+});
+
+test("the popup shows its frame before a slow model list arrives", async ({ ext, mock }) => {
+  const provider = await startMockProvider({ modelsDelayMs: 3000 });
+  try {
+    await seedProvider(ext.worker, provider);
+    const page = await ext.context.newPage();
+    await page.goto(`${mock.url}/fixtures/article.html`);
+    const popup = await openPopup(ext, page);
+    const frame = popup.locator("main.pop");
+    await expect(frame).toBeVisible({ timeout: 1000 });
+    expect((await frame.boundingBox())?.width).toBe(360);
+    await expect(popup.getByRole("button", { name: "Translate page" })).toBeVisible({
+      timeout: 10_000,
+    });
+  } finally {
+    await provider.stop();
+  }
+});
+
+test("a failing model list still shows the settings", async ({ paired, mock }) => {
+  const page = await paired.context.newPage();
+  await page.goto(`${mock.url}/fixtures/article.html`);
+  const popup = await openPopup(paired, page, () => {
+    const send = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = ((msg: { type?: string }, cb: (r: unknown) => void) => {
+      if (msg?.type !== "models") return send(msg, cb);
+      Object.defineProperty(chrome.runtime, "lastError", {
+        configurable: true,
+        get: () => ({ message: "e2e" }),
+      });
+      cb(undefined);
+      Reflect.deleteProperty(chrome.runtime, "lastError");
+      (window as unknown as { modelsRejected: boolean }).modelsRejected = true;
+    }) as never;
+  });
+  await popup.waitForFunction(
+    () => (window as unknown as { modelsRejected?: boolean }).modelsRejected,
+  );
+  await expect(popup.getByRole("combobox", { name: "Translate to" })).toBeVisible();
+  await expect(popup.getByRole("combobox", { name: "Model" })).toBeVisible();
+  await expect(popup.getByRole("combobox", { name: "Model" }).locator("optgroup")).toHaveCount(0);
+  await expect(popup.getByText("Could not load the popup")).toHaveCount(0);
 });

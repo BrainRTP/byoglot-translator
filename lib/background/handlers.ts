@@ -130,6 +130,7 @@ function stampSettings(settings: TemplateSettings, activeId: string | null): Tem
 }
 
 const MODELS_TTL_MS = 30_000;
+const MODELS_FETCH_TIMEOUT_MS = 8_000;
 const BADGE_TEXT: Record<PageState["state"], string> = {
   idle: "",
   translating: "...",
@@ -142,10 +143,29 @@ export function createHandlers(deps: HandlerDeps) {
   let modelsCache: { at: number; models: ModelInfo[] } | null = null;
   const selectionJobs = new Map<string, { controller: AbortController; tabId?: number }>();
 
-  async function fetchModels(): Promise<ModelInfo[]> {
-    const models = await (await deps.getBackend()).listModels();
-    modelsCache = { at: Date.now(), models };
-    return models;
+  let pending: Promise<ModelInfo[]> | null = null;
+  let modelsEpoch = 0;
+
+  function resetModels(): void {
+    modelsCache = null;
+    pending = null;
+    modelsEpoch++;
+  }
+
+  function fetchModels(): Promise<ModelInfo[]> {
+    if (pending) return pending;
+    const epoch = modelsEpoch;
+    const request: Promise<ModelInfo[]> = (async () =>
+      (await deps.getBackend()).listModels(AbortSignal.timeout(MODELS_FETCH_TIMEOUT_MS)))()
+      .then((models) => {
+        if (epoch === modelsEpoch) modelsCache = { at: Date.now(), models };
+        return models;
+      })
+      .finally(() => {
+        if (pending === request) pending = null;
+      });
+    pending = request;
+    return request;
   }
 
   async function loadModels(): Promise<ModelInfo[] | null> {
@@ -241,13 +261,15 @@ export function createHandlers(deps: HandlerDeps) {
     if (!active) return { state: "disconnected" };
     const view = toView(active, active.id);
     try {
-      const info = await (await deps.getBackend()).info();
+      let version = "";
+      if (active.kind === "provider") await fetchModels();
+      else version = (await (await deps.getBackend()).info()).version;
       return {
         state: "connected",
         kind: active.kind,
         name: view.name,
         url: view.url,
-        version: info.version,
+        version,
       };
     } catch (error) {
       return errorStatus(view.url, error, active.kind);
@@ -315,7 +337,7 @@ export function createHandlers(deps: HandlerDeps) {
   }
 
   async function activate(record: ConnectionRecord, list: ConnectionRecord[]): Promise<void> {
-    modelsCache = null;
+    resetModels();
     const next = list.some((rec) => rec.id === record.id)
       ? list.map((rec) => (rec.id === record.id ? record : rec))
       : [...list, record];
@@ -546,7 +568,7 @@ export function createHandlers(deps: HandlerDeps) {
     async activateConnection(id: string): Promise<Status> {
       const list = await connectionsStore.getAll();
       if (!list.some((rec) => rec.id === id)) throw new Error(`Connection not found: ${id}`);
-      modelsCache = null;
+      resetModels();
       await connectionsStore.setActiveId(id);
       await initModels();
       return status();
@@ -557,7 +579,7 @@ export function createHandlers(deps: HandlerDeps) {
       const removed = list.find((rec) => rec.id === id);
       if (!removed) return views(list);
       const next = list.filter((rec) => rec.id !== id);
-      modelsCache = null;
+      resetModels();
       if ((await connectionsStore.getActiveId()) === id) await connectionsStore.setActiveId(null);
       await connectionsStore.setAll(next);
       if (removed.kind === "provider") {

@@ -43,6 +43,7 @@ export const en = {
   "common.settings": "Settings",
   "common.retry": "Retry",
   "common.cancel": "Cancel",
+  "popup.loading": "Loading…",
   "popup.translatePage": "Translate page",
   "popup.showOriginal": "Show original",
   "popup.stop": "Stop",

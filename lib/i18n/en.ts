@@ -215,6 +215,8 @@ export const en = {
   "models.slowNote": "5-7 times slower than with none.",
   "models.unavailable": "Models are not available. Connect opencode to change them.",
   "models.noEffort": "This model has no effort levels.",
+  "models.effortOneShot": "Effort: One-shot",
+  "models.effortPinned": "Effort: Pinned",
   "opt.tpl.lead":
     "A template is a named set of options: pre-prompt, language, display mode, models and effort. Empty fields fall back to the global settings. Applying a template copies its values into the tab settings; edits in the popup never change the saved template.",
   "opt.tpl.search": "Search templates",
@@ -231,7 +233,7 @@ export const en = {
   "opt.tpl.pageModel": "Page model",
   "opt.tpl.pageEffort": "Page effort",
   "opt.tpl.selectionModel": "Selection model",
-  "opt.tpl.selectionEffort": "Selection effort",
+  "opt.tpl.selectionEffort": "Selection effort (One-shot)",
   "opt.tpl.save": "Save",
   "opt.tpl.duplicate": "Duplicate",
   "opt.tpl.makeDefault": "Make default",

@@ -215,6 +215,8 @@ export const ru = {
   "models.slowNote": "Медленнее в 5-7 раз, чем при none.",
   "models.unavailable": "Список моделей недоступен. Подключите opencode, чтобы их менять.",
   "models.noEffort": "У этой модели нет уровней effort.",
+  "models.effortOneShot": "Effort: Разовый",
+  "models.effortPinned": "Effort: Закрепленный",
   "opt.tpl.lead":
     "Шаблон - именованный набор настроек: пре-промпт, язык, режим, модели и effort. Пустые поля берутся из общих настроек. При применении значения копируются в настройки вкладки; правки в popup сохраненный шаблон не меняют.",
   "opt.tpl.search": "Поиск шаблонов",
@@ -231,7 +233,7 @@ export const ru = {
   "opt.tpl.pageModel": "Модель страницы",
   "opt.tpl.pageEffort": "Effort страницы",
   "opt.tpl.selectionModel": "Модель выделения",
-  "opt.tpl.selectionEffort": "Effort выделения",
+  "opt.tpl.selectionEffort": "Effort выделения (Разовый)",
   "opt.tpl.save": "Сохранить",
   "opt.tpl.duplicate": "Дублировать",
   "opt.tpl.makeDefault": "Сделать по умолчанию",

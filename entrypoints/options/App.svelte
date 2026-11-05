@@ -14,6 +14,7 @@
   } from "../../lib/messaging/protocol";
   import type { ModelInfo, ModelRef } from "../../lib/opencode/types";
   import { DEFAULT_GLOBALS } from "../../lib/settings/defaults";
+  import { pinnedModel } from "../../lib/settings/effective";
   import type { GlobalSettings, SiteRule, Template, ThemeChoice } from "../../lib/settings/types";
   import AnimationSection from "../../lib/ui/AnimationSection.svelte";
   import ConnectionList from "../../lib/ui/ConnectionList.svelte";
@@ -412,6 +413,31 @@
     ? models.find((m) => m.providerID === current.providerID && m.id === current.id)
     : undefined}
   {@const variants = info?.variants ?? []}
+  {@const pinned = current ? pinnedModel(current, info, globals?.pinnedEffort ?? null).variant : undefined}
+  {@const efforts =
+    kind === "selectionModel"
+      ? [
+          {
+            key: "oneshot",
+            label: tr("models.effortOneShot"),
+            value: current?.variant ?? "",
+            set: (v: string) => setVariant(kind, v),
+          },
+          {
+            key: "pinned",
+            label: tr("models.effortPinned"),
+            value: pinned ?? "",
+            set: (v: string) => patchGlobals("models", { pinnedEffort: v }),
+          },
+        ]
+      : [
+          {
+            key: "page",
+            label: tr("popup.effort"),
+            value: current?.variant ?? "",
+            set: (v: string) => setVariant(kind, v),
+          },
+        ]}
   <div class="box card">
     <div class="ct">{title}</div>
     <div>
@@ -423,24 +449,26 @@
         onchange={(m) => setModel(kind, m)}
       />
     </div>
-    <div>
-      <span class="lbl">{tr("popup.effort")}</span>
-      {#if variants.length > 0}
-        <Segmented
-          value={current?.variant ?? ""}
-          options={variants.map((v) => ({ value: v, label: v }))}
-          label={`${title}: ${tr("popup.effort")}`}
-          onchange={(v) => setVariant(kind, v)}
-        />
-      {:else if models.length > 0 && current}
-        <div class="mu small">{tr("models.noEffort")}</div>
-      {:else}
-        <div class="mu small">{current?.variant ?? "-"}</div>
-      {/if}
-    </div>
-    {#if current?.variant === "none"}
+    {#each efforts as e (e.key)}
+      <div>
+        <span class="lbl">{e.label}</span>
+        {#if variants.length > 0}
+          <Segmented
+            value={e.value}
+            options={variants.map((v) => ({ value: v, label: v }))}
+            label={`${title}: ${e.label}`}
+            onchange={e.set}
+          />
+        {:else if models.length > 0 && current}
+          <div class="mu small">{tr("models.noEffort")}</div>
+        {:else}
+          <div class="mu small">{e.value || "-"}</div>
+        {/if}
+      </div>
+    {/each}
+    {#if efforts.some((e) => e.value === "none")}
       <div class="mu small">{tr("models.noneNote")}</div>
-    {:else if current?.variant}
+    {:else if efforts.some((e) => e.value)}
       <div class="mu small">{tr("models.slowNote")}</div>
     {/if}
   </div>

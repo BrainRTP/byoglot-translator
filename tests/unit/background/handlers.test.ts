@@ -652,7 +652,12 @@ describe("background handlers", () => {
           { text: "hello", context: "", hostname: "example.com" },
           { tab: { id: 5, url: "https://example.com/" } },
         ),
-      ).toEqual({ error: "rate_limit", retryAfterMs: 1500, backend: "opencode" });
+      ).toEqual({
+        error: "rate_limit",
+        retryAfterMs: 1500,
+        backend: "opencode",
+        source: "deepseek",
+      });
     });
 
     it("captures the connection kind before the request", async () => {

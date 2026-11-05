@@ -89,13 +89,14 @@ export function describeError(
   retryAfterMs?: number,
   now: number = Date.now(),
   backend: ConnectionKind = "opencode",
+  source?: string,
 ): ErrorPresentation {
   const provider = backend === "provider";
   const title = (provider && PROVIDER_TITLES[kind]) || TITLES[kind];
   const bodyKey = (provider && PROVIDER_BODIES[kind]?.[surface]) || BODIES[kind][surface];
   return {
     tone: kind === "rate_limit" ? "wn" : "er",
-    title: t(title),
+    title: source ? `${t(title)} (${source})` : t(title),
     body: kind === "rate_limit" ? rateLimitBody(surface, retryAfterMs, now) : t(bodyKey),
     hint: provider ? undefined : HINTS[kind],
     action: ACTIONS[kind],

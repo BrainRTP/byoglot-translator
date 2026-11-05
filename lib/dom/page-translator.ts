@@ -376,6 +376,7 @@ export function createPageTranslator(deps: PageTranslatorDeps): PageTranslator {
         failure = { kind: message.kind };
         if (message.backend !== undefined) failure.backend = message.backend;
         if (message.retryAfterMs !== undefined) failure.retryAfterMs = message.retryAfterMs;
+        if (message.source !== undefined) failure.source = message.source;
         abandon();
         phase = "error";
         publish();

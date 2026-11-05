@@ -16,17 +16,21 @@ function retryAfterMs(header: string | null): number | undefined {
 async function failureFromResponse(response: Response): Promise<BackendError> {
   const { status } = response;
   if (status === 401 || status === 403) {
-    return new BackendError("provider_auth", { detail: await messageOf(response) });
+    return new BackendError("provider_auth", { status, detail: await messageOf(response) });
   }
   if (status === 404) return new BackendError("incompatible", { detail: "HTTP 404" });
-  if (status === 402) return new BackendError("provider_error", { detail: "insufficient balance" });
+  if (status === 402) {
+    return new BackendError("provider_error", { status, detail: "insufficient balance" });
+  }
   if (status === 429) {
     return new BackendError("rate_limit", {
+      status,
       retryAfterMs: retryAfterMs(response.headers.get("retry-after")),
       detail: await messageOf(response),
     });
   }
   return new BackendError("provider_error", {
+    status,
     detail: (await messageOf(response)) ?? `HTTP ${status}`,
   });
 }

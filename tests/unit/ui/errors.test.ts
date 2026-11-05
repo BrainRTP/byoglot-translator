@@ -24,6 +24,11 @@ describe("describeError for the popup", () => {
     expect(v.body).toMatch(/Resets in 1 h 24 min \(at \d{2}:\d{2}\)/);
   });
 
+  it("names the source of a provider failure in the title", () => {
+    const v = describeError("rate_limit", "popup", undefined, 0, "provider", "DeepSeek, HTTP 429");
+    expect(v.title).toBe("Provider limit reached (DeepSeek, HTTP 429)");
+  });
+
   it("rate_limit without a delay has no time", () => {
     expect(describeError("rate_limit", "popup").body).toBe(
       "Translation is paused. Try again later or choose another model.",

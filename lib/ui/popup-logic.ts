@@ -24,8 +24,11 @@ export function errorView(
   retryAfterMs?: number,
   now: number = Date.now(),
   backend: ConnectionKind = "opencode",
+  source?: string,
 ): ErrorView | null {
-  return kind === "aborted" ? null : describeError(kind, "popup", retryAfterMs, now, backend);
+  return kind === "aborted"
+    ? null
+    : describeError(kind, "popup", retryAfterMs, now, backend, source);
 }
 
 export function statusFailure(status: Status | null, now: number = Date.now()): ErrorView | null {
@@ -47,6 +50,7 @@ export function pageFailure(
           page.error.retryAfterMs,
           Date.now(),
           page.error.backend ?? "opencode",
+          page.error.source,
         );
   if (!error) return { error: null, showResume: true };
   return { error, showResume: error.action === "chooseModel" };

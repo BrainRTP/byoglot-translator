@@ -332,6 +332,19 @@ export function createHandlers(deps: HandlerDeps) {
     }
   }
 
+  // names who answered a provider-side failure: the connection for providers, the model's provider for opencode
+  async function errorSource(model?: ModelRef): Promise<(e: BackendError) => string | undefined> {
+    const active = await connectionsStore.getActive();
+    const name = active?.kind === "provider" ? active.name : model?.providerID;
+    return (e) => {
+      if (!name) return undefined;
+      if (e.kind !== "rate_limit" && e.kind !== "provider_auth" && e.kind !== "provider_error") {
+        return undefined;
+      }
+      return e.status === undefined ? name : `${name}, HTTP ${e.status}`;
+    };
+  }
+
   async function activeKind(): Promise<ConnectionKind | undefined> {
     return (await connectionsStore.getActive())?.kind;
   }
@@ -632,6 +645,7 @@ export function createHandlers(deps: HandlerDeps) {
     connections: () => views(),
 
     activeKind,
+    errorSource,
 
     saveProvider,
 
@@ -741,6 +755,7 @@ export function createHandlers(deps: HandlerDeps) {
       const kind = await activeKind();
       const controller = new AbortController();
       if (i.requestId) selectionJobs.set(i.requestId, { controller, tabId: sender.tab?.id });
+      let used: ModelRef | undefined;
       try {
         const hostname = hostnameOf(sender.tab?.url) || i.hostname;
         const required = await requireModel(
@@ -757,6 +772,7 @@ export function createHandlers(deps: HandlerDeps) {
           );
           model = pinnedModel(model, info, (await globalsItem.getValue()).pinnedEffort);
         }
+        used = model;
         const text = await deps.service.translateSelection(
           {
             text: i.text,
@@ -776,7 +792,13 @@ export function createHandlers(deps: HandlerDeps) {
         };
       } catch (error) {
         const e = toBackendError(error);
-        return { error: e.kind, retryAfterMs: e.retryAfterMs, backend: kind };
+        const source = (await errorSource(used))(e);
+        return {
+          error: e.kind,
+          retryAfterMs: e.retryAfterMs,
+          backend: kind,
+          ...(source !== undefined && { source }),
+        };
       } finally {
         if (i.requestId && selectionJobs.get(i.requestId)?.controller === controller) {
           selectionJobs.delete(i.requestId);

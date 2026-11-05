@@ -70,14 +70,19 @@ export type RuleOp = { type: "upsert"; rule: SiteRule } | { type: "delete"; id: 
 
 export type SelectionResult =
   | { text: string; sourceLang: string; targetLang: string; model: ModelRef }
-  | { error: BackendErrorKind; retryAfterMs?: number; backend?: ConnectionKind };
+  | { error: BackendErrorKind; retryAfterMs?: number; backend?: ConnectionKind; source?: string };
 
 export type PageState = {
   state: "idle" | "translating" | "translated" | "error";
   done: number;
   total: number;
   failed: number;
-  error?: { kind: BackendErrorKind; retryAfterMs?: number; backend?: ConnectionKind };
+  error?: {
+    kind: BackendErrorKind;
+    retryAfterMs?: number;
+    backend?: ConnectionKind;
+    source?: string;
+  };
 };
 
 export interface ProtocolMap {

@@ -4,16 +4,18 @@ export class BackendError extends Error {
   kind: BackendErrorKind;
   retryAfterMs?: number;
   detail?: string;
+  status?: number;
 
   constructor(
     kind: BackendErrorKind,
-    options: { retryAfterMs?: number; detail?: string; cause?: unknown } = {},
+    options: { retryAfterMs?: number; detail?: string; status?: number; cause?: unknown } = {},
   ) {
     super(options.detail ? `${kind}: ${options.detail}` : kind, { cause: options.cause });
     this.name = "BackendError";
     this.kind = kind;
     this.retryAfterMs = options.retryAfterMs;
     this.detail = options.detail;
+    this.status = options.status;
   }
 }
 

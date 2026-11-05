@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ConnectionView } from "../../../lib/connections/types";
-import { presetDefaults, validateProviderForm } from "../../../lib/ui/connection-logic";
+import {
+  cleartextSecret,
+  presetDefaults,
+  validateProviderForm,
+} from "../../../lib/ui/connection-logic";
 
 const existing: ConnectionView = {
   id: "c1",
@@ -95,5 +99,20 @@ describe("validateProviderForm", () => {
       field: "baseUrl",
       reason: "invalid",
     });
+  });
+});
+
+describe("cleartextSecret", () => {
+  it("warns for a remote http url with a key", () => {
+    expect(cleartextSecret("http://example.com/v1", "k")).toBe(true);
+    expect(cleartextSecret("http://example.com/v1", "", true)).toBe(true);
+  });
+
+  it("stays quiet for https, local hosts, no key or a bad url", () => {
+    expect(cleartextSecret("https://example.com", "k")).toBe(false);
+    expect(cleartextSecret("http://localhost:11434", "k")).toBe(false);
+    expect(cleartextSecret("http://127.0.0.1:4096", "k")).toBe(false);
+    expect(cleartextSecret("http://example.com", " ")).toBe(false);
+    expect(cleartextSecret("nope", "k")).toBe(false);
   });
 });

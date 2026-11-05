@@ -301,6 +301,8 @@ export const ru = {
   "conn.form.keyKeep": "Оставьте пустым, чтобы сохранить текущий ключ",
   "conn.form.keyOptional": "Для локальных серверов необязательно",
   "conn.form.baseUrlInvalid": "Введите адрес http или https.",
+  "conn.form.cleartext":
+    "Ключ уйдет по сети в открытом виде. Используйте https, если сервер не в вашей локальной сети.",
   "conn.form.keyRequired": "Введите API-ключ.",
   "conn.form.save": "Сохранить",
   "conn.form.saving": "Сохраняем…",

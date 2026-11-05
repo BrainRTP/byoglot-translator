@@ -4,7 +4,7 @@ import { connectSchema } from "./schemas";
 import type { Connection } from "./types";
 
 const PAIR_TIMEOUT_MS = 10_000;
-const LINK_RE = /https?:\/\/[^\s"'<>]*?\/auth\/connect\/([A-Za-z0-9_-]+)/;
+const LINK_RE = /https?:\/\/[^/\s"'<>]+\/auth\/connect\/([A-Za-z0-9_-]+)/;
 
 export function parsePairingLink(input: string): { origin: string; code: string } {
   const match = LINK_RE.exec(input);

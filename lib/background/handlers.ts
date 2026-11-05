@@ -461,7 +461,6 @@ export function createHandlers(deps: HandlerDeps) {
         .version;
     } catch (error) {
       const latest = await connectionsStore.getAll();
-      await revokeOrigin(latest, origin);
       return {
         status: errorStatus(baseUrl, error, "provider"),
         connections: await views(latest),

@@ -302,6 +302,8 @@ export const en = {
   "conn.form.keyKeep": "Leave empty to keep the current key",
   "conn.form.keyOptional": "Optional for local servers",
   "conn.form.baseUrlInvalid": "Enter an http or https address.",
+  "conn.form.cleartext":
+    "The key will be sent over the network in clear text. Use https unless the server is on your local network.",
   "conn.form.keyRequired": "Enter the API key.",
   "conn.form.save": "Save",
   "conn.form.saving": "Saving…",

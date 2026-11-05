@@ -2,7 +2,7 @@
   import type { ConnectionView, ProviderPreset } from "../connections/types";
   import type { ProviderInput, Status } from "../messaging/protocol";
   import { needsKey } from "../provider/presets";
-  import { presetDefaults, validateProviderForm } from "./connection-logic";
+  import { cleartextSecret, presetDefaults, validateProviderForm } from "./connection-logic";
   import { describeError } from "./errors";
   import { requestOrigin } from "./host-permission";
   import { tr } from "./i18n.svelte";
@@ -38,6 +38,8 @@
   const keyHint = $derived(
     existing?.hasKey ? tr("conn.form.keyKeep") : keyRequired ? "" : tr("conn.form.keyOptional"),
   );
+
+  const cleartext = $derived(cleartextSecret(baseUrl, apiKey, existing?.hasKey === true));
 
   function resetFeedback() {
     invalid = null;
@@ -119,6 +121,7 @@
       oninput={resetFeedback}
     />
     {#if invalid === "baseUrl"}<span class="err" role="alert">{tr("conn.form.baseUrlInvalid")}</span>{/if}
+    {#if cleartext}<span class="err">{tr("conn.form.cleartext")}</span>{/if}
   </label>
   <label class="field">
     <span class="lbl">{tr("conn.form.apiKey")}</span>

@@ -1,5 +1,7 @@
 # ByoGlot Translator
 
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/mpdonojnmjmlielbfmjdkbfmcpmalhdn?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/mpdonojnmjmlielbfmjdkbfmcpmalhdn) [![CI](https://github.com/BrainRTP/byoglot-translator/actions/workflows/ci.yml/badge.svg)](https://github.com/BrainRTP/byoglot-translator/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/github/license/BrainRTP/byoglot-translator)](LICENSE)
+
 English | [Русский](README.ru.md)
 
 A Chrome and Firefox extension (Manifest V3) that translates web pages and selected text with a model you bring. You connect it in one of two ways: to your local [opencode](https://opencode.ai), or to your own provider with an API key (DeepSeek, OpenRouter, Ollama, LM Studio or any OpenAI-compatible URL). ByoGlot stands for "bring your own" plus "-glot": the model and the translation instructions are yours. The extension has no accounts or servers of its own and ships no keys. Your text goes only to the connection you picked.
@@ -34,6 +36,10 @@ Most AI translators either lock you into their own subscription or ask for an AP
 - One of the two: opencode 2.x running as a background service (`opencode service start`; opencode 1.x is not supported), or an API key for an OpenAI-compatible provider. Ollama and LM Studio need no key.
 - Chrome, Edge, Brave, Arc or another Chromium browser, or Firefox, with Manifest V3.
 - For development: Node.js 24 or newer and pnpm 12 (via corepack).
+
+## Install
+
+Chrome, Edge, Brave, Arc and other Chromium browsers: install [ByoGlot from the Chrome Web Store](https://chromewebstore.google.com/detail/mpdonojnmjmlielbfmjdkbfmcpmalhdn). Firefox: build from source for now, see below.
 
 ## Install from source
 

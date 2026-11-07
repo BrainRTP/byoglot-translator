@@ -1,5 +1,7 @@
 # ByoGlot Translator
 
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/mpdonojnmjmlielbfmjdkbfmcpmalhdn?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/mpdonojnmjmlielbfmjdkbfmcpmalhdn) [![CI](https://github.com/BrainRTP/byoglot-translator/actions/workflows/ci.yml/badge.svg)](https://github.com/BrainRTP/byoglot-translator/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/github/license/BrainRTP/byoglot-translator)](LICENSE)
+
 [English](README.md) | Русский
 
 Расширение для Chrome и Firefox (Manifest V3), которое переводит веб-страницы и выделенный текст вашей моделью. Подключиться можно двумя способами: к локальному opencode или к своему провайдеру по ключу API (DeepSeek, OpenRouter, Ollama, LM Studio или любой адрес с OpenAI-совместимым API). Аккаунтов и серверов у расширения нет, своих ключей оно не содержит: перевод делает выбранная вами модель, а текст уходит только в выбранное подключение. ByoGlot значит "bring your own" плюс "-glot": модель и инструкции для перевода ваши.
@@ -18,6 +20,10 @@
 - Одно из двух: opencode 2.x, запущенный как сервис (`opencode service start`), или ключ API провайдера с OpenAI-совместимым API. Для Ollama и LM Studio ключ не нужен.
 - Chrome или Firefox с поддержкой Manifest V3.
 - Для разработки: Node.js 24 или новее и pnpm 12 (через corepack).
+
+## Установка
+
+Chrome, Edge, Brave, Arc и другие браузеры на Chromium: установите [ByoGlot из Chrome Web Store](https://chromewebstore.google.com/detail/mpdonojnmjmlielbfmjdkbfmcpmalhdn). Firefox: пока только сборка из исходников, см. ниже.
 
 ## Установка из исходников
 

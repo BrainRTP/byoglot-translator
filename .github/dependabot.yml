@@ -30,3 +30,9 @@ updates:
     commit-message:
       prefix: ci
     labels: ["dependencies", "area:infra"]
+
+  - package-ecosystem: cargo
+    directory: /linux
+    schedule:
+      interval: weekly
+    labels: ["dependencies", "area:linux"]

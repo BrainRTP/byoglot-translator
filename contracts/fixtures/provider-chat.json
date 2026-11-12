@@ -1,0 +1,533 @@
+{
+  "contract": "provider-chat",
+  "version": 1,
+  "cases": [
+    {
+      "name": "deepseek with effort high",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "model": {
+          "providerID": "deepseek",
+          "id": "deepseek-flash",
+          "variant": "high"
+        },
+        "prompt": "Translate hello to Russian.",
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "choices": [
+              {
+                "message": {
+                  "content": "Привет"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "POST",
+          "url": "https://api.deepseek.com/chat/completions",
+          "headers": {
+            "authorization": "Bearer fixture-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "deepseek-flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Translate hello to Russian."
+              }
+            ],
+            "stream": false,
+            "reasoning_effort": "high"
+          }
+        },
+        "result": {
+          "content": "Привет"
+        }
+      }
+    },
+    {
+      "name": "deepseek without a variant",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "model": {
+          "providerID": "deepseek",
+          "id": "deepseek-flash"
+        },
+        "prompt": "Translate hello to Russian.",
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "choices": [
+              {
+                "message": {
+                  "content": "Привет"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "POST",
+          "url": "https://api.deepseek.com/chat/completions",
+          "headers": {
+            "authorization": "Bearer fixture-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "deepseek-flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Translate hello to Russian."
+              }
+            ],
+            "stream": false,
+            "reasoning_effort": "none"
+          }
+        },
+        "result": {
+          "content": "Привет"
+        }
+      }
+    },
+    {
+      "name": "openrouter with effort low",
+      "input": {
+        "provider": {
+          "preset": "openrouter",
+          "name": "OpenRouter",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKey": "fixture-key"
+        },
+        "model": {
+          "providerID": "openrouter",
+          "id": "example-model",
+          "variant": "low"
+        },
+        "prompt": "Translate hello to Russian.",
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "choices": [
+              {
+                "message": {
+                  "content": "Привет"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "POST",
+          "url": "https://openrouter.ai/api/v1/chat/completions",
+          "headers": {
+            "authorization": "Bearer fixture-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "example-model",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Translate hello to Russian."
+              }
+            ],
+            "stream": false,
+            "reasoning": {
+              "effort": "low"
+            }
+          }
+        },
+        "result": {
+          "content": "Привет"
+        }
+      }
+    },
+    {
+      "name": "openrouter with variant none",
+      "input": {
+        "provider": {
+          "preset": "openrouter",
+          "name": "OpenRouter",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKey": "fixture-key"
+        },
+        "model": {
+          "providerID": "openrouter",
+          "id": "example-model",
+          "variant": "none"
+        },
+        "prompt": "Translate hello to Russian.",
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "choices": [
+              {
+                "message": {
+                  "content": "Привет"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "POST",
+          "url": "https://openrouter.ai/api/v1/chat/completions",
+          "headers": {
+            "authorization": "Bearer fixture-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "example-model",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Translate hello to Russian."
+              }
+            ],
+            "stream": false
+          }
+        },
+        "result": {
+          "content": "Привет"
+        }
+      }
+    },
+    {
+      "name": "custom without effort params",
+      "input": {
+        "provider": {
+          "preset": "custom",
+          "name": "Example",
+          "baseUrl": "https://models.example.com/v1",
+          "apiKey": "fixture-key"
+        },
+        "model": {
+          "providerID": "custom",
+          "id": "example-model",
+          "variant": "high"
+        },
+        "prompt": "Translate hello to Russian.",
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "choices": [
+              {
+                "message": {
+                  "content": "Привет"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "POST",
+          "url": "https://models.example.com/v1/chat/completions",
+          "headers": {
+            "authorization": "Bearer fixture-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "example-model",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Translate hello to Russian."
+              }
+            ],
+            "stream": false
+          }
+        },
+        "result": {
+          "content": "Привет"
+        }
+      }
+    },
+    {
+      "name": "empty completion",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "model": {
+          "providerID": "deepseek",
+          "id": "deepseek-flash"
+        },
+        "prompt": "Translate hello to Russian.",
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "choices": [
+              {
+                "message": {
+                  "content": ""
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "POST",
+          "url": "https://api.deepseek.com/chat/completions",
+          "headers": {
+            "authorization": "Bearer fixture-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "deepseek-flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Translate hello to Russian."
+              }
+            ],
+            "stream": false,
+            "reasoning_effort": "none"
+          }
+        },
+        "result": {
+          "error": {
+            "kind": "bad_response",
+            "detail": "empty completion"
+          }
+        }
+      }
+    },
+    {
+      "name": "null content",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "model": {
+          "providerID": "deepseek",
+          "id": "deepseek-flash"
+        },
+        "prompt": "Translate hello to Russian.",
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "choices": [
+              {
+                "message": {
+                  "content": null
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "POST",
+          "url": "https://api.deepseek.com/chat/completions",
+          "headers": {
+            "authorization": "Bearer fixture-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "deepseek-flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Translate hello to Russian."
+              }
+            ],
+            "stream": false,
+            "reasoning_effort": "none"
+          }
+        },
+        "result": {
+          "error": {
+            "kind": "bad_response",
+            "detail": "empty completion"
+          }
+        }
+      }
+    },
+    {
+      "name": "no choices",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "model": {
+          "providerID": "deepseek",
+          "id": "deepseek-flash"
+        },
+        "prompt": "Translate hello to Russian.",
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "choices": []
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "POST",
+          "url": "https://api.deepseek.com/chat/completions",
+          "headers": {
+            "authorization": "Bearer fixture-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "deepseek-flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Translate hello to Russian."
+              }
+            ],
+            "stream": false,
+            "reasoning_effort": "none"
+          }
+        },
+        "result": {
+          "error": {
+            "kind": "bad_response",
+            "detail": "empty completion"
+          }
+        }
+      }
+    },
+    {
+      "name": "response is not JSON",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "model": {
+          "providerID": "deepseek",
+          "id": "deepseek-flash"
+        },
+        "prompt": "Translate hello to Russian.",
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": "<html>"
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "POST",
+          "url": "https://api.deepseek.com/chat/completions",
+          "headers": {
+            "authorization": "Bearer fixture-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "deepseek-flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Translate hello to Russian."
+              }
+            ],
+            "stream": false,
+            "reasoning_effort": "none"
+          }
+        },
+        "result": {
+          "error": {
+            "kind": "incompatible",
+            "detail": "response is not JSON"
+          }
+        }
+      }
+    },
+    {
+      "name": "choices missing",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "model": {
+          "providerID": "deepseek",
+          "id": "deepseek-flash"
+        },
+        "prompt": "Translate hello to Russian.",
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {}
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "POST",
+          "url": "https://api.deepseek.com/chat/completions",
+          "headers": {
+            "authorization": "Bearer fixture-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "deepseek-flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Translate hello to Russian."
+              }
+            ],
+            "stream": false,
+            "reasoning_effort": "none"
+          }
+        },
+        "result": {
+          "error": {
+            "kind": "incompatible",
+            "detail": "[\n  {\n    \"expected\": \"array\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"choices\"\n    ],\n    \"message\": \"Invalid input: expected array, received undefined\"\n  }\n]"
+          }
+        }
+      }
+    }
+  ]
+}

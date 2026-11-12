@@ -1,0 +1,178 @@
+{
+  "contract": "provider-effort",
+  "version": 1,
+  "cases": [
+    {
+      "name": "deepseek with levels",
+      "input": {
+        "preset": "deepseek",
+        "rawModel": {
+          "id": "deepseek-flash",
+          "effort": {
+            "supported_levels": [
+              "low",
+              "high",
+              "max"
+            ]
+          }
+        },
+        "variant": "high",
+        "baseUrl": "https://api.deepseek.com"
+      },
+      "expected": {
+        "variants": [
+          "none",
+          "low",
+          "high",
+          "max"
+        ],
+        "params": {
+          "reasoning_effort": "high"
+        },
+        "needsKey": true
+      }
+    },
+    {
+      "name": "deepseek without the effort field",
+      "input": {
+        "preset": "deepseek",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://api.deepseek.com"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {
+          "reasoning_effort": "high"
+        },
+        "needsKey": true
+      }
+    },
+    {
+      "name": "openrouter with reasoning",
+      "input": {
+        "preset": "openrouter",
+        "rawModel": {
+          "id": "reasoner",
+          "supported_parameters": [
+            "reasoning"
+          ]
+        },
+        "variant": "low",
+        "baseUrl": "https://openrouter.ai/api/v1"
+      },
+      "expected": {
+        "variants": [
+          "none",
+          "low",
+          "medium",
+          "high"
+        ],
+        "params": {
+          "reasoning": {
+            "effort": "low"
+          }
+        },
+        "needsKey": true
+      }
+    },
+    {
+      "name": "openrouter without reasoning",
+      "input": {
+        "preset": "openrouter",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://openrouter.ai/api/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {
+          "reasoning": {
+            "effort": "high"
+          }
+        },
+        "needsKey": true
+      }
+    },
+    {
+      "name": "ollama",
+      "input": {
+        "preset": "ollama",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "http://localhost:11434/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": false
+      }
+    },
+    {
+      "name": "custom on localhost needs no key",
+      "input": {
+        "preset": "custom",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "http://localhost:8080/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": false
+      }
+    },
+    {
+      "name": "custom on a public host needs a key",
+      "input": {
+        "preset": "custom",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://models.example.com/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": true
+      }
+    },
+    {
+      "name": "custom with a broken url needs a key",
+      "input": {
+        "preset": "custom",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "broken url"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": true
+      }
+    }
+  ]
+}

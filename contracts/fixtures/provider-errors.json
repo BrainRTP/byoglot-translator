@@ -1,0 +1,231 @@
+{
+  "contract": "provider-errors",
+  "version": 1,
+  "cases": [
+    {
+      "name": "401 with a message",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 401,
+          "headers": {},
+          "body": {
+            "error": {
+              "message": "invalid key"
+            }
+          }
+        }
+      },
+      "expected": {
+        "kind": "provider_auth",
+        "status": 401,
+        "detail": "invalid key"
+      }
+    },
+    {
+      "name": "403 without a body",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 403,
+          "headers": {},
+          "body": ""
+        }
+      },
+      "expected": {
+        "kind": "provider_auth",
+        "status": 403
+      }
+    },
+    {
+      "name": "404",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 404,
+          "headers": {},
+          "body": {}
+        }
+      },
+      "expected": {
+        "kind": "incompatible",
+        "detail": "HTTP 404"
+      }
+    },
+    {
+      "name": "402",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 402,
+          "headers": {},
+          "body": {}
+        }
+      },
+      "expected": {
+        "kind": "provider_error",
+        "status": 402,
+        "detail": "insufficient balance"
+      }
+    },
+    {
+      "name": "429 with Retry-After 30",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 429,
+          "headers": {
+            "Retry-After": "30"
+          },
+          "body": {
+            "error": {
+              "message": "slow down"
+            }
+          }
+        }
+      },
+      "expected": {
+        "kind": "rate_limit",
+        "status": 429,
+        "retryAfterMs": 30000,
+        "detail": "slow down"
+      }
+    },
+    {
+      "name": "429 with Retry-After 1.5",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 429,
+          "headers": {
+            "Retry-After": "1.5"
+          },
+          "body": {}
+        }
+      },
+      "expected": {
+        "kind": "rate_limit",
+        "status": 429,
+        "retryAfterMs": 1500
+      }
+    },
+    {
+      "name": "429 with Retry-After soon",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 429,
+          "headers": {
+            "Retry-After": "soon"
+          },
+          "body": {}
+        }
+      },
+      "expected": {
+        "kind": "rate_limit",
+        "status": 429
+      }
+    },
+    {
+      "name": "429 without the header",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 429,
+          "headers": {},
+          "body": {}
+        }
+      },
+      "expected": {
+        "kind": "rate_limit",
+        "status": 429
+      }
+    },
+    {
+      "name": "500 with a message",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 500,
+          "headers": {},
+          "body": {
+            "error": {
+              "message": "server failed"
+            }
+          }
+        }
+      },
+      "expected": {
+        "kind": "provider_error",
+        "status": 500,
+        "detail": "server failed"
+      }
+    },
+    {
+      "name": "500 with an HTML body",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 500,
+          "headers": {},
+          "body": "<html>error</html>"
+        }
+      },
+      "expected": {
+        "kind": "provider_error",
+        "status": 500,
+        "detail": "HTTP 500"
+      }
+    }
+  ]
+}

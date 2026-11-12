@@ -3,9 +3,11 @@ name: Windows
 on:
   push:
     branches: [main]
-    paths: ["windows/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/windows.yml"]
+    paths:
+      ["windows/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/windows.yml"]
   pull_request:
-    paths: ["windows/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/windows.yml"]
+    paths:
+      ["windows/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/windows.yml"]
   workflow_dispatch:
 
 permissions:

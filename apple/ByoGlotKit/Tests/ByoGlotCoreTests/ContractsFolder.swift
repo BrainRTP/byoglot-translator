@@ -25,7 +25,7 @@ enum ContractsFolder {
     ) throws -> [ContractCase<I, E>] {
         let data = try Data(contentsOf: url.appending(path: "fixtures/\(name).json"))
         let envelope = try JSONDecoder().decode(Envelope<I, E>.self, from: data)
-        guard envelope.contract == name, envelope.version == 1 else {
+        guard envelope.contract == name, envelope.version == 1, !envelope.cases.isEmpty else {
             throw CocoaError(.fileReadCorruptFile)
         }
         return envelope.cases

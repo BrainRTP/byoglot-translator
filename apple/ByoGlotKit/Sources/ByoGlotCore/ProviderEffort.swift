@@ -45,7 +45,7 @@ public enum ProviderEffort: Sendable {
 
     public static func needsKey(preset: ProviderPreset, baseUrl: String) -> Bool {
         if preset == .custom, let url = URL(string: baseUrl),
-           ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+           url.scheme != nil,
            let host = url.host?.lowercased(), ["localhost", "127.0.0.1"].contains(host) {
             return false
         }

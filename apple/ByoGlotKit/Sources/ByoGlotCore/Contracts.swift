@@ -49,8 +49,7 @@ public enum Contracts: Sendable {
             let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
             var profiles: [String: String] = [:]
             for file in files where file.pathExtension == "md" {
-                profiles[file.deletingPathExtension().lastPathComponent] = try String(contentsOf: file, encoding: .utf8)
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                profiles[file.deletingPathExtension().lastPathComponent] = jsTrim(try String(contentsOf: file, encoding: .utf8))
             }
             guard profiles[genericProfileId] != nil else { fatalError("Missing profiles/generic.md") }
             return profiles

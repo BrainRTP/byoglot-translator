@@ -49,8 +49,7 @@ public struct ProviderClient: Sendable {
     private func call(path: String, body: JSONValue? = nil, timeout: Duration) async throws(BackendError) -> Data {
         var base = connection.baseUrl
         while base.hasSuffix("/") { base.removeLast() }
-        guard let url = URL(string: base + path), url.host != nil,
-              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
+        guard let url = URL(string: base + path), HTTPDestinationPolicy.permits(url) else {
             throw BackendError(kind: .offline)
         }
         var headers: [String: String] = [:]
@@ -94,7 +93,7 @@ public struct ProviderClient: Sendable {
     }
 
     private func retryAfter(_ header: String?) -> Int? {
-        guard let value = header?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
+        guard let value = header.map(jsTrim), !value.isEmpty else { return nil }
         if value.range(of: #"^[0-9]+(?:\.[0-9]+)?$"#, options: .regularExpression) != nil {
             guard let seconds = Double(value) else { return nil }
             return milliseconds(seconds * 1000)

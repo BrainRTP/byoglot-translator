@@ -52,7 +52,7 @@ public actor Translator {
         do throws(BackendError) {
             let backend = try await generator()
             guard !Task.isCancelled else { throw BackendError(kind: .aborted) }
-            result = try await backend.generate(prompt: prompt, model: request.model).trimmingCharacters(in: .whitespacesAndNewlines)
+            result = jsTrim(try await backend.generate(prompt: prompt, model: request.model))
         } catch {
             throw Task.isCancelled ? BackendError(kind: .aborted) : error
         }

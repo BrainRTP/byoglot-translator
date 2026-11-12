@@ -13,7 +13,7 @@ public enum LanguageProfiles: Sendable {
         let automatic = builtins[primary] != nil ? primary : Contracts.genericProfileId
         let id = builtins[choice] != nil ? choice : automatic
         let builtin = builtins[id] ?? ""
-        if let override = overrides[id], override.text.trimmingCharacters(in: .whitespacesAndNewlines) != builtin.trimmingCharacters(in: .whitespacesAndNewlines) {
+        if let override = overrides[id], jsTrim(override.text) != jsTrim(builtin) {
             return override.text
         }
         return builtin

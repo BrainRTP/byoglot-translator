@@ -22,7 +22,7 @@ public struct TextPromptInput: Codable, Sendable {
 
 public enum PromptBuilder: Sendable {
     public static func text(_ i: TextPromptInput) -> String {
-        let hasContext = !i.context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasContext = !jsTrim(i.context).isEmpty
         var rules = [
             "You are a translation assistant.",
             "A reader selected the TEXT below and wants to understand it. Translate the TEXT from \(Contracts.languageName(i.sourceLang)) to \(Contracts.languageName(i.targetLang)).",
@@ -33,13 +33,13 @@ public enum PromptBuilder: Sendable {
         }
         rules.append("The answer is shown to a human as plain text or simple markdown. Do not wrap it in JSON or code fences, do not repeat the source text and do not add notes unless the user instructions ask for them. The user instructions below control wording, style and any extra explanations.")
         var parts = [rules.joined(separator: "\n")]
-        let language = i.languagePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let language = jsTrim(i.languagePrompt)
         if !language.isEmpty {
             parts.append("LANGUAGE STYLE (the user instructions below override it):\n\(language)")
         }
-        let instructions = i.prePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let instructions = jsTrim(i.prePrompt)
         parts.append("USER INSTRUCTIONS:\n\(instructions.isEmpty ? "(none)" : instructions)")
-        let appName = i.appName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let appName = jsTrim(i.appName)
         if !appName.isEmpty { parts.append("The text comes from the app \(appName).") }
         if hasContext { parts.append("CONTEXT (do not translate):\n\(i.context)") }
         parts.append("TEXT:\n\(i.text)")

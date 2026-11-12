@@ -45,19 +45,32 @@ public struct URLSessionTransport: HTTPTransport {
     }
 
     public func send(_ request: HTTPRequest, timeout: Duration) async throws -> HTTPResponse {
+        guard HTTPDestinationPolicy.permits(request.url) else { throw URLError(.appTransportSecurityRequiresSecureConnection) }
         let parts = timeout.components
         var urlRequest = URLRequest(url: request.url)
         urlRequest.timeoutInterval = Double(parts.seconds) + Double(parts.attoseconds) / 1e18
         urlRequest.httpMethod = request.method
         urlRequest.allHTTPHeaderFields = request.headers
         urlRequest.httpBody = request.body
-        let (data, response) = try await owner.session.data(for: urlRequest)
-        guard let response = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
-        var headers: [String: String] = [:]
-        for (key, value) in response.allHeaderFields {
-            if let key = key as? String { headers[key.lowercased()] = String(describing: value) }
+        let prepared = urlRequest
+        let session = owner.session
+        return try await withThrowingTaskGroup(of: HTTPResponse.self) { group in
+            group.addTask {
+                let (data, response) = try await session.data(for: prepared)
+                guard let response = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+                var headers: [String: String] = [:]
+                for (key, value) in response.allHeaderFields {
+                    if let key = key as? String { headers[key.lowercased()] = String(describing: value) }
+                }
+                return HTTPResponse(status: response.statusCode, headers: headers, body: data)
+            }
+            group.addTask {
+                try await Task.sleep(for: timeout)
+                throw URLError(.timedOut)
+            }
+            defer { group.cancelAll() }
+            return try await group.next()!
         }
-        return HTTPResponse(status: response.statusCode, headers: headers, body: data)
     }
 
     private final class SessionOwner: Sendable {
@@ -71,11 +84,7 @@ public struct URLSessionTransport: HTTPTransport {
 
 final class RedirectDelegate: NSObject, URLSessionTaskDelegate {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
-        var next = request
-        if !Self.sameOrigin(task.originalRequest?.url, request.url) {
-            next.setValue(nil, forHTTPHeaderField: "Authorization")
-        }
-        completionHandler(next)
+        completionHandler(Self.sameOrigin(task.originalRequest?.url, request.url) ? request : nil)
     }
 
     private static func sameOrigin(_ a: URL?, _ b: URL?) -> Bool {

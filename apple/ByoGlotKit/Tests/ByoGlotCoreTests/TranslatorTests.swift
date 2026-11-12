@@ -10,10 +10,12 @@ actor FakeGenerator: TextGenerating {
     private var active = 0
     private var failures: [BackendError]
     private var delay: Duration
+    private let answer: String
     let starts = AsyncStream<Int>.makeStream()
 
-    init(delay: Duration = .zero, failures: [BackendError] = []) {
+    init(delay: Duration = .zero, failures: [BackendError] = [], answer: String = "  привет \n") {
         self.delay = delay
+        self.answer = answer
         self.failures = failures
     }
 
@@ -28,7 +30,7 @@ actor FakeGenerator: TextGenerating {
         do { try await Task.sleep(for: delay) }
         catch { throw BackendError(kind: .aborted) }
         if !failures.isEmpty { throw failures.removeFirst() }
-        return "  привет \n"
+        return answer
     }
 }
 
@@ -107,4 +109,13 @@ struct TranslatorTests {
         _ = try await translator.translate(request("first"))
         #expect(await fake.calls == 4)
     }
+    @Test(arguments: ["\u{feff}", "\u{0085}"])
+    func trimsAnswersUsingTheJavaScriptCharacterSet(_ padding: String) async throws {
+        let answer = padding + "привет" + padding
+        let fake = FakeGenerator(answer: answer)
+        let translator = Translator(generator: { fake })
+        let expected = padding == "\u{feff}" ? "привет" : answer
+        #expect(try await translator.translate(request()) == expected)
+    }
+
 }

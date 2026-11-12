@@ -31,4 +31,11 @@ public class CapturePlanTests
         Assert.Equal(new QuickState.Message(key), QuickReducer.Reduce(new QuickState.Hidden(), new QuickEvent.Captured(result, 1)).State);
     }
 
+    [Fact]
+    public async Task CaptureWhitespaceMatchesJavaScript()
+    {
+        Assert.IsType<CaptureResult.Nothing>(await CapturePlan.RunAsync(new(false, "\uFEFF", true, () => Task.FromResult<ClipboardRead>(new ClipboardRead.Text("\uFEFF")))));
+        Assert.Equal(new CaptureResult.Text("\u0085", SelectionSource.Automation), await CapturePlan.RunAsync(new(false, "\u0085", true, () => throw new InvalidOperationException("Automation text must win."))));
+    }
+
 }

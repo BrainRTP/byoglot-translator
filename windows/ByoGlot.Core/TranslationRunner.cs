@@ -25,7 +25,7 @@ public sealed class TranslationRunner(ISettingsRepository settings, ISecretStore
     public async Task<RunnerOutput> TranslateAsync(RunnerInput input, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var text = input.Text.Trim();
+        var text = JsText.Trim(input.Text);
         if (text.Length == 0) throw new RunnerException(new RunnerError.Empty());
         if (text.Length > input.Limit) throw new RunnerException(new RunnerError.TooLong(input.Limit));
         var state = await settings.ReadAsync();

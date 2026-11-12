@@ -108,7 +108,7 @@ public sealed class ProviderClient(Connection connection, string? secret, IHttpT
 
     private long? RetryAfter(string? header)
     {
-        var value = header?.Trim();
+        var value = header is null ? null : JsText.Trim(header);
         if (string.IsNullOrEmpty(value)) return null;
         if (Regex.IsMatch(value, @"^[0-9]+(?:\.[0-9]+)?$", RegexOptions.CultureInvariant))
         {

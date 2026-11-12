@@ -13,7 +13,7 @@ public sealed class ConnectionEditor(ISettingsRepository settings, ISecretStore 
         if (Origins.OriginOf(draft.BaseUrl) is not { } origin) return DraftProblem.BaseUrl;
         var uri = new Uri(origin);
         if (uri.Scheme == "http" && !Origins.IsLocalHost(uri.Host)) return DraftProblem.InsecureRemote;
-        return ProviderEffort.NeedsKey(draft.Preset, draft.BaseUrl) && string.IsNullOrWhiteSpace(draft.ApiKey) && !hasStoredKey ? DraftProblem.ApiKey : null;
+        return ProviderEffort.NeedsKey(draft.Preset, draft.BaseUrl) && JsText.Trim(draft.ApiKey).Length == 0 && !hasStoredKey ? DraftProblem.ApiKey : null;
     }
 
     public async Task<Connection> SaveAsync(ConnectionDraft draft, bool consent, CancellationToken ct)
@@ -28,13 +28,13 @@ public sealed class ConnectionEditor(ISettingsRepository settings, ISecretStore 
         if (!Origins.IsLocalHost(new Uri(origin).Host) && !consent && !state.ConsentedOrigins.Contains(origin))
             throw new RunnerException(new RunnerError.ConsentNeeded(origin));
         var id = old?.Id ?? draft.Id ?? Guid.NewGuid().ToString();
-        string? key = draft.ApiKey.Trim();
+        string? key = JsText.Trim(draft.ApiKey);
         if (key.Length == 0 && hasKey)
         {
             try { key = await secrets.GetAsync(id, origin); }
             catch (OriginMismatchException) { throw new RunnerException(new RunnerError.KeyMissing()); }
         }
-        var connection = new Connection(id, draft.Preset, draft.Name.Trim(), Origins.NormalizeBaseUrl(draft.BaseUrl)!);
+        var connection = new Connection(id, draft.Preset, JsText.Trim(draft.Name), Origins.NormalizeBaseUrl(draft.BaseUrl)!);
         var client = new ProviderClient(connection, key, transport);
         var models = await ListModelsAsync(client, ct);
         var defaultModel = connection.Preset == ProviderPreset.Deepseek ? models.FirstOrDefault(m => m.Id == "deepseek-flash") : models.FirstOrDefault();

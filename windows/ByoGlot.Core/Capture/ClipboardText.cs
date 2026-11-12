@@ -17,7 +17,7 @@ public static class ClipboardText
     {
         if (formatNames.Contains("ExcludeClipboardContentFromMonitorProcessing") || formatNames.Contains("CanIncludeInClipboardHistory")) return new ClipboardRead.Concealed();
         if (!formatNames.Any(f => f is "Text" or "UnicodeText" or "CF_TEXT" or "CF_UNICODETEXT")) return new ClipboardRead.Empty();
-        var value = text()?.Trim();
+        var value = text() is { } raw ? JsText.Trim(raw) : null;
         if (string.IsNullOrEmpty(value)) return new ClipboardRead.Empty();
         return value.Length > limit ? new ClipboardRead.TooLong(limit) : new ClipboardRead.Text(value);
     }

@@ -11,6 +11,6 @@ public static class LanguageProfiles
         var own = profile == Contracts.GenericProfile || profile == language;
         var id = own && builtins.ContainsKey(profile) ? profile : builtins.ContainsKey(language) ? language : Contracts.GenericProfile;
         var builtin = builtins.GetValueOrDefault(id, "");
-        return overrides.TryGetValue(id, out var value) && value.Text.Trim() != builtin.Trim() ? value.Text : builtin;
+        return overrides.TryGetValue(id, out var value) && JsText.Trim(value.Text) != JsText.Trim(builtin) ? value.Text : builtin;
     }
 }

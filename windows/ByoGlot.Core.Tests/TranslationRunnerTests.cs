@@ -39,6 +39,7 @@ public class TranslationRunnerTests
 
     [Theory]
     [InlineData("", false)]
+    [InlineData("\uFEFF", false)]
     [InlineData(" \n ", false)]
     [InlineData("123456", true)]
     public async Task InputErrorsPrecedeNetwork(string text, bool tooLong)
@@ -125,6 +126,16 @@ public class TranslationRunnerTests
         var error = Assert.IsType<RunnerError.Backend>((await Assert.ThrowsAsync<RunnerException>(() => runner.TranslateAsync(new("private text", 5000), CancellationToken.None))).Error);
         Assert.Equal(ErrorKind.Offline, error.Error.Kind);
         Assert.Empty(transport.Calls);
+    }
+
+    [Fact]
+    public async Task NextLineControlIsTextRatherThanJavaScriptWhitespace()
+    {
+        var transport = new RecordingTransport();
+        var runner = await Runner(Configured(), transport);
+        await runner.TranslateAsync(new("\u0085", 5000), CancellationToken.None);
+        var prompt = JsonNode.Parse(Assert.Single(transport.Calls).Request.Body!)!["messages"]![0]!["content"]!.GetValue<string>();
+        Assert.EndsWith("TEXT:\n\u0085", prompt);
     }
 
 }

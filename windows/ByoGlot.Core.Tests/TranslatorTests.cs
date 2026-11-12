@@ -75,6 +75,15 @@ public class TranslatorTests
         await translator.TranslateAsync(Request("a"), CancellationToken.None);
         Assert.Equal(3, calls);
     }
+    [Theory]
+    [InlineData("\uFEFFanswer\uFEFF", "answer")]
+    [InlineData("\u0085answer\u0085", "\u0085answer\u0085")]
+    public async Task AnswerTrimmingMatchesJavaScript(string answer, string expected)
+    {
+        var translator = Translator(new((_, _) => Task.FromResult(answer)));
+        Assert.Equal(expected, await translator.TranslateAsync(Request(), CancellationToken.None));
+    }
+
 }
 
 internal static class InterlockedExtensions

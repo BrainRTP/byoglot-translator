@@ -23,4 +23,11 @@ public class ClipboardTextTests
     [Fact]
     public void ChangedSequenceStillUsesPrivacyChecks() => Assert.IsType<ClipboardRead.Concealed>(ClipboardText.ReadChanged(10, 11, ["Text", "CanIncludeInClipboardHistory"], 5000, () => throw new InvalidOperationException("Must not read private content.")));
 
+    [Fact]
+    public void BomOnlyIsEmptyAndNextLineControlIsPreserved()
+    {
+        Assert.IsType<ClipboardRead.Empty>(ClipboardText.Read(["Text"], 5000, () => "\uFEFF"));
+        Assert.Equal(new ClipboardRead.Text("\u0085"), ClipboardText.Read(["Text"], 5000, () => "\u0085"));
+    }
+
 }

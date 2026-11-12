@@ -33,7 +33,7 @@ public static class Contracts
         foreach (var name in assembly.GetManifestResourceNames().Where(n => n.StartsWith("profiles/", StringComparison.Ordinal)))
         {
             using var reader = new StreamReader(assembly.GetManifestResourceStream(name)!);
-            profiles[Path.GetFileNameWithoutExtension(name)] = reader.ReadToEnd().Trim();
+            profiles[Path.GetFileNameWithoutExtension(name)] = JsText.Trim(reader.ReadToEnd());
         }
         return new ReadOnlyDictionary<string, string>(profiles);
     }

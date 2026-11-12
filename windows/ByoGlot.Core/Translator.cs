@@ -25,7 +25,7 @@ public sealed class Translator(Func<CancellationToken, Task<ITextGenerator>> gen
             }
             var backend = await generator(ct);
             var prompt = PromptBuilder.Text(new(request.PrePrompt, request.LanguagePrompt, request.SourceLang, request.TargetLang, request.Text, request.Context, request.AppName));
-            var result = (await backend.GenerateAsync(prompt, request.Model, ct)).Trim();
+            var result = JsText.Trim(await backend.GenerateAsync(prompt, request.Model, ct));
             ct.ThrowIfCancellationRequested();
             lock (gate)
             {

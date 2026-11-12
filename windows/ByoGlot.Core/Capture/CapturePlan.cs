@@ -15,13 +15,15 @@ public static class CapturePlan
     public static async Task<CaptureResult> RunAsync(CaptureInputs inputs)
     {
         if (inputs.ForegroundIsElevated) return new CaptureResult.Elevated();
-        if (!string.IsNullOrWhiteSpace(inputs.AutomationText)) return new CaptureResult.Text(inputs.AutomationText.Trim(), SelectionSource.Automation);
+        var automation = JsText.Trim(inputs.AutomationText ?? "");
+        if (automation.Length > 0) return new CaptureResult.Text(automation, SelectionSource.Automation);
         if (inputs.CopyFallbackAllowed)
         {
             var read = await inputs.CopyAndRead();
             if (read is ClipboardRead.Text text)
             {
-                if (!string.IsNullOrWhiteSpace(text.Value)) return new CaptureResult.Text(text.Value.Trim(), SelectionSource.CopyFallback);
+                var value = JsText.Trim(text.Value);
+                if (value.Length > 0) return new CaptureResult.Text(value, SelectionSource.CopyFallback);
             }
             else if (read is not ClipboardRead.Empty) return new CaptureResult.Clipboard(read);
         }

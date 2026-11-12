@@ -611,6 +611,7 @@
   .pop {
     --side-col: 104px;
     width: 360px;
+    max-width: 100vw;
     padding: 12px 16px 16px;
     display: flex;
     flex-direction: column;

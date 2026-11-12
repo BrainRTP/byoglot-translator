@@ -24,6 +24,7 @@
   import ModelSelect from "../../lib/ui/ModelSelect.svelte";
   import { isFirefoxAgent, type ModelId } from "../../lib/ui/options-logic";
   import ProviderForm from "../../lib/ui/ProviderForm.svelte";
+  import { isAndroid } from "../../lib/ui/platform";
   import { variantFor } from "../../lib/ui/popup-logic";
   import Segmented from "../../lib/ui/Segmented.svelte";
   import SiteRules from "../../lib/ui/SiteRules.svelte";
@@ -68,6 +69,7 @@
   } as const;
 
   let loaded = $state(false);
+  let android = $state(false);
   let loadFailed = $state(false);
   let status = $state<Status | null>(null);
   let connections = $state<ConnectionView[]>([]);
@@ -138,6 +140,7 @@
   }
 
   async function loadShortcuts() {
+    if (android || !browser.commands) return;
     try {
       const all = await browser.commands.getAll();
       shortcuts = all
@@ -167,7 +170,8 @@
   async function load() {
     loadFailed = false;
     try {
-      const [g, tpl, rl, cache, prof, conns] = await Promise.all([
+      const [mobile, g, tpl, rl, cache, prof, conns] = await Promise.all([
+        isAndroid(),
         sendMessage("globals", undefined),
         sendMessage("templates", undefined),
         sendMessage("rules", undefined),
@@ -175,6 +179,7 @@
         sendMessage("languageProfiles", undefined),
         sendMessage("connections", undefined),
       ]);
+      android = mobile;
       connections = conns;
       globals = g;
       templates = tpl;
@@ -403,6 +408,7 @@
   }
 
   function openShortcuts() {
+    if (android) return;
     void browser.tabs.create({ url: "chrome://extensions/shortcuts" });
   }
 
@@ -503,7 +509,7 @@
     {:else}
       <div class="layout">
         <nav aria-label={tr("opt.sections")}>
-          {#each SECTIONS as id (id)}
+          {#each SECTIONS.filter((id) => !android || id !== "hotkeys") as id (id)}
             <a href={`#${id}`} class:on={active === id} onclick={() => (active = id)}>
               {tr(NAV_KEYS[id])}
             </a>
@@ -539,7 +545,9 @@
             {/if}
             <div class="btns gap">
               <button type="button" class="btn" onclick={() => (editor = {})}>{tr("conn.add")}</button>
+              {#if !android}
               <button type="button" class="btn" onclick={openOnboarding}>{tr("conn.connectOpencode")}</button>
+              {/if}
             </div>
           </section>
 
@@ -670,7 +678,7 @@
             </label>
           </section>
 
-          <section class="sec" id="cache">
+          <section class="sec" class:last={android} id="cache">
             {@render heading("cache", flags.cache)}
             <p class="lead mu">{tr("opt.cache.lead")}</p>
             <div class="box conn gap">
@@ -684,6 +692,7 @@
             </div>
           </section>
 
+          {#if !android}
           <section class="sec last" id="hotkeys">
             {@render heading("hotkeys", null)}
             <div class="tbl">
@@ -718,6 +727,7 @@
               {firefox ? tr("opt.hotkeys.noteFirefox") : tr("opt.hotkeys.noteChrome")}
             </p>
           </section>
+          {/if}
         </div>
       </div>
     {/if}

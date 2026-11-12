@@ -224,6 +224,122 @@ describe("selection trigger icon", () => {
   });
 });
 
+describe("touch", () => {
+  function mountTouch(coarse: boolean) {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(pointer: coarse)" ? coarse : query === "(any-pointer: coarse)",
+    }));
+    return mount();
+  }
+
+  function selectPageText(text = "Agile teams") {
+    const p = paragraph(text);
+    selectText(p.firstChild as Text, 0, text.length);
+    document.dispatchEvent(new Event("selectionchange"));
+  }
+
+  it("shows the icon after the selection stops changing, without mouseup", () => {
+    mountTouch(true);
+    selectPageText();
+    vi.advanceTimersByTime(200);
+    document.dispatchEvent(new Event("selectionchange"));
+    vi.advanceTimersByTime(499);
+    expect(icon()).toBeNull();
+    vi.advanceTimersByTime(1);
+    expect(shadow().querySelectorAll(".icon")).toHaveLength(1);
+  });
+
+  it("puts a 44px icon below the selection", () => {
+    vi.spyOn(Range.prototype, "getClientRects").mockReturnValue([
+      rect(100, 200, 180, 220),
+    ] as unknown as DOMRectList);
+    mountTouch(true);
+    selectPageText();
+    vi.advanceTimersByTime(500);
+    expect(icon()?.style.top).toBe("232px");
+    expect(icon()?.style.left).toBe("136px");
+    expect(icon()?.classList.contains("touch")).toBe(true);
+  });
+
+  it("does not show the icon for a selection inside a text field", () => {
+    mountTouch(true);
+    const ta = document.createElement("textarea");
+    ta.value = ta.textContent = "some text";
+    document.body.append(ta);
+    ta.focus();
+    selectText(ta.firstChild as Text, 0, 9);
+    document.dispatchEvent(new Event("selectionchange"));
+    vi.advanceTimersByTime(500);
+    expect(icon()).toBeNull();
+  });
+
+  it("keeps mouse behavior when the pointer is fine", () => {
+    mountTouch(false);
+    selectPageText();
+    vi.advanceTimersByTime(1000);
+    expect(icon()).toBeNull();
+  });
+
+  it("replaces an open one-shot card after another touch selection", async () => {
+    const { translate } = mountTouch(true);
+    selectPageText();
+    ui?.trigger();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(card()).not.toBeNull();
+
+    selectPageText("Other text");
+    vi.advanceTimersByTime(499);
+    expect(card()).not.toBeNull();
+    expect(icon()).toBeNull();
+    vi.advanceTimersByTime(1);
+    expect(card()).toBeNull();
+    expect(icon()).not.toBeNull();
+    icon()?.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(translate).toHaveBeenLastCalledWith("Other text", "Other text", undefined, "oneshot");
+  });
+
+  it("adds a touch selection to a pinned card without duplicates or its own text", async () => {
+    const { translate } = mountTouch(true);
+    selectPageText();
+    ui?.trigger();
+    await vi.advanceTimersByTimeAsync(0);
+    shadow().querySelector<HTMLButtonElement>(".pin")?.click();
+    translate.mockClear();
+
+    selectPageText("Other text");
+    await vi.advanceTimersByTimeAsync(500);
+    expect(translate).toHaveBeenCalledWith("Other text", "Other text", undefined, "pinned");
+    expect(shadow().querySelectorAll(".entry")).toHaveLength(2);
+    expect(icon()).toBeNull();
+    document.dispatchEvent(new Event("selectionchange"));
+    await vi.advanceTimersByTimeAsync(500);
+    const src = shadow().querySelector(".src") as HTMLElement;
+    selectText(src.firstChild as Text, 0, 5);
+    document.dispatchEvent(new Event("selectionchange"));
+    await vi.advanceTimersByTimeAsync(500);
+    expect(translate).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves the touch icon to the selection after scrolling stops", () => {
+    const rects = vi.mocked(Range.prototype.getClientRects);
+    rects.mockReturnValue([rect(100, 200, 180, 220)] as unknown as DOMRectList);
+    mountTouch(true);
+    selectPageText();
+    vi.advanceTimersByTime(500);
+    expect(icon()?.style.top).toBe("232px");
+
+    rects.mockReturnValue([rect(100, 120, 180, 140)] as unknown as DOMRectList);
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersByTime(100);
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersByTime(149);
+    expect(icon()?.style.top).toBe("232px");
+    vi.advanceTimersByTime(1);
+    expect(icon()?.style.top).toBe("152px");
+  });
+});
+
 describe("shadow styles", () => {
   it("draws a visible resize grip", () => {
     const rule = STYLES.split("\n").find((l) => l.startsWith(".grip{")) ?? "";

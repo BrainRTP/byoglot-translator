@@ -1,0 +1,19 @@
+name: Apple
+
+on:
+  pull_request:
+    paths: ["apple/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/apple.yml"]
+  push:
+    branches: [main]
+    paths: ["apple/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/apple.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  kit:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: apple/scripts/sync-resources.sh --check
+      - run: swift test --package-path apple/ByoGlotKit

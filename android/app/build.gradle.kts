@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlin.serialization)
 }
 android {
     namespace = "io.github.brainrtp.byoglot"
@@ -24,6 +25,8 @@ dependencies {
     androidTestImplementation(libs.android.test.runner)
     androidTestImplementation(libs.android.test.junit)
     implementation(libs.coroutines.core)
+    implementation(libs.datastore)
+    implementation(libs.serialization.json)
     implementation(project(":core"))
     implementation(libs.activity.compose)
     implementation(libs.compose.ui)

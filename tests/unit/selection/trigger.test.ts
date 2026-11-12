@@ -224,6 +224,63 @@ describe("selection trigger icon", () => {
   });
 });
 
+describe("touch", () => {
+  function mountTouch(coarse: boolean) {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(pointer: coarse)" ? coarse : query === "(any-pointer: coarse)",
+    }));
+    mount();
+  }
+
+  function selectPageText() {
+    const p = paragraph("Agile teams");
+    selectText(p.firstChild as Text, 0, 11);
+    document.dispatchEvent(new Event("selectionchange"));
+  }
+
+  it("shows the icon after the selection stops changing, without mouseup", () => {
+    mountTouch(true);
+    selectPageText();
+    vi.advanceTimersByTime(200);
+    document.dispatchEvent(new Event("selectionchange"));
+    vi.advanceTimersByTime(499);
+    expect(icon()).toBeNull();
+    vi.advanceTimersByTime(1);
+    expect(shadow().querySelectorAll(".icon")).toHaveLength(1);
+  });
+
+  it("puts a 44px icon below the selection", () => {
+    vi.spyOn(Range.prototype, "getClientRects").mockReturnValue([
+      rect(100, 200, 180, 220),
+    ] as unknown as DOMRectList);
+    mountTouch(true);
+    selectPageText();
+    vi.advanceTimersByTime(500);
+    expect(icon()?.style.top).toBe("232px");
+    expect(icon()?.style.left).toBe("136px");
+    expect(icon()?.classList.contains("touch")).toBe(true);
+  });
+
+  it("does not show the icon for a selection inside a text field", () => {
+    mountTouch(true);
+    const ta = document.createElement("textarea");
+    ta.value = ta.textContent = "some text";
+    document.body.append(ta);
+    ta.focus();
+    selectText(ta.firstChild as Text, 0, 9);
+    document.dispatchEvent(new Event("selectionchange"));
+    vi.advanceTimersByTime(500);
+    expect(icon()).toBeNull();
+  });
+
+  it("keeps mouse behavior when the pointer is fine", () => {
+    mountTouch(false);
+    selectPageText();
+    vi.advanceTimersByTime(1000);
+    expect(icon()).toBeNull();
+  });
+});
+
 describe("shadow styles", () => {
   it("draws a visible resize grip", () => {
     const rule = STYLES.split("\n").find((l) => l.startsWith(".grip{")) ?? "";

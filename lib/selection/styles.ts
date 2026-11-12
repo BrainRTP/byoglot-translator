@@ -28,6 +28,7 @@ export const STYLES = `
 .btn.ico.flat{border-color:transparent;background:none;color:var(--mu)}
 .btn:focus-visible,.tsel:focus-visible,.scroll:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .icon{position:fixed;width:24px;height:24px;padding:0;border-radius:6px;border:1px solid var(--bd2);background:var(--bg);color:var(--tx);box-shadow:var(--sh);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.85}
+.icon.touch{width:44px;height:44px;border-radius:22px;opacity:1}
 .icon:hover,.icon:focus-visible{opacity:1}
 .icon:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .revert{position:absolute;left:4px;top:0;width:24px;height:24px;padding:0;border-radius:6px;border:1px solid var(--bd2);background:var(--bg);color:var(--tx);box-shadow:var(--sh);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.35}

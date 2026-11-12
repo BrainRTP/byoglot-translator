@@ -18,6 +18,9 @@ export type SelectionUi = {
 };
 
 const DEBOUNCE_MS = 150;
+const TOUCH_DEBOUNCE_MS = 500;
+const TOUCH_ICON_SIZE = 44;
+const TOUCH_ICON_GAP = 12;
 const MAX_SELECTION = 5000;
 const MAX_CONTEXT = 1000;
 const ICON_SIZE = 24;
@@ -109,6 +112,7 @@ export function readSelection(doc: Document, explicit = false): Snapshot | null 
 
 export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): SelectionUi {
   const win = doc.defaultView as Window;
+  const touch = win.matchMedia?.("(pointer: coarse)").matches === true;
   const host = doc.createElement("div");
   host.setAttribute(MARK_ATTR, "selection");
   host.setAttribute("style", HOST_STYLE);
@@ -150,18 +154,21 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
     const { anchor } = snap;
     const vw = win.innerWidth;
     const vh = win.innerHeight;
+    const size = touch ? TOUCH_ICON_SIZE : ICON_SIZE;
     let top = anchor.top - ICON_SIZE - ICON_GAP;
-    if (top < EDGE) top = anchor.bottom + ICON_GAP;
-    const left = Math.min(
-      Math.max(anchor.right - ICON_SIZE, EDGE),
-      Math.max(EDGE, vw - ICON_SIZE - EDGE),
-    );
+    if (touch) {
+      top = anchor.bottom + TOUCH_ICON_GAP;
+      if (top + size > vh - EDGE) {
+        top = Math.max(EDGE, anchor.top - size - TOUCH_ICON_GAP);
+      }
+    } else if (top < EDGE) top = anchor.bottom + ICON_GAP;
+    const left = Math.min(Math.max(anchor.right - size, EDGE), Math.max(EDGE, vw - size - EDGE));
     const btn = doc.createElement("button");
     btn.type = "button";
-    btn.className = "icon";
+    btn.className = touch ? "icon touch" : "icon";
     btn.setAttribute("aria-label", t("selection.translate"));
     btn.style.left = `${left}px`;
-    btn.style.top = `${Math.min(top, Math.max(EDGE, vh - ICON_SIZE - EDGE))}px`;
+    btn.style.top = `${Math.min(top, Math.max(EDGE, vh - size - EDGE))}px`;
     btn.append(
       svgIcon(doc, 14, [
         "m5 8 6 6",
@@ -231,8 +238,14 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
   const onSelectionChange = () => {
     const sel = doc.getSelection();
     if (!sel || sel.isCollapsed) hideIcon();
+    if (touch) {
+      clearTimeout(timer);
+      timer = setTimeout(() => check(false), TOUCH_DEBOUNCE_MS);
+    }
   };
-  const onScroll = () => hideIcon();
+  const onScroll = () => {
+    if (!touch) hideIcon();
+  };
 
   doc.addEventListener("mouseup", onMouseUp, true);
   doc.addEventListener("keyup", onKeyUp, true);

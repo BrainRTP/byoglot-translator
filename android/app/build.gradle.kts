@@ -7,6 +7,7 @@ android {
     compileSdk = 37
     buildToolsVersion = libs.versions.buildTools.get()
     defaultConfig {
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         applicationId = "io.github.brainrtp.byoglot"
         minSdk = 37
         targetSdk = 37
@@ -20,6 +21,9 @@ android {
     }
 }
 dependencies {
+    androidTestImplementation(libs.android.test.runner)
+    androidTestImplementation(libs.android.test.junit)
+    implementation(libs.coroutines.core)
     implementation(project(":core"))
     implementation(libs.activity.compose)
     implementation(libs.compose.ui)

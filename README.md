@@ -170,6 +170,20 @@ The stack: WXT, Svelte 5, TypeScript 7 (svelte-check runs on TypeScript 6 throug
 - Text inside closed shadow DOM is not reachable and is not translated.
 - The `>_` mark in the icon is not readable at 16 px.
 
+## Repository layout
+
+| Path                                         | Contents                                                                                                 | Stack                      |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `/` (root: `entrypoints/`, `lib/`, `tests/`) | Chrome, Firefox and Firefox Android extension, and the JavaScript part of Safari                         | WXT, Svelte 5, TypeScript  |
+| `contracts/`                                 | Shared data and fixtures that test every implementation                                                  | JSON, JSON Schema          |
+| `lib/translate/profiles/`                    | Language profiles shared as resources by all platforms                                                   | Markdown                   |
+| `apple/`                                     | `ByoGlotKit` Swift package, macOS Safari container, iOS app with Safari extension, and macOS desktop app | Swift 6.4, SwiftUI, AppKit |
+| `android/`                                   | Android app                                                                                              | Kotlin, Jetpack Compose    |
+| `windows/`                                   | Windows app                                                                                              | C#, WinUI 3, .NET 11       |
+| `linux/`                                     | Linux app                                                                                                | Rust, GTK 4, libadwaita    |
+
+Native platform folders are reserved for the platform plans. Extension releases use `v*`; native releases use `apple-v*`, `android-v*`, `windows-v*` and `linux-v*`. See [the shared contracts](contracts/README.md) for cross-platform behavior.
+
 ## License
 
 [MIT](LICENSE)

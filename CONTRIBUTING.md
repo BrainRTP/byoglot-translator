@@ -6,6 +6,10 @@ Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md). Bugs, fe
 
 The rest of this file covers language profiles, the translation rules for one language.
 
+## Monorepo
+
+Each native platform has its own folder: `apple/`, `android/`, `windows/` or `linux/`. Each platform has its own workflow file `.github/workflows/<platform>.yml` with a `paths:` filter. A contract change updates TypeScript, regenerated [contract files](contracts/README.md) and all existing implementations in the same pull request.
+
 ## Language profiles
 
 ### What a profile is

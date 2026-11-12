@@ -2,6 +2,23 @@ name: Bug report
 description: Something in the extension does not work as described
 labels: [bug]
 body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Chrome extension
+        - Firefox extension
+        - Firefox for Android
+        - Safari on macOS
+        - Safari on iOS
+        - macOS app
+        - iOS app
+        - Android app
+        - Windows app
+        - Linux app
+    validations:
+      required: true
   - type: textarea
     id: what
     attributes:

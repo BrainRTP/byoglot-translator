@@ -1,0 +1,168 @@
+{
+  "contract": "language-profile",
+  "version": 1,
+  "cases": [
+    {
+      "name": "disabled",
+      "input": {
+        "languagePromptEnabled": false,
+        "languageProfile": "auto",
+        "targetLang": "ru",
+        "builtins": {
+          "generic": "G",
+          "ru": "R",
+          "de": "D"
+        },
+        "overrides": {}
+      },
+      "expected": ""
+    },
+    {
+      "name": "auto picks the target language",
+      "input": {
+        "languagePromptEnabled": true,
+        "languageProfile": "auto",
+        "targetLang": "ru",
+        "builtins": {
+          "generic": "G",
+          "ru": "R",
+          "de": "D"
+        },
+        "overrides": {}
+      },
+      "expected": "R"
+    },
+    {
+      "name": "auto with a region code",
+      "input": {
+        "languagePromptEnabled": true,
+        "languageProfile": "auto",
+        "targetLang": "pt-BR",
+        "builtins": {
+          "generic": "G",
+          "ru": "R",
+          "de": "D"
+        },
+        "overrides": {}
+      },
+      "expected": "G"
+    },
+    {
+      "name": "auto with a Russian region code",
+      "input": {
+        "languagePromptEnabled": true,
+        "languageProfile": "auto",
+        "targetLang": "ru-RU",
+        "builtins": {
+          "generic": "G",
+          "ru": "R",
+          "de": "D"
+        },
+        "overrides": {}
+      },
+      "expected": "R"
+    },
+    {
+      "name": "explicit profile for its own language",
+      "input": {
+        "languagePromptEnabled": true,
+        "languageProfile": "ru",
+        "targetLang": "ru",
+        "builtins": {
+          "generic": "G",
+          "ru": "R",
+          "de": "D"
+        },
+        "overrides": {}
+      },
+      "expected": "R"
+    },
+    {
+      "name": "explicit profile for another language falls back to auto",
+      "input": {
+        "languagePromptEnabled": true,
+        "languageProfile": "ru",
+        "targetLang": "de",
+        "builtins": {
+          "generic": "G",
+          "ru": "R",
+          "de": "D"
+        },
+        "overrides": {}
+      },
+      "expected": "D"
+    },
+    {
+      "name": "explicit generic applies to any language",
+      "input": {
+        "languagePromptEnabled": true,
+        "languageProfile": "generic",
+        "targetLang": "de",
+        "builtins": {
+          "generic": "G",
+          "ru": "R",
+          "de": "D"
+        },
+        "overrides": {}
+      },
+      "expected": "G"
+    },
+    {
+      "name": "override replaces the builtin",
+      "input": {
+        "languagePromptEnabled": true,
+        "languageProfile": "auto",
+        "targetLang": "ru",
+        "builtins": {
+          "generic": "G",
+          "ru": "R",
+          "de": "D"
+        },
+        "overrides": {
+          "ru": {
+            "text": "Mine",
+            "base": "R",
+            "savedAt": 1
+          }
+        }
+      },
+      "expected": "Mine"
+    },
+    {
+      "name": "override equal to the builtin after trim is ignored",
+      "input": {
+        "languagePromptEnabled": true,
+        "languageProfile": "auto",
+        "targetLang": "ru",
+        "builtins": {
+          "generic": "G",
+          "ru": "R",
+          "de": "D"
+        },
+        "overrides": {
+          "ru": {
+            "text": "  R \n",
+            "base": "R",
+            "savedAt": 1
+          }
+        }
+      },
+      "expected": "R"
+    },
+    {
+      "name": "unknown profile id falls back to auto",
+      "input": {
+        "languagePromptEnabled": true,
+        "languageProfile": "unknown",
+        "targetLang": "ru",
+        "builtins": {
+          "generic": "G",
+          "ru": "R",
+          "de": "D"
+        },
+        "overrides": {}
+      },
+      "expected": "R"
+    }
+  ]
+}

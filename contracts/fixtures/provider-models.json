@@ -1,0 +1,462 @@
+{
+  "contract": "provider-models",
+  "version": 1,
+  "cases": [
+    {
+      "name": "deepseek",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "object": "list",
+            "data": [
+              {
+                "id": "deepseek-flash",
+                "object": "model",
+                "owned_by": "deepseek",
+                "name": "DeepSeek-V4.1-Flash",
+                "context_window": 1048576,
+                "max_output_tokens": 393216,
+                "input_modalities": [
+                  "text",
+                  "image"
+                ],
+                "output_modalities": [
+                  "text"
+                ],
+                "effort": {
+                  "supported_levels": [
+                    "low",
+                    "high",
+                    "max"
+                  ],
+                  "default_level": "high"
+                },
+                "api_capabilities": {
+                  "anthropic_messages": {
+                    "system_prompt_update": "in-history",
+                    "tool_update": "addition-only"
+                  }
+                }
+              },
+              {
+                "id": "deepseek-v4-pro",
+                "object": "model",
+                "owned_by": "deepseek",
+                "name": "DeepSeek-V4-Pro",
+                "context_window": 1048576,
+                "max_output_tokens": 393216,
+                "input_modalities": [
+                  "text"
+                ],
+                "output_modalities": [
+                  "text"
+                ],
+                "effort": {
+                  "supported_levels": [
+                    "low",
+                    "high",
+                    "max"
+                  ],
+                  "default_level": "high"
+                },
+                "api_capabilities": {
+                  "anthropic_messages": {
+                    "system_prompt_update": "leading-only",
+                    "tool_update": "leading-only"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "GET",
+          "url": "https://api.deepseek.com/models",
+          "headers": {
+            "authorization": "Bearer fixture-key"
+          }
+        },
+        "models": [
+          {
+            "providerID": "deepseek",
+            "id": "deepseek-flash",
+            "name": "DeepSeek-V4.1-Flash",
+            "variants": [
+              "none",
+              "low",
+              "high",
+              "max"
+            ],
+            "contextLimit": 1048576,
+            "outputLimit": 393216
+          },
+          {
+            "providerID": "deepseek",
+            "id": "deepseek-v4-pro",
+            "name": "DeepSeek-V4-Pro",
+            "variants": [
+              "none",
+              "low",
+              "high",
+              "max"
+            ],
+            "contextLimit": 1048576,
+            "outputLimit": 393216
+          }
+        ],
+        "defaultModel": {
+          "providerID": "deepseek",
+          "id": "deepseek-flash",
+          "name": "DeepSeek-V4.1-Flash",
+          "variants": [
+            "none",
+            "low",
+            "high",
+            "max"
+          ],
+          "contextLimit": 1048576,
+          "outputLimit": 393216
+        }
+      }
+    },
+    {
+      "name": "openrouter with reasoning",
+      "input": {
+        "provider": {
+          "preset": "openrouter",
+          "name": "OpenRouter",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "data": [
+              {
+                "id": "reasoner",
+                "name": "Reasoner",
+                "supported_parameters": [
+                  "reasoning"
+                ],
+                "context_length": 128000
+              },
+              {
+                "id": "plain",
+                "context_length": 64000
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "GET",
+          "url": "https://openrouter.ai/api/v1/models",
+          "headers": {
+            "authorization": "Bearer fixture-key"
+          }
+        },
+        "models": [
+          {
+            "providerID": "openrouter",
+            "id": "reasoner",
+            "name": "Reasoner",
+            "variants": [
+              "none",
+              "low",
+              "medium",
+              "high"
+            ],
+            "contextLimit": 128000,
+            "outputLimit": 0
+          },
+          {
+            "providerID": "openrouter",
+            "id": "plain",
+            "name": "plain",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 64000,
+            "outputLimit": 0
+          }
+        ],
+        "defaultModel": {
+          "providerID": "openrouter",
+          "id": "reasoner",
+          "name": "Reasoner",
+          "variants": [
+            "none",
+            "low",
+            "medium",
+            "high"
+          ],
+          "contextLimit": 128000,
+          "outputLimit": 0
+        }
+      }
+    },
+    {
+      "name": "ollama without a key",
+      "input": {
+        "provider": {
+          "preset": "ollama",
+          "name": "Ollama",
+          "baseUrl": "http://localhost:11434/v1",
+          "apiKey": ""
+        },
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "data": [
+              {
+                "id": "local"
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "GET",
+          "url": "http://localhost:11434/v1/models",
+          "headers": {}
+        },
+        "models": [
+          {
+            "providerID": "ollama",
+            "id": "local",
+            "name": "local",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 0,
+            "outputLimit": 0
+          }
+        ],
+        "defaultModel": {
+          "providerID": "ollama",
+          "id": "local",
+          "name": "local",
+          "variants": [
+            "none"
+          ],
+          "contextLimit": 0,
+          "outputLimit": 0
+        }
+      }
+    },
+    {
+      "name": "base url with trailing slashes",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com///",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "object": "list",
+            "data": [
+              {
+                "id": "deepseek-flash",
+                "object": "model",
+                "owned_by": "deepseek",
+                "name": "DeepSeek-V4.1-Flash",
+                "context_window": 1048576,
+                "max_output_tokens": 393216,
+                "input_modalities": [
+                  "text",
+                  "image"
+                ],
+                "output_modalities": [
+                  "text"
+                ],
+                "effort": {
+                  "supported_levels": [
+                    "low",
+                    "high",
+                    "max"
+                  ],
+                  "default_level": "high"
+                },
+                "api_capabilities": {
+                  "anthropic_messages": {
+                    "system_prompt_update": "in-history",
+                    "tool_update": "addition-only"
+                  }
+                }
+              },
+              {
+                "id": "deepseek-v4-pro",
+                "object": "model",
+                "owned_by": "deepseek",
+                "name": "DeepSeek-V4-Pro",
+                "context_window": 1048576,
+                "max_output_tokens": 393216,
+                "input_modalities": [
+                  "text"
+                ],
+                "output_modalities": [
+                  "text"
+                ],
+                "effort": {
+                  "supported_levels": [
+                    "low",
+                    "high",
+                    "max"
+                  ],
+                  "default_level": "high"
+                },
+                "api_capabilities": {
+                  "anthropic_messages": {
+                    "system_prompt_update": "leading-only",
+                    "tool_update": "leading-only"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "GET",
+          "url": "https://api.deepseek.com/models",
+          "headers": {
+            "authorization": "Bearer fixture-key"
+          }
+        },
+        "models": [
+          {
+            "providerID": "deepseek",
+            "id": "deepseek-flash",
+            "name": "DeepSeek-V4.1-Flash",
+            "variants": [
+              "none",
+              "low",
+              "high",
+              "max"
+            ],
+            "contextLimit": 1048576,
+            "outputLimit": 393216
+          },
+          {
+            "providerID": "deepseek",
+            "id": "deepseek-v4-pro",
+            "name": "DeepSeek-V4-Pro",
+            "variants": [
+              "none",
+              "low",
+              "high",
+              "max"
+            ],
+            "contextLimit": 1048576,
+            "outputLimit": 393216
+          }
+        ],
+        "defaultModel": {
+          "providerID": "deepseek",
+          "id": "deepseek-flash",
+          "name": "DeepSeek-V4.1-Flash",
+          "variants": [
+            "none",
+            "low",
+            "high",
+            "max"
+          ],
+          "contextLimit": 1048576,
+          "outputLimit": 393216
+        }
+      }
+    },
+    {
+      "name": "empty list",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "data": []
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "GET",
+          "url": "https://api.deepseek.com/models",
+          "headers": {
+            "authorization": "Bearer fixture-key"
+          }
+        },
+        "models": [],
+        "defaultModel": null
+      }
+    },
+    {
+      "name": "deepseek without deepseek-flash",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "data": [
+              {
+                "id": "deepseek-v4-pro"
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "GET",
+          "url": "https://api.deepseek.com/models",
+          "headers": {
+            "authorization": "Bearer fixture-key"
+          }
+        },
+        "models": [
+          {
+            "providerID": "deepseek",
+            "id": "deepseek-v4-pro",
+            "name": "deepseek-v4-pro",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 0,
+            "outputLimit": 0
+          }
+        ],
+        "defaultModel": null
+      }
+    }
+  ]
+}

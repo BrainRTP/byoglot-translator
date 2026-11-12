@@ -1,0 +1,123 @@
+{
+  "contract": "prompt-text",
+  "version": 1,
+  "cases": [
+    {
+      "name": "no context, no app",
+      "input": {
+        "prePrompt": "be brief",
+        "languagePrompt": "",
+        "sourceLang": "auto",
+        "targetLang": "ru",
+        "text": "ubiquitous",
+        "context": "",
+        "appName": ""
+      },
+      "expected": "You are a translation assistant.\nA reader selected the TEXT below and wants to understand it. Translate the TEXT from the source language (detect it) to Russian.\nThe TEXT can be a single word, a phrase, a sentence or a paragraph. Translate exactly this fragment and keep its form: a term stays a term, a phrase stays a phrase, a sentence stays a sentence. Start with a lowercase letter unless the fragment starts a sentence or is a name.\nThe answer is shown to a human as plain text or simple markdown. Do not wrap it in JSON or code fences, do not repeat the source text and do not add notes unless the user instructions ask for them. The user instructions below control wording, style and any extra explanations.\n\nUSER INSTRUCTIONS:\nbe brief\n\nTEXT:\nubiquitous"
+    },
+    {
+      "name": "context only",
+      "input": {
+        "prePrompt": "be brief",
+        "languagePrompt": "",
+        "sourceLang": "auto",
+        "targetLang": "ru",
+        "text": "ubiquitous",
+        "context": "Ubiquitous computing.",
+        "appName": ""
+      },
+      "expected": "You are a translation assistant.\nA reader selected the TEXT below and wants to understand it. Translate the TEXT from the source language (detect it) to Russian.\nThe TEXT can be a single word, a phrase, a sentence or a paragraph. Translate exactly this fragment and keep its form: a term stays a term, a phrase stays a phrase, a sentence stays a sentence. Start with a lowercase letter unless the fragment starts a sentence or is a name.\nCONTEXT is the text around the selection. Do not translate it, but use it to pick the meaning that fits, especially for short terms.\nThe answer is shown to a human as plain text or simple markdown. Do not wrap it in JSON or code fences, do not repeat the source text and do not add notes unless the user instructions ask for them. The user instructions below control wording, style and any extra explanations.\n\nUSER INSTRUCTIONS:\nbe brief\n\nCONTEXT (do not translate):\nUbiquitous computing.\n\nTEXT:\nubiquitous"
+    },
+    {
+      "name": "app only",
+      "input": {
+        "prePrompt": "be brief",
+        "languagePrompt": "",
+        "sourceLang": "auto",
+        "targetLang": "ru",
+        "text": "ubiquitous",
+        "context": "",
+        "appName": "Notes"
+      },
+      "expected": "You are a translation assistant.\nA reader selected the TEXT below and wants to understand it. Translate the TEXT from the source language (detect it) to Russian.\nThe TEXT can be a single word, a phrase, a sentence or a paragraph. Translate exactly this fragment and keep its form: a term stays a term, a phrase stays a phrase, a sentence stays a sentence. Start with a lowercase letter unless the fragment starts a sentence or is a name.\nThe answer is shown to a human as plain text or simple markdown. Do not wrap it in JSON or code fences, do not repeat the source text and do not add notes unless the user instructions ask for them. The user instructions below control wording, style and any extra explanations.\n\nUSER INSTRUCTIONS:\nbe brief\n\nThe text comes from the app Notes.\n\nTEXT:\nubiquitous"
+    },
+    {
+      "name": "context and app",
+      "input": {
+        "prePrompt": "be brief",
+        "languagePrompt": "",
+        "sourceLang": "auto",
+        "targetLang": "ru",
+        "text": "ubiquitous",
+        "context": "Ubiquitous computing.",
+        "appName": "Notes"
+      },
+      "expected": "You are a translation assistant.\nA reader selected the TEXT below and wants to understand it. Translate the TEXT from the source language (detect it) to Russian.\nThe TEXT can be a single word, a phrase, a sentence or a paragraph. Translate exactly this fragment and keep its form: a term stays a term, a phrase stays a phrase, a sentence stays a sentence. Start with a lowercase letter unless the fragment starts a sentence or is a name.\nCONTEXT is the text around the selection. Do not translate it, but use it to pick the meaning that fits, especially for short terms.\nThe answer is shown to a human as plain text or simple markdown. Do not wrap it in JSON or code fences, do not repeat the source text and do not add notes unless the user instructions ask for them. The user instructions below control wording, style and any extra explanations.\n\nUSER INSTRUCTIONS:\nbe brief\n\nThe text comes from the app Notes.\n\nCONTEXT (do not translate):\nUbiquitous computing.\n\nTEXT:\nubiquitous"
+    },
+    {
+      "name": "app name with spaces is trimmed",
+      "input": {
+        "prePrompt": "be brief",
+        "languagePrompt": "",
+        "sourceLang": "auto",
+        "targetLang": "ru",
+        "text": "ubiquitous",
+        "context": "",
+        "appName": "  Notes "
+      },
+      "expected": "You are a translation assistant.\nA reader selected the TEXT below and wants to understand it. Translate the TEXT from the source language (detect it) to Russian.\nThe TEXT can be a single word, a phrase, a sentence or a paragraph. Translate exactly this fragment and keep its form: a term stays a term, a phrase stays a phrase, a sentence stays a sentence. Start with a lowercase letter unless the fragment starts a sentence or is a name.\nThe answer is shown to a human as plain text or simple markdown. Do not wrap it in JSON or code fences, do not repeat the source text and do not add notes unless the user instructions ask for them. The user instructions below control wording, style and any extra explanations.\n\nUSER INSTRUCTIONS:\nbe brief\n\nThe text comes from the app Notes.\n\nTEXT:\nubiquitous"
+    },
+    {
+      "name": "with language block",
+      "input": {
+        "prePrompt": "be brief",
+        "languagePrompt": "  rules \n",
+        "sourceLang": "auto",
+        "targetLang": "ru",
+        "text": "ubiquitous",
+        "context": "",
+        "appName": ""
+      },
+      "expected": "You are a translation assistant.\nA reader selected the TEXT below and wants to understand it. Translate the TEXT from the source language (detect it) to Russian.\nThe TEXT can be a single word, a phrase, a sentence or a paragraph. Translate exactly this fragment and keep its form: a term stays a term, a phrase stays a phrase, a sentence stays a sentence. Start with a lowercase letter unless the fragment starts a sentence or is a name.\nThe answer is shown to a human as plain text or simple markdown. Do not wrap it in JSON or code fences, do not repeat the source text and do not add notes unless the user instructions ask for them. The user instructions below control wording, style and any extra explanations.\n\nLANGUAGE STYLE (the user instructions below override it):\nrules\n\nUSER INSTRUCTIONS:\nbe brief\n\nTEXT:\nubiquitous"
+    },
+    {
+      "name": "whitespace-only context",
+      "input": {
+        "prePrompt": "be brief",
+        "languagePrompt": "",
+        "sourceLang": "auto",
+        "targetLang": "ru",
+        "text": "ubiquitous",
+        "context": "  \n",
+        "appName": ""
+      },
+      "expected": "You are a translation assistant.\nA reader selected the TEXT below and wants to understand it. Translate the TEXT from the source language (detect it) to Russian.\nThe TEXT can be a single word, a phrase, a sentence or a paragraph. Translate exactly this fragment and keep its form: a term stays a term, a phrase stays a phrase, a sentence stays a sentence. Start with a lowercase letter unless the fragment starts a sentence or is a name.\nThe answer is shown to a human as plain text or simple markdown. Do not wrap it in JSON or code fences, do not repeat the source text and do not add notes unless the user instructions ask for them. The user instructions below control wording, style and any extra explanations.\n\nUSER INSTRUCTIONS:\nbe brief\n\nTEXT:\nubiquitous"
+    },
+    {
+      "name": "padded context is preserved",
+      "input": {
+        "prePrompt": "be brief",
+        "languagePrompt": "",
+        "sourceLang": "auto",
+        "targetLang": "ru",
+        "text": "ubiquitous",
+        "context": " Ubiquitous computing. ",
+        "appName": ""
+      },
+      "expected": "You are a translation assistant.\nA reader selected the TEXT below and wants to understand it. Translate the TEXT from the source language (detect it) to Russian.\nThe TEXT can be a single word, a phrase, a sentence or a paragraph. Translate exactly this fragment and keep its form: a term stays a term, a phrase stays a phrase, a sentence stays a sentence. Start with a lowercase letter unless the fragment starts a sentence or is a name.\nCONTEXT is the text around the selection. Do not translate it, but use it to pick the meaning that fits, especially for short terms.\nThe answer is shown to a human as plain text or simple markdown. Do not wrap it in JSON or code fences, do not repeat the source text and do not add notes unless the user instructions ask for them. The user instructions below control wording, style and any extra explanations.\n\nUSER INSTRUCTIONS:\nbe brief\n\nCONTEXT (do not translate):\n Ubiquitous computing. \n\nTEXT:\nubiquitous"
+    },
+    {
+      "name": "empty text",
+      "input": {
+        "prePrompt": "be brief",
+        "languagePrompt": "",
+        "sourceLang": "auto",
+        "targetLang": "ru",
+        "text": "",
+        "context": "",
+        "appName": ""
+      },
+      "expected": "You are a translation assistant.\nA reader selected the TEXT below and wants to understand it. Translate the TEXT from the source language (detect it) to Russian.\nThe TEXT can be a single word, a phrase, a sentence or a paragraph. Translate exactly this fragment and keep its form: a term stays a term, a phrase stays a phrase, a sentence stays a sentence. Start with a lowercase letter unless the fragment starts a sentence or is a name.\nThe answer is shown to a human as plain text or simple markdown. Do not wrap it in JSON or code fences, do not repeat the source text and do not add notes unless the user instructions ask for them. The user instructions below control wording, style and any extra explanations.\n\nUSER INSTRUCTIONS:\nbe brief\n\nTEXT:\n"
+    }
+  ]
+}

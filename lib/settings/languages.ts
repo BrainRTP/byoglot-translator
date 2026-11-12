@@ -20,3 +20,26 @@ export const LANGUAGE_CODES = [
   "ko",
   "vi",
 ];
+
+export const LANGUAGE_NAMES: Readonly<Record<string, string>> = {
+  en: "English",
+  ru: "Russian",
+  uk: "Ukrainian",
+  de: "German",
+  fr: "French",
+  es: "Spanish",
+  it: "Italian",
+  pt: "Portuguese",
+  pl: "Polish",
+  nl: "Dutch",
+  cs: "Czech",
+  sv: "Swedish",
+  tr: "Turkish",
+  ar: "Arabic",
+  he: "Hebrew",
+  hi: "Hindi",
+  zh: "Chinese",
+  ja: "Japanese",
+  ko: "Korean",
+  vi: "Vietnamese",
+};

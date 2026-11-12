@@ -22,6 +22,8 @@ The output is in `dist/firefox-mv3/`. `pnpm zip:firefox` packs the same build in
 
 ## Notes for reviewers
 
+- The folders `apple/`, `android/`, `windows/` and `linux/` hold native apps. They are not part of the add-on and are left out of the sources zip.
+
 - The code is bundled by WXT (Vite) and not obfuscated. The sources are TypeScript and Svelte in `entrypoints/` and `lib/`.
 - The add-on targets Firefox for Android 160 and newer and desktop Firefox 140 and newer. `web-ext lint` reports exactly three warnings: two `DANGEROUS_EVAL` warnings in `background.js` and an onboarding chunk, and one `UNSAFE_VAR_ASSIGNMENT` warning in a theme chunk. The `Function("")` calls are Zod checking inside `try` whether it may compile validators. Under the extension's CSP that check fails and Zod falls back to plain validation. The `innerHTML` assignment is the Svelte runtime cloning its compiled static templates. Translated text never goes through `innerHTML`: page translations are written into text nodes and the selection card builds its elements with `createElement` and `textContent`.
 - By default the extension talks only to `127.0.0.1` and `localhost`, where the user's opencode server runs. Other hosts are optional host permissions: the browser asks for one only when the user adds a provider of type "My provider", and only for that provider's origin.

@@ -3,7 +3,7 @@ import type { EffectiveSettings, GlobalSettings, Template, TemplateSettings } fr
 
 export const SELECTION_DEFAULT_EFFORT = "high";
 
-const FAVORITE = { providerID: "deepseek", id: "deepseek-flash" };
+export const FAVORITE = { providerID: "deepseek", id: "deepseek-flash" };
 
 function copyModel(m: ModelRef | null | undefined): ModelRef | null {
   return m ? { ...m } : null;

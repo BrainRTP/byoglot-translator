@@ -12,6 +12,7 @@ Write the Russian text the way a Russian-speaking developer would write it from 
 - Never use the Cyrillic letter U+0451 (e with diaeresis); always write the plain "е" instead.
 
 Examples of the difference (the style matters, not the words):
+
 - "This flag is meant to be used only for debugging." Literal: "Этот флаг предназначен для того, чтобы использоваться только для отладки." Good: "Этот флаг нужен только для отладки."
 - "Calling flush() writes the buffer to disk. However, the file is still open." Literal: "Вызов flush() записывает буфер на диск. Однако файл по-прежнему является открытым." Good: "flush() запишет буфер на диск, но файл останется открытым."
 - "You may want to consider caching the results." Literal: "Возможно, вы захотите рассмотреть возможность кэширования результатов." Good: "Результаты стоит кэшировать."

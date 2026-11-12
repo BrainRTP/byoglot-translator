@@ -1,15 +1,17 @@
 # ByoGlot for Linux
 
-The workspace contains a platform independent core and a GTK application shell. The application id is `io.github.brainrtp.ByoGlot`. Tasks 2 and 3 provide the core and quick-window state machine; the application features follow in Tasks 4 through 7.
+The Cargo workspace contains a GTK-free core and a GTK 4/libadwaita application. The application id is `io.github.brainrtp.ByoGlot`.
 
-Run `cargo test -p byoglot-core`, `cargo clippy -p byoglot-core -- -D warnings` and `cargo fmt --check` in this directory. The application shell is compiled by the Linux workflow in `fedora:45` with `gtk4-devel`, `libadwaita-devel`, GCC and the Fedora-packaged `rustup-init` installer. It currently has an empty entry point.
+Run `cargo test -p byoglot-core`, `cargo test -p byoglot --no-default-features`, `cargo clippy --workspace --no-default-features -- -D warnings`, and `cargo fmt --check` in this directory. GTK-free application modules build on macOS; the default `gui` feature builds the application on Fedora with `gtk4-devel`, `libadwaita-devel`, GCC and the distribution Rust toolchain. The Linux workflow checks the full workspace and release binary in `fedora:45` and prints its compiler version.
 
-The installed stable toolchain used here is Rust and Cargo 1.94.1, pinned in `rust-toolchain.toml`. Direct dependencies checked on crates.io are serde 1.0.229, serde_json 1.0.154, thiserror 2.0.21, gtk4 0.11.5 and libadwaita 0.9.2. Tokio 1.54.1 is used only by core tests. `Cargo.lock` records resolved versions.
+Local development uses Rust 1.99.1. The workspace minimum is Rust 1.95 for oo7 0.7.1; Fedora 45 publishes Rust 1.98.1. Existing dependency versions remain unchanged: serde 1.0.229, serde_json 1.0.154, thiserror 2.0.21, gtk4 0.11.5, libadwaita 0.9.2 and Tokio 1.54.1. New transport and secret dependencies are reqwest 0.13.5 with rustls and oo7 0.7.1. Cargo.lock records the resolved versions.
 
-Contract JSON and language profiles are compiled from the monorepo resources. Build from the repository checkout. The build script discovers Markdown profiles automatically, so adding a profile requires no Rust source change. Tests locate the shared fixtures by walking up from the core crate directory.
+The transport follows at most five redirects within the original origin and returns other redirects to the provider client as errors. Public endpoints require HTTPS. Dropping a request aborts its runtime task, and the deadline covers redirects and the response body. Response bodies are limited to 8 MB.
 
-Core futures cancel by being dropped. The transport implementation must cancel I/O when its send future is dropped. Secret stores bind each key to a connection id and origin; production persistent storage and the HTTP transport are implemented in Task 4.
+Settings live in the user configuration directory under `byoglot/settings.json` and are replaced atomically. API keys live only in the Secret Service. If the service cannot be opened, keys remain in memory until exit. Connection saves validate against staging stores, then finish the key/settings transaction independently of the dialog lifetime; a settings write failure restores the prior key. Origin and key share one Secret Service value so replacing a key cannot leave it bound to another origin. No translation history is written.
 
-Quick-window completion events carry their original source: `QuickEvent::Finished { source, output }` and `QuickEvent::FailedWith { source, error }`. The controller must retain the source from `StartTranslating` for these events. `CancelTranslating` must abort a spawned task explicitly; dropping a task handle alone may leave it running. The controller must also filter task generations when the same source is submitted again. `SecretStore::set` replaces the existing secret for a connection id, including its origin.
+Contract JSON and language profiles compile from the monorepo resources. Build from the repository checkout. The core build script discovers Markdown profiles automatically.
 
-Provider numeric metadata and `BackendError::retry_after_ms` use `f64`, matching TypeScript numbers, including finite values outside integer ranges. Convert a retry delay to the runtime's duration type only when scheduling it, with that runtime's bounds.
+Quick-window completion events use `QuickEvent::Finished { source, output }` and `QuickEvent::FailedWith { source, error }`. A future controller must also retain a request generation to distinguish identical source text submitted twice. Tasks 6 and 7 remain gated on the manual Wayland prototype.
+
+Provider numeric metadata and `BackendError::retry_after_ms` use `f64` to match the TypeScript contracts.

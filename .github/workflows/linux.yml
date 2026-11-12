@@ -33,14 +33,12 @@ jobs:
     steps:
       - name: Install system libraries
         working-directory: /
-        run: dnf install -y git gtk4-devel libadwaita-devel gcc rustup
+        run: dnf install -y git gtk4-devel libadwaita-devel gcc rust cargo clippy rustfmt
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install Rust
+      - name: Check the Fedora toolchain
         run: |
-          rustup-init -y --profile minimal --default-toolchain none --no-modify-path
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-      - name: Install the pinned Rust toolchain
-        run: rustup show active-toolchain
-      - run: cargo clippy --workspace -- -D warnings
-      - run: cargo test --workspace --locked
-      - run: cargo build -p byoglot --release --locked
+          /usr/bin/rustc --version
+          /usr/bin/cargo --version
+      - run: /usr/bin/cargo clippy --workspace -- -D warnings
+      - run: /usr/bin/cargo test --workspace --locked
+      - run: /usr/bin/cargo build -p byoglot --release --locked

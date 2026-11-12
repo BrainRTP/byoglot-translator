@@ -42,7 +42,7 @@ impl ErrorKind {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, thiserror::Error)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, thiserror::Error)]
 #[serde(rename_all = "camelCase")]
 #[error("{kind:?}")]
 pub struct BackendError {
@@ -66,5 +66,16 @@ impl BackendError {
     }
     pub fn is_fatal(&self) -> bool {
         self.kind != ErrorKind::BadResponse
+    }
+}
+
+impl std::fmt::Debug for BackendError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BackendError")
+            .field("kind", &self.kind)
+            .field("status", &self.status)
+            .field("retry_after_ms", &self.retry_after_ms)
+            .field("detail", &self.detail.as_ref().map(|_| "[redacted]"))
+            .finish()
     }
 }

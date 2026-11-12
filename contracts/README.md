@@ -16,6 +16,8 @@ Provider responses that do not match the expected JSON shape have kind `incompat
 
 `Retry-After` is trimmed before parsing. Seconds must match `[0-9]+(\.[0-9]+)?`: a non-negative decimal integer or fraction, without a sign, exponent or hexadecimal prefix. Multiply by 1000 and round to the nearest millisecond; non-finite results are ignored. A date must be an IMF-fixdate HTTP date, for example `Thu, 01 Jan 2026 00:00:10 GMT`, with English weekday/month names, GMT and a valid calendar date. Its delay is the date minus the current time, clamped to zero. Other values, including `-1`, are ignored.
 
+`samples/export-v1.json` is a raw portable export sample, outside the fixture envelope. Tests validate it with `parseExport` and with the published JSON Schema through the installed Zod `fromJSONSchema` conversion. Both reject unknown keys, including nested connection secrets.
+
 The export format contains portable globals, templates, profile overrides, site rules and provider connections without secrets. It excludes opencode connections. Native apps ignore `siteRules`. Model references keep `connectionId`; an importer drops references whose connection id is absent from `connections`. Export and import controls are a separate change.
 
 | File                             | Pins                                                   | TypeScript source                                                                           |
@@ -35,5 +37,5 @@ The export format contains portable globals, templates, profile overrides, site 
 | `fixtures/provider-chat.json`    | Completion requests, content and errors                | `createProviderBackend` (`generate`)                                                        |
 | `fixtures/provider-errors.json`  | HTTP error mapping and retry delays                    | `createProviderBackend` (`listModels`)                                                      |
 | `fixtures/provider-effort.json`  | Reasoning variants, parameters and key requirements    | `effortVariants`, `effortParams`, `needsKey`                                                |
-| `fixtures/export-v1.json`        | Hand-authored portable export sample                   | `builtinTemplate`, validated by `parseExport`                                               |
+| `samples/export-v1.json`         | Hand-authored portable export sample                   | `parseExport`, `z.fromJSONSchema`                                                           |
 | `schemas/export-v1.schema.json`  | Portable export structure and required fields          | `z.toJSONSchema(exportSchema)`                                                              |

@@ -5,18 +5,18 @@ import type { GlobalSettings, ProfileOverrides, SiteRule, Template } from "./typ
 export const EXPORT_FORMAT = "byoglot-export";
 export const EXPORT_VERSION = 1;
 
-const modelSchema = z.object({
+const modelSchema = z.strictObject({
   providerID: z.string(),
   id: z.string(),
   variant: z.string().optional(),
   connectionId: z.string().optional(),
 });
 
-export const exportSchema = z.object({
+export const exportSchema = z.strictObject({
   format: z.literal(EXPORT_FORMAT),
   version: z.literal(EXPORT_VERSION),
   exportedAt: z.iso.datetime(),
-  globals: z.object({
+  globals: z.strictObject({
     sourceLang: z.string(),
     targetLang: z.string(),
     languagePromptEnabled: z.boolean(),
@@ -24,11 +24,11 @@ export const exportSchema = z.object({
     defaultTemplateId: z.string(),
   }),
   templates: z.array(
-    z.object({
+    z.strictObject({
       id: z.string(),
       name: z.string(),
       builtin: z.boolean(),
-      settings: z.object({
+      settings: z.strictObject({
         prePrompt: z.string().optional(),
         targetLang: z.string().optional(),
         displayMode: z.enum(["replace", "bilingual"]).optional(),
@@ -40,11 +40,13 @@ export const exportSchema = z.object({
   ),
   profileOverrides: z.record(
     z.string(),
-    z.object({ text: z.string(), base: z.string(), savedAt: z.number() }),
+    z.strictObject({ text: z.string(), base: z.string(), savedAt: z.number() }),
   ),
-  siteRules: z.array(z.object({ id: z.string(), pattern: z.string(), templateId: z.string() })),
+  siteRules: z.array(
+    z.strictObject({ id: z.string(), pattern: z.string(), templateId: z.string() }),
+  ),
   connections: z.array(
-    z.object({
+    z.strictObject({
       id: z.string(),
       preset: z.enum(["deepseek", "openrouter", "ollama", "lmstudio", "custom"]),
       name: z.string(),

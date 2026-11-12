@@ -69,3 +69,14 @@ it.each([
   const file = { ...buildExport(state, new Date(0)), ...patch };
   expect(() => parseExport(file)).toThrow();
 });
+
+it("rejects an unknown key", () => {
+  const file = buildExport(state, new Date(0));
+  expect(() => parseExport({ ...file, unknown: true })).toThrow();
+  expect(() =>
+    parseExport({
+      ...file,
+      connections: file.connections.map((connection) => ({ ...connection, apiKey: "sk-secret" })),
+    }),
+  ).toThrow();
+});

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../contracts/languages.json;../../contracts/presets.json;../../contracts/limits.json;../../contracts/builtin-template.json;../../contracts/errors.json">
+      <Link>contracts/%(Filename)%(Extension)</Link>
+      <LogicalName>contracts/%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../../lib/translate/profiles/*.md">
+      <Link>profiles/%(Filename)%(Extension)</Link>
+      <LogicalName>profiles/%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+</Project>

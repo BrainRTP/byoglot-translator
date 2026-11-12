@@ -1,6 +1,12 @@
 # Weekly version updates. Minor and patch bumps come grouped, majors come one by one.
 version: 2
 updates:
+  - package-ecosystem: nuget
+    directory: /windows
+    schedule:
+      interval: weekly
+    labels: ["dependencies", "area:windows"]
+
   - package-ecosystem: npm
     directory: /
     schedule:
@@ -42,3 +48,8 @@ updates:
     schedule:
       interval: weekly
     labels: ["dependencies", "area:apple"]
+  - package-ecosystem: cargo
+    directory: /linux
+    schedule:
+      interval: weekly
+    labels: ["dependencies", "area:linux"]

@@ -480,6 +480,7 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
     shell = attachWindow(card, head, () => syncChrome());
     syncChrome();
     doc.addEventListener("keydown", onKeyDown, true);
+    if (touch) win.addEventListener("resize", layout);
 
     const mine = card;
     void Promise.all([
@@ -512,6 +513,7 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
     for (const entry of entries) retire(entry);
     clearTimeout(insertTimer);
     doc.removeEventListener("keydown", onKeyDown, true);
+    if (touch) win.removeEventListener("resize", layout);
     shell?.destroy();
     card?.remove();
     card = feed = select = lang = pin = insertBtn = shell = null;

@@ -31,6 +31,12 @@ updates:
       prefix: ci
     labels: ["dependencies", "area:infra"]
 
+  - package-ecosystem: gradle
+    directory: /android
+    schedule:
+      interval: weekly
+    labels: ["dependencies", "area:android"]
+
   - package-ecosystem: cargo
     directory: /linux
     schedule:

@@ -1,13 +1,10 @@
+import { LANGUAGE_NAMES } from "../settings/languages";
+
 const AUTO_SOURCE = "the source language (detect it)";
 
 function languageName(code: string): string {
   if (code === "auto") return AUTO_SOURCE;
-  try {
-    const name = new Intl.DisplayNames(["en"], { type: "language" }).of(code);
-    return name && name !== code ? name : code;
-  } catch {
-    return code;
-  }
+  return Object.hasOwn(LANGUAGE_NAMES, code) ? (LANGUAGE_NAMES[code] ?? code) : code;
 }
 
 const LANGUAGE_HEADER = "LANGUAGE STYLE (the user instructions below override it):";

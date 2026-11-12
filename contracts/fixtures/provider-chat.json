@@ -524,7 +524,7 @@
         "result": {
           "error": {
             "kind": "incompatible",
-            "detail": "[\n  {\n    \"expected\": \"array\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"choices\"\n    ],\n    \"message\": \"Invalid input: expected array, received undefined\"\n  }\n]"
+            "detail": "unexpected response shape"
           }
         }
       }

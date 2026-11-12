@@ -226,6 +226,73 @@
         "status": 500,
         "detail": "HTTP 500"
       }
+    },
+    {
+      "name": "429 with padded Retry-After 30",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 429,
+          "headers": {
+            "Retry-After": " 30 "
+          },
+          "body": {}
+        }
+      },
+      "expected": {
+        "kind": "rate_limit",
+        "status": 429,
+        "retryAfterMs": 30000
+      }
+    },
+    {
+      "name": "429 with negative Retry-After",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 429,
+          "headers": {
+            "Retry-After": "-1"
+          },
+          "body": {}
+        }
+      },
+      "expected": {
+        "kind": "rate_limit",
+        "status": 429
+      }
+    },
+    {
+      "name": "429 with hexadecimal Retry-After",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 429,
+          "headers": {
+            "Retry-After": "0x10"
+          },
+          "body": {}
+        }
+      },
+      "expected": {
+        "kind": "rate_limit",
+        "status": 429
+      }
     }
   ]
 }

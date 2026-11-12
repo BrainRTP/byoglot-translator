@@ -3,5 +3,7 @@
   "maxChars": 4000,
   "concurrency": 4,
   "generateTimeoutMs": 180000,
-  "maxProfileText": 20000
+  "maxProfileText": 20000,
+  "maxSelection": 5000,
+  "maxContext": 1000
 }

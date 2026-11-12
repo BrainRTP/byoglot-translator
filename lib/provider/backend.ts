@@ -5,12 +5,20 @@ import type { ModelInfo, ModelRef, TranslationBackend } from "../opencode/types"
 import { effortParams, effortVariants, type RawModel } from "./presets";
 import { chatSchema, errorBodySchema, modelListSchema } from "./schemas";
 
+const HTTP_DATE =
+  /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/;
+
 function retryAfterMs(header: string | null): number | undefined {
-  if (!header?.trim()) return undefined;
-  const seconds = Number(header);
-  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1000);
-  const date = Date.parse(header);
-  return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now());
+  const value = header?.trim();
+  if (!value) return undefined;
+  if (/^\d+(?:\.\d+)?$/.test(value)) {
+    const ms = Math.round(Number(value) * 1000);
+    return Number.isFinite(ms) ? ms : undefined;
+  }
+  if (!HTTP_DATE.test(value)) return undefined;
+  const date = Date.parse(value);
+  if (!Number.isFinite(date) || new Date(date).toUTCString() !== value) return undefined;
+  return Math.max(0, date - Date.now());
 }
 
 async function failureFromResponse(response: Response): Promise<BackendError> {
@@ -90,7 +98,7 @@ export function createProviderBackend(
     }
     const parsed = schema.safeParse(raw);
     if (!parsed.success) {
-      throw new BackendError("incompatible", { detail: parsed.error.message });
+      throw new BackendError("incompatible", { detail: "unexpected response shape" });
     }
     return parsed.data;
   }

@@ -80,3 +80,18 @@ it("rejects an unknown key", () => {
     }),
   ).toThrow();
 });
+
+it("drops an extra stored key when building an export", () => {
+  const stored = {
+    ...state,
+    templates: state.templates.map((template) => ({
+      ...template,
+      legacy: true,
+      settings: { ...template.settings, legacy: true },
+    })),
+    profileOverrides: { ru: { ...state.profileOverrides.ru, legacy: true } },
+    siteRules: state.siteRules.map((rule) => ({ ...rule, legacy: true })),
+  };
+  const now = new Date(0);
+  expect(buildExport(stored, now)).toEqual(buildExport(state, now));
+});

@@ -57,6 +57,14 @@ export const exportSchema = z.strictObject({
 
 export type ExportFile = z.infer<typeof exportSchema>;
 
+function pick<T extends object, K extends keyof T>(value: T, keys: readonly K[]): Pick<T, K> {
+  const result = {} as Pick<T, K>;
+  for (const key of keys) {
+    if (Object.hasOwn(value, key)) result[key] = value[key];
+  }
+  return result;
+}
+
 export function buildExport(
   state: {
     globals: GlobalSettings;
@@ -74,9 +82,28 @@ export function buildExport(
     version: EXPORT_VERSION,
     exportedAt: now.toISOString(),
     globals: { sourceLang, targetLang, languagePromptEnabled, languageProfile, defaultTemplateId },
-    templates: state.templates,
-    profileOverrides: state.profileOverrides,
-    siteRules: state.siteRules,
+    templates: state.templates.map((template) => {
+      const settings = pick(template.settings, [
+        "prePrompt",
+        "targetLang",
+        "displayMode",
+        "visibleOnly",
+        "pageModel",
+        "selectionModel",
+      ]);
+      for (const key of ["pageModel", "selectionModel"] as const) {
+        const model = settings[key];
+        if (model) settings[key] = pick(model, ["providerID", "id", "variant", "connectionId"]);
+      }
+      return { ...pick(template, ["id", "name", "builtin"]), settings };
+    }),
+    profileOverrides: Object.fromEntries(
+      Object.entries(state.profileOverrides).map(([id, override]) => [
+        id,
+        pick(override, ["text", "base", "savedAt"]),
+      ]),
+    ),
+    siteRules: state.siteRules.map((rule) => pick(rule, ["id", "pattern", "templateId"])),
     connections: state.connections
       .filter((connection) => connection.kind === "provider")
       .map(({ id, preset, name, baseUrl }) => ({ id, preset, name, baseUrl })),

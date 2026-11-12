@@ -241,9 +241,9 @@
       "input": {
         "raw": "{\"1\":\"One\"}",
         "expected": {
-          "1": "One",
+          "10": "Ten",
           "2": "Two",
-          "10": "Ten"
+          "1": "One"
         }
       },
       "expected": {

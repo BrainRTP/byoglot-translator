@@ -24,7 +24,8 @@ export function compareOrUpdate(path: string, actual: unknown, update: boolean):
 export function runContract<I, E>(name: string, fn: (input: I) => E | Promise<E>): void {
   describe(name, () => {
     const path = join(process.cwd(), "contracts", "fixtures", `${name}.json`);
-    const file: ContractFile<I, E> = JSON.parse(readFileSync(path, "utf8"));
+    const source = readFileSync(path, "utf8");
+    const file: ContractFile<I, E> = JSON.parse(source);
     expect(file.contract, path).toBe(name);
     expect(file.version, path).toBe(1);
     if (UPDATE) {
@@ -36,7 +37,16 @@ export function runContract<I, E>(name: string, fn: (input: I) => E | Promise<E>
           }
           entry.expected = actual;
         }
-        compareOrUpdate(path, file, true);
+        // Preserve hand-authored input key order while regenerating expectations.
+        const input = /^ {6}"input": [\s\S]*?(?=^ {6}"expected":)/gm;
+        const originals = source.match(input) ?? [];
+        expect(originals, path).toHaveLength(file.cases.length);
+        let index = 0;
+        const updated = `${JSON.stringify(file, null, 2)}\n`;
+        writeFileSync(
+          path,
+          updated.replace(input, () => originals[index++] ?? ""),
+        );
       });
     } else {
       for (const entry of file.cases) {

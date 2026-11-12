@@ -98,6 +98,7 @@ export function createProviderBackend(
     }
     const parsed = schema.safeParse(raw);
     if (!parsed.success) {
+      console.warn("Provider response schema mismatch:", parsed.error.message);
       throw new BackendError("incompatible", { detail: "unexpected response shape" });
     }
     return parsed.data;

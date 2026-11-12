@@ -293,6 +293,76 @@
         "kind": "rate_limit",
         "status": 429
       }
+    },
+    {
+      "name": "429 with an HTTP date",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 429,
+          "headers": {
+            "Retry-After": "Thu, 01 Jan 2026 00:00:10 GMT"
+          },
+          "body": {}
+        },
+        "now": "2026-01-01T00:00:00.000Z"
+      },
+      "expected": {
+        "kind": "rate_limit",
+        "status": 429,
+        "retryAfterMs": 10000
+      }
+    },
+    {
+      "name": "429 with an invalid calendar date",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 429,
+          "headers": {
+            "Retry-After": "Mon, 30 Feb 2026 00:00:10 GMT"
+          },
+          "body": {}
+        },
+        "now": "2026-01-01T00:00:00.000Z"
+      },
+      "expected": {
+        "kind": "rate_limit",
+        "status": 429
+      }
+    },
+    {
+      "name": "429 with lower-case gmt",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 429,
+          "headers": {
+            "Retry-After": "Thu, 01 Jan 2026 00:00:10 gmt"
+          },
+          "body": {}
+        },
+        "now": "2026-01-01T00:00:00.000Z"
+      },
+      "expected": {
+        "kind": "rate_limit",
+        "status": 429
+      }
     }
   ]
 }

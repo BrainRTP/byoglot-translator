@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 import type { ProviderData, ProviderPreset } from "../../../lib/connections/types";
 import { BackendError } from "../../../lib/opencode/errors";
 import type { ModelRef } from "../../../lib/opencode/types";
@@ -75,15 +76,24 @@ runContract(
     return { request: request(), result };
   },
 );
-runContract("provider-errors", async (i: { provider: ProviderData; response: Http }) => {
-  const { backend } = recorded(i.provider, i.response);
-  try {
-    await backend.listModels();
-  } catch (error) {
-    return shape(error);
-  }
-  throw new Error("Expected provider request to fail");
-});
+runContract(
+  "provider-errors",
+  async (i: { provider: ProviderData; response: Http; now?: string }) => {
+    if (i.now !== undefined) {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(i.now));
+    }
+    const { backend } = recorded(i.provider, i.response);
+    try {
+      await backend.listModels();
+    } catch (error) {
+      return shape(error);
+    } finally {
+      if (i.now !== undefined) vi.useRealTimers();
+    }
+    throw new Error("Expected provider request to fail");
+  },
+);
 runContract(
   "provider-effort",
   (i: { preset: ProviderPreset; rawModel: RawModel; variant?: string; baseUrl: string }) => ({

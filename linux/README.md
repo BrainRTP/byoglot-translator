@@ -9,3 +9,7 @@ The installed stable toolchain used here is Rust and Cargo 1.94.1, pinned in `ru
 Contract JSON and language profiles are compiled from the monorepo resources. Build from the repository checkout. The build script discovers Markdown profiles automatically, so adding a profile requires no Rust source change. Tests locate the shared fixtures by walking up from the core crate directory.
 
 Core futures cancel by being dropped. The transport implementation must cancel I/O when its send future is dropped. Secret stores bind each key to a connection id and origin; production persistent storage and the HTTP transport are implemented in Task 4.
+
+Quick-window completion events carry their original source: `QuickEvent::Finished { source, output }` and `QuickEvent::FailedWith { source, error }`. The controller must retain the source from `StartTranslating` for these events. `CancelTranslating` must abort a spawned task explicitly; dropping a task handle alone may leave it running. The controller must also filter task generations when the same source is submitted again. `SecretStore::set` replaces the existing secret for a connection id, including its origin.
+
+Provider numeric metadata and `BackendError::retry_after_ms` use `f64`, matching TypeScript numbers, including finite values outside integer ranges. Convert a retry delay to the runtime's duration type only when scheduling it, with that runtime's bounds.

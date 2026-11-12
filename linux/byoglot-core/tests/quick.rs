@@ -59,7 +59,14 @@ fn primary_text_starts_a_translation() {
     );
     let result = output();
     assert_eq!(
-        reduce(state.clone(), Finished(result.clone()), LIMIT),
+        reduce(
+            state.clone(),
+            Finished {
+                source: "hello".into(),
+                output: result.clone()
+            },
+            LIMIT
+        ),
         (
             QuickState::Done {
                 source: "hello".into(),
@@ -69,7 +76,14 @@ fn primary_text_starts_a_translation() {
         )
     );
     assert_eq!(
-        reduce(state, FailedWith(RunnerError::NoModel), LIMIT),
+        reduce(
+            state,
+            FailedWith {
+                source: "hello".into(),
+                error: RunnerError::NoModel
+            },
+            LIMIT
+        ),
         (
             QuickState::Failed {
                 source: "hello".into(),
@@ -188,10 +202,57 @@ fn a_stale_read_after_paste_is_ignored() {
 #[test]
 fn a_late_result_after_dismiss_is_ignored() {
     let (state, _) = reduce(translating(), Dismissed, LIMIT);
-    for event in [Finished(output()), FailedWith(RunnerError::NoModel)] {
+    for event in [
+        Finished {
+            source: "hello".into(),
+            output: output(),
+        },
+        FailedWith {
+            source: "hello".into(),
+            error: RunnerError::NoModel,
+        },
+    ] {
         assert_eq!(
             reduce(state.clone(), event, LIMIT),
             (QuickState::Hidden, vec![])
+        );
+    }
+}
+
+#[test]
+fn stale_completions_after_replacing_the_source_are_ignored() {
+    for replacement in [Pasted("new".into()), TriggeredWithText("new".into())] {
+        let (state, _) = reduce(translating(), replacement, LIMIT);
+        for event in [
+            Finished {
+                source: "hello".into(),
+                output: output(),
+            },
+            FailedWith {
+                source: "hello".into(),
+                error: RunnerError::NoModel,
+            },
+        ] {
+            assert_eq!(reduce(state.clone(), event, LIMIT), (state.clone(), vec![]));
+        }
+        let mut result = output();
+        result.text = "new translation".into();
+        assert_eq!(
+            reduce(
+                state,
+                Finished {
+                    source: "new".into(),
+                    output: result.clone()
+                },
+                LIMIT
+            ),
+            (
+                QuickState::Done {
+                    source: "new".into(),
+                    output: result
+                },
+                vec![]
+            )
         );
     }
 }

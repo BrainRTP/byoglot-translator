@@ -31,7 +31,7 @@ pub enum QuickState {
     },
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum QuickEvent {
     Triggered,
     TriggeredWithText(String),
@@ -39,8 +39,14 @@ pub enum QuickEvent {
     PrimaryRead(Option<String>),
     ClipboardRead(Option<String>),
     Pasted(String),
-    Finished(RunnerOutput),
-    FailedWith(RunnerError),
+    Finished {
+        source: String,
+        output: RunnerOutput,
+    },
+    FailedWith {
+        source: String,
+        error: RunnerError,
+    },
     Dismissed,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -89,12 +95,20 @@ pub fn reduce(
             text_rule(text.unwrap_or_default(), limit, Vec::new())
         }
         Pasted(text) => text_rule(text, limit, cancel()),
-        Finished(output) => match state {
-            QuickState::Translating { source } => (QuickState::Done { source, output }, Vec::new()),
+        Finished {
+            source: completed_source,
+            output,
+        } => match state {
+            QuickState::Translating { source } if source == completed_source => {
+                (QuickState::Done { source, output }, Vec::new())
+            }
             _ => (state, Vec::new()),
         },
-        FailedWith(error) => match state {
-            QuickState::Translating { source } => {
+        FailedWith {
+            source: completed_source,
+            error,
+        } => match state {
+            QuickState::Translating { source } if source == completed_source => {
                 (QuickState::Failed { source, error }, Vec::new())
             }
             _ => (state, Vec::new()),

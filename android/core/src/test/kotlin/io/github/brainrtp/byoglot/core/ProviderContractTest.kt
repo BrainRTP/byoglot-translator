@@ -155,4 +155,13 @@ class ProviderContractTest {
         assertEquals(30000L, error.retryAfterMs)
     }
 
+    @Test fun `only the TypeScript custom hosts are keyless`() {
+        listOf("http://localhost/v1", "https://LOCALHOST:443/v1", "http://127.0.0.1:8080/v1").forEach {
+            assertFalse(ProviderEffort.needsKey(ProviderPreset.custom, it), it)
+        }
+        listOf("http://127.0.0.2/v1", "http://[::1]/v1", "http://10.0.0.1/v1", "http://172.16.0.1/v1", "http://192.168.1.5/v1", "http://169.254.1.1/v1", "http://[fd12::5]/v1", "http://[fe80::1]/v1", "http://server.local/v1", "http://localhost./v1", "https://example.com/v1", "broken url").forEach {
+            assertTrue(ProviderEffort.needsKey(ProviderPreset.custom, it), it)
+        }
+    }
+
 }

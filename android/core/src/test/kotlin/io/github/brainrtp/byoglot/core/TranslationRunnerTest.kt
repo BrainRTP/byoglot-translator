@@ -46,12 +46,18 @@ class TranslationRunnerTest {
     @Test fun `requires consent for a remote origin`() = runBlocking {
         assertEquals(RunnerError.ConsentNeeded("https://api.deepseek.com"), error(runner(initial.copy(consentedOrigins = emptyList()))))
     }
-    @Test fun `local connections need no consent or key`() = runBlocking {
+    @Test fun `LAN connections need a key but permit HTTP without consent`() = runBlocking {
         listOf("http://192.168.1.5:11434/v1", "http://[fd12::5]:11434/v1", "http://[fe80::1]:11434/v1").forEach { url ->
             val local = connection.copy(preset = ProviderPreset.custom, baseUrl = url)
             val state = initial.copy(connections = listOf(local), consentedOrigins = emptyList())
-            val runner = TranslationRunner(InMemorySettingsRepository(state), InMemorySecretStore(), RecordingTransport(HttpResponse(200, emptyMap(), "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}".toByteArray())))
+            val secrets = InMemorySecretStore()
+            val transport = RecordingTransport(HttpResponse(200, emptyMap(), "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}".toByteArray()))
+            val runner = TranslationRunner(InMemorySettingsRepository(state), secrets, transport)
+            assertEquals(RunnerError.KeyMissing, error(runner))
+            assertTrue(transport.requests.isEmpty())
+            secrets.set("fixture-key", local.id, checkNotNull(originOf(url)))
             assertEquals("ok", runner.translate(input).text)
+            assertEquals("Bearer fixture-key", transport.requests.single().headers["authorization"])
         }
     }
     @Test fun `a changed origin or missing secret requires a key`() = runBlocking {

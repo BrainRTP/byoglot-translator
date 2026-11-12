@@ -19,7 +19,7 @@ object ProviderEffort {
     }
 
     fun needsKey(preset: ProviderPreset, baseUrl: String): Boolean =
-        if (preset == ProviderPreset.custom) originOf(baseUrl)?.let { !isLocalHost(URI(it).host) } ?: true
+        if (preset == ProviderPreset.custom) originOf(baseUrl)?.let { URI(it).host !in setOf("localhost", "127.0.0.1") } ?: true
         else Contracts.presets.getValue(preset).needsKey
 }
 

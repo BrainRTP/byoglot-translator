@@ -28,6 +28,7 @@ export const STYLES = `
 .btn.ico.flat{border-color:transparent;background:none;color:var(--mu)}
 .btn:focus-visible,.tsel:focus-visible,.scroll:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .icon{position:fixed;width:24px;height:24px;padding:0;border-radius:6px;border:1px solid var(--bd2);background:var(--bg);color:var(--tx);box-shadow:var(--sh);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.85}
+.icon.touch{width:44px;height:44px;border-radius:22px;opacity:1}
 .icon:hover,.icon:focus-visible{opacity:1}
 .icon:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .revert{position:absolute;left:4px;top:0;width:24px;height:24px;padding:0;border-radius:6px;border:1px solid var(--bd2);background:var(--bg);color:var(--tx);box-shadow:var(--sh);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.35}
@@ -37,6 +38,11 @@ export const STYLES = `
 .card{position:fixed;max-width:calc(100vw - 16px);background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:8px;box-shadow:var(--sh);padding:10px 12px 12px;display:flex;flex-direction:column;gap:10px}
 .head{display:flex;align-items:center;gap:8px;cursor:move;user-select:none;touch-action:none}
 .grip{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;user-select:none;touch-action:none;background:linear-gradient(135deg,transparent 0 52%,var(--bd2) 52% 62%,transparent 62% 74%,var(--bd2) 74% 84%,transparent 84%)}
+.card.sheet .grip{display:none}
+.card.sheet .head{cursor:default}
+.card.sheet .btn.ico{width:44px;height:44px}
+.card.sheet .btn.sm{min-height:44px}
+.card.sheet .tsel{height:44px}
 .feed{flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-width:thin;margin:-3px;padding:3px}
 .pin[aria-pressed="true"]{color:var(--ac)}
 .src{color:var(--mu);font-size:12px;line-height:18px;margin-bottom:6px;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}

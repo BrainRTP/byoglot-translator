@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildPagePrompt, buildSelectionPrompt } from "../../../lib/translate/prompt";
+import {
+  buildPagePrompt,
+  buildSelectionPrompt,
+  buildTextPrompt,
+} from "../../../lib/translate/prompt";
 
 const page = {
   prePrompt: "explain academic words with examples and etymology",
@@ -108,5 +112,49 @@ describe("buildSelectionPrompt", () => {
     const base = buildSelectionPrompt(sel);
     expect(base).not.toContain("LANGUAGE STYLE");
     expect(buildSelectionPrompt({ ...sel, languagePrompt: "   " })).toBe(base);
+  });
+});
+
+describe("buildTextPrompt", () => {
+  const base = {
+    prePrompt: "be brief",
+    languagePrompt: "",
+    sourceLang: "auto",
+    targetLang: "ru",
+    text: "ubiquitous",
+    context: "",
+    appName: "",
+  };
+
+  it("has no browser wording, no context block and no app line when both are empty", () => {
+    const p = buildTextPrompt(base);
+    expect(p.startsWith("You are a translation assistant.\n")).toBe(true);
+    expect(p).not.toContain("browser");
+    expect(p).not.toContain("web page");
+    expect(p).not.toContain("CONTEXT");
+    expect(p).not.toContain("The text comes from");
+    expect(p.endsWith("USER INSTRUCTIONS:\nbe brief\n\nTEXT:\nubiquitous")).toBe(true);
+  });
+
+  it("adds the context rule, the app line and the context block when given", () => {
+    const p = buildTextPrompt({ ...base, context: "Ubiquitous computing.", appName: "Notes" });
+    expect(p).toContain(
+      "CONTEXT is the text around the selection. Do not translate it, but use it to pick the meaning that fits, especially for short terms.",
+    );
+    expect(p).toContain(
+      "\n\nThe text comes from the app Notes.\n\nCONTEXT (do not translate):\nUbiquitous computing.\n\nTEXT:\nubiquitous",
+    );
+  });
+
+  it("shares the form rule and the output rule with the selection prompt", () => {
+    const text = buildTextPrompt(base);
+    const web = buildSelectionPrompt({ ...base, hostname: "example.com" });
+    for (const rule of [
+      "Translate exactly this fragment and keep its form",
+      "plain text or simple markdown",
+    ]) {
+      expect(text).toContain(rule);
+      expect(web).toContain(rule);
+    }
   });
 });

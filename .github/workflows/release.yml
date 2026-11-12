@@ -1,6 +1,6 @@
 name: Release
 
-# A tag like v0.2.6 builds the Chrome and Firefox zips and attaches them to a GitHub release.
+# A tag like v0.4.0 releases the browser extension. Native apps use their own prefixes (apple-v*, android-v*, windows-v*, linux-v*) and their own workflows.
 on:
   push:
     tags: ["v*"]

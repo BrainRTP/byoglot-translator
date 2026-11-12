@@ -4,7 +4,10 @@ export default defineConfig({
   modules: ["@wxt-dev/module-svelte"],
   outDir: "dist",
   // AMO reviewers rebuild from the sources zip; the pnpm hook and the Node version are hidden files.
-  zip: { includeSources: ["**/*", ".pnpmfile.cjs", ".nvmrc"] },
+  zip: {
+    includeSources: ["**/*", ".pnpmfile.cjs", ".nvmrc"],
+    excludeSources: ["apple/**", "android/**", "windows/**", "linux/**"],
+  },
   manifest: ({ browser }) => ({
     name: "__MSG_extName__",
     description: "__MSG_extDescription__",
@@ -42,6 +45,9 @@ export default defineConfig({
           // The built-in data consent needs Firefox 140.
           strict_min_version: "140.0",
           data_collection_permissions: { required: ["websiteContent", "browsingActivity"] },
+        },
+        gecko_android: {
+          strict_min_version: "160.0",
         },
       },
     }),

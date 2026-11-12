@@ -1,9 +1,26 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "includes": ["**", "!pnpm-lock.yaml", "!docs"] },
+  "files": {
+    "includes": [
+      "**",
+      "!pnpm-lock.yaml",
+      "!docs",
+      "!apple",
+      "!android",
+      "!windows",
+      "!linux",
+      "!contracts/fixtures"
+    ]
+  },
   "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "linter": { "enabled": true },
   "html": { "experimentalFullSupportEnabled": true },
-  "css": { "formatter": { "enabled": true } }
+  "css": { "formatter": { "enabled": true } },
+  "overrides": [
+    {
+      "includes": ["contracts/schemas/**/*.json"],
+      "json": { "formatter": { "expand": "always" } }
+    }
+  ]
 }

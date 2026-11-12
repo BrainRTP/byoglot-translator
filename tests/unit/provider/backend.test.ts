@@ -251,8 +251,18 @@ describe("errors", () => {
   });
 
   it("wrong schema is incompatible", async () => {
-    const error = await call(async () => json({ nope: true }));
-    expect(error.kind).toBe("incompatible");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const error = await call(async () => json({ nope: true }));
+      expect(error.kind).toBe("incompatible");
+      expect(error.detail).toBe("unexpected response shape");
+      expect(warn).toHaveBeenCalledWith(
+        "Provider response schema mismatch:",
+        expect.stringContaining('"choices"'),
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("abort is aborted", async () => {

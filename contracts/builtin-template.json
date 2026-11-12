@@ -1,0 +1,8 @@
+{
+  "id": "builtin-default",
+  "name": "Plain translation",
+  "builtin": true,
+  "settings": {
+    "prePrompt": "Translate naturally, preserving meaning, tone and context. Keep names, code, numbers and product names as they are."
+  }
+}

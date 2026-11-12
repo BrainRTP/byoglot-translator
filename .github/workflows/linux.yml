@@ -26,18 +26,18 @@ jobs:
       - run: cargo test -p byoglot-core --locked
   app:
     runs-on: ubuntu-latest
-    container: fedora:latest
+    container: fedora:45
     defaults:
       run:
         working-directory: linux
     steps:
       - name: Install system libraries
         working-directory: /
-        run: dnf install -y git gtk4-devel libadwaita-devel gcc curl
+        run: dnf install -y git gtk4-devel libadwaita-devel gcc rustup
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Rust
         run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+          rustup-init -y --profile minimal --default-toolchain none --no-modify-path
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - name: Install the pinned Rust toolchain
         run: rustup show active-toolchain

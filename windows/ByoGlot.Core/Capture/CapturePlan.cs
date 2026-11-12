@@ -1,12 +1,13 @@
 namespace ByoGlot.Core.Capture;
 
 public enum SelectionSource { None, Automation, CopyFallback }
-public sealed record CaptureInputs(bool ForegroundIsElevated, string? AutomationText, bool CopyFallbackAllowed, Func<Task<string?>> CopyAndRead);
+public sealed record CaptureInputs(bool ForegroundIsElevated, string? AutomationText, bool CopyFallbackAllowed, Func<Task<ClipboardRead>> CopyAndRead);
 public abstract record CaptureResult
 {
     public sealed record Text(string Value, SelectionSource Source) : CaptureResult;
     public sealed record Elevated : CaptureResult;
     public sealed record Nothing : CaptureResult;
+    public sealed record Clipboard(ClipboardRead Read) : CaptureResult;
 }
 
 public static class CapturePlan
@@ -17,8 +18,12 @@ public static class CapturePlan
         if (!string.IsNullOrWhiteSpace(inputs.AutomationText)) return new CaptureResult.Text(inputs.AutomationText.Trim(), SelectionSource.Automation);
         if (inputs.CopyFallbackAllowed)
         {
-            var text = await inputs.CopyAndRead();
-            if (!string.IsNullOrWhiteSpace(text)) return new CaptureResult.Text(text.Trim(), SelectionSource.CopyFallback);
+            var read = await inputs.CopyAndRead();
+            if (read is ClipboardRead.Text text)
+            {
+                if (!string.IsNullOrWhiteSpace(text.Value)) return new CaptureResult.Text(text.Value.Trim(), SelectionSource.CopyFallback);
+            }
+            else if (read is not ClipboardRead.Empty) return new CaptureResult.Clipboard(read);
         }
         return new CaptureResult.Nothing();
     }

@@ -18,4 +18,9 @@ public class ClipboardTextTests
     public void TextIsTrimmed() => Assert.Equal(new ClipboardRead.Text("hello"), ClipboardText.Read(["Text"], 5000, () => " hello \n"));
     [Fact]
     public void LimitCountsUtf16CodeUnits() => Assert.Equal(new ClipboardRead.TooLong(5000), ClipboardText.Read(["Text"], 5000, () => string.Concat(Enumerable.Repeat("😀", 2501))));
+    [Fact]
+    public void UnchangedSequenceNeverReadsStaleClipboardText() => Assert.IsType<ClipboardRead.Empty>(ClipboardText.ReadChanged(10, 10, ["Text"], 5000, () => throw new InvalidOperationException("Must not read the previous clipboard.")));
+    [Fact]
+    public void ChangedSequenceStillUsesPrivacyChecks() => Assert.IsType<ClipboardRead.Concealed>(ClipboardText.ReadChanged(10, 11, ["Text", "CanIncludeInClipboardHistory"], 5000, () => throw new InvalidOperationException("Must not read private content.")));
+
 }

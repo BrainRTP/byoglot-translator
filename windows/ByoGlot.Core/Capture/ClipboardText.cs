@@ -10,6 +10,9 @@ public abstract record ClipboardRead
 
 public static class ClipboardText
 {
+    public static ClipboardRead ReadChanged(uint previousSequence, uint currentSequence, IReadOnlyCollection<string> formatNames, int limit, Func<string?> text)
+        => previousSequence == currentSequence ? new ClipboardRead.Empty() : Read(formatNames, limit, text);
+
     public static ClipboardRead Read(IReadOnlyCollection<string> formatNames, int limit, Func<string?> text)
     {
         if (formatNames.Contains("ExcludeClipboardContentFromMonitorProcessing") || formatNames.Contains("CanIncludeInClipboardHistory")) return new ClipboardRead.Concealed();

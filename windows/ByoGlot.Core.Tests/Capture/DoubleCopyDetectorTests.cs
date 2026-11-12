@@ -47,4 +47,26 @@ public class DoubleCopyDetectorTests
         Assert.False(detector.Observe(1, Ms(200)));
         Assert.True(detector.Observe(2, Ms(300)));
     }
+    [Fact]
+    public void OwnCopyFallbackDoesNotCompleteAUserDoubleCopy()
+    {
+        var detector = new DoubleCopyDetector();
+        Assert.False(detector.Observe(1, Ms(0)));
+        detector.Ignore(2);
+        Assert.False(detector.Observe(2, Ms(200)));
+        Assert.False(detector.Observe(3, Ms(400)));
+        Assert.True(detector.Observe(4, Ms(600)));
+    }
+    [Fact]
+    public void TwoOwnWritesNeverFireEvenAcrossSequenceWrap()
+    {
+        var detector = new DoubleCopyDetector();
+        detector.Ignore(uint.MaxValue);
+        detector.Ignore(0);
+        Assert.False(detector.Observe(uint.MaxValue, Ms(0)));
+        Assert.False(detector.Observe(0, Ms(200)));
+        Assert.False(detector.Observe(1, Ms(400)));
+        Assert.True(detector.Observe(2, Ms(600)));
+    }
+
 }

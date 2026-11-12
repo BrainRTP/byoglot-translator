@@ -235,6 +235,82 @@
         },
         "failed": []
       }
+    },
+    {
+      "name": "numeric failed id order",
+      "input": {
+        "raw": "{\"1\":\"One\"}",
+        "expected": {
+          "1": "One",
+          "2": "Two",
+          "10": "Ten"
+        }
+      },
+      "expected": {
+        "ok": {
+          "1": "One"
+        },
+        "failed": [
+          "2",
+          "10"
+        ]
+      }
+    },
+    {
+      "name": "duplicated placeholder",
+      "input": {
+        "raw": "{\"1\":\"<x2/><x2/>\"}",
+        "expected": {
+          "1": "<x2/>"
+        }
+      },
+      "expected": {
+        "ok": {},
+        "failed": [
+          "1"
+        ]
+      }
+    },
+    {
+      "name": "added placeholder",
+      "input": {
+        "raw": "{\"1\":\"<x2/>Привет\"}",
+        "expected": {
+          "1": "Hello"
+        }
+      },
+      "expected": {
+        "ok": {},
+        "failed": [
+          "1"
+        ]
+      }
+    },
+    {
+      "name": "duplicate id, last wins",
+      "input": {
+        "raw": "{\"1\":\"a\",\"1\":\"b\"}",
+        "expected": {
+          "1": "Hello"
+        }
+      },
+      "expected": {
+        "ok": {
+          "1": "b"
+        },
+        "failed": []
+      }
+    },
+    {
+      "name": "empty expected segments",
+      "input": {
+        "raw": "{}",
+        "expected": {}
+      },
+      "expected": {
+        "ok": {},
+        "failed": []
+      }
     }
   ]
 }

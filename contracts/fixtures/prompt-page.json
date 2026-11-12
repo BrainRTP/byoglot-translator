@@ -153,6 +153,56 @@
         }
       },
       "expected": "You are a translation engine inside a browser extension.\nINPUT is a JSON object that maps segment ids to source text.\nOUTPUT must be only a JSON object with exactly the same ids, each mapped to its translation. No markdown, no code fences, no comments, no extra keys.\nKeep placeholder tags such as <x1>...</x1> and <x2/> exactly as written. Put them around the translated words they belong to. Do not add, remove or renumber them. Every tag of a segment must appear in its translation, also when one tag wraps the whole segment: \"<x1>Getting started</x1>\" becomes \"<x1>Начало работы</x1>\", never \"Начало работы\".\nTranslate from English to pt-BR. The user instructions below control wording and style, never the output format.\n\nUSER INSTRUCTIONS:\nexplain academic words\n\nPage: \"Docs - Agile\" on example.com.\n\nRemember: reply with the JSON object only.\n\nINPUT:\n{\"1\":\"Agile teams\",\"2\":\"Read <x1>docs</x1> now.\",\"3\":\"Hi<x2/>\"}"
+    },
+    {
+      "name": "numeric segment id order",
+      "input": {
+        "prePrompt": "explain academic words",
+        "languagePrompt": "",
+        "sourceLang": "en",
+        "targetLang": "ru",
+        "pageTitle": "Docs - Agile",
+        "hostname": "example.com",
+        "segments": {
+          "1": "One",
+          "2": "Two",
+          "10": "Ten"
+        }
+      },
+      "expected": "You are a translation engine inside a browser extension.\nINPUT is a JSON object that maps segment ids to source text.\nOUTPUT must be only a JSON object with exactly the same ids, each mapped to its translation. No markdown, no code fences, no comments, no extra keys.\nKeep placeholder tags such as <x1>...</x1> and <x2/> exactly as written. Put them around the translated words they belong to. Do not add, remove or renumber them. Every tag of a segment must appear in its translation, also when one tag wraps the whole segment: \"<x1>Getting started</x1>\" becomes \"<x1>Начало работы</x1>\", never \"Начало работы\".\nTranslate from English to Russian. The user instructions below control wording and style, never the output format.\n\nUSER INSTRUCTIONS:\nexplain academic words\n\nPage: \"Docs - Agile\" on example.com.\n\nRemember: reply with the JSON object only.\n\nINPUT:\n{\"1\":\"One\",\"2\":\"Two\",\"10\":\"Ten\"}"
+    },
+    {
+      "name": "JSON string escaping",
+      "input": {
+        "prePrompt": "explain academic words",
+        "languagePrompt": "",
+        "sourceLang": "en",
+        "targetLang": "ru",
+        "pageTitle": "Docs - Agile",
+        "hostname": "example.com",
+        "segments": {
+          "1": "a\nb\tc",
+          "2": "\u0001",
+          "3": " ",
+          "4": "\ud83d",
+          "5": "\b\f\r\u000b",
+          "6": " "
+        }
+      },
+      "expected": "You are a translation engine inside a browser extension.\nINPUT is a JSON object that maps segment ids to source text.\nOUTPUT must be only a JSON object with exactly the same ids, each mapped to its translation. No markdown, no code fences, no comments, no extra keys.\nKeep placeholder tags such as <x1>...</x1> and <x2/> exactly as written. Put them around the translated words they belong to. Do not add, remove or renumber them. Every tag of a segment must appear in its translation, also when one tag wraps the whole segment: \"<x1>Getting started</x1>\" becomes \"<x1>Начало работы</x1>\", never \"Начало работы\".\nTranslate from English to Russian. The user instructions below control wording and style, never the output format.\n\nUSER INSTRUCTIONS:\nexplain academic words\n\nPage: \"Docs - Agile\" on example.com.\n\nRemember: reply with the JSON object only.\n\nINPUT:\n{\"1\":\"a\\nb\\tc\",\"2\":\"\\u0001\",\"3\":\" \",\"4\":\"\\ud83d\",\"5\":\"\\b\\f\\r\\u000b\",\"6\":\" \"}"
+    },
+    {
+      "name": "empty segments",
+      "input": {
+        "prePrompt": "explain academic words",
+        "languagePrompt": "",
+        "sourceLang": "en",
+        "targetLang": "ru",
+        "pageTitle": "Docs - Agile",
+        "hostname": "example.com",
+        "segments": {}
+      },
+      "expected": "You are a translation engine inside a browser extension.\nINPUT is a JSON object that maps segment ids to source text.\nOUTPUT must be only a JSON object with exactly the same ids, each mapped to its translation. No markdown, no code fences, no comments, no extra keys.\nKeep placeholder tags such as <x1>...</x1> and <x2/> exactly as written. Put them around the translated words they belong to. Do not add, remove or renumber them. Every tag of a segment must appear in its translation, also when one tag wraps the whole segment: \"<x1>Getting started</x1>\" becomes \"<x1>Начало работы</x1>\", never \"Начало работы\".\nTranslate from English to Russian. The user instructions below control wording and style, never the output format.\n\nUSER INSTRUCTIONS:\nexplain academic words\n\nPage: \"Docs - Agile\" on example.com.\n\nRemember: reply with the JSON object only.\n\nINPUT:\n{}"
     }
   ]
 }

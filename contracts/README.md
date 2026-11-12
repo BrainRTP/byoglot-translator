@@ -4,9 +4,9 @@ TypeScript in `lib/` is the reference implementation. Data and fixture expectati
 
 A behavior change belongs in one pull request containing the TypeScript change, regenerated contract files and every native implementation that exists at that time.
 
-Fixture files have the format `{ "contract": string, "version": number, "cases": [{ "name": string, "input": any, "expected": any }] }`. Segment ids are canonical non-negative integers written as strings. Sort them as numbers to reproduce JavaScript object key order. Every JSON file uses two-space indentation and a trailing newline.
+Fixture files have the format `{ "contract": string, "version": number, "cases": [{ "name": string, "input": any, "expected": any }] }`. Segment ids are canonical non-negative integers written as strings. Sort them as numbers to reproduce JavaScript object key order. A repeated id in a model response uses the last value, as in `JSON.parse`. Every JSON file uses two-space indentation and a trailing newline. The harness checks the contract name and version and prints each changed case name during an update.
 
-String lengths are UTF-16 code units, as in JavaScript `String.length`. The compact `JSON.stringify` output is part of the page prompt: there is no space after `:` or `,`, `/` and non-ASCII characters are not escaped, and control characters are escaped as `\b \f \n \r \t` or `\u00xx` with lower-case hex.
+String lengths are UTF-16 code units, as in JavaScript `String.length`. The compact `JSON.stringify` output is part of the page prompt: there is no space after `:` or `,`, `/` and non-ASCII characters are not escaped, and control characters are escaped as `\b \f \n \r \t` or `\u00xx` with lower-case hex. U+2028 and U+2029 stay unescaped. Lone UTF-16 surrogates are escaped with lower-case hex, for example `\ud83d`.
 
 Language profiles are not copied here. They live in `lib/translate/profiles/<code>.md`; native builds bundle those files as resources. The profile id is the file name without `.md`, and the profile text is the trimmed file content.
 

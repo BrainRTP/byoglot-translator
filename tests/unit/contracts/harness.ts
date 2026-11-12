@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { describe, expect, it } from "vitest";
 
 export type ContractCase<I, E> = { name: string; input: I; expected: E };
@@ -24,9 +25,17 @@ export function runContract<I, E>(name: string, fn: (input: I) => E | Promise<E>
   describe(name, () => {
     const path = join(process.cwd(), "contracts", "fixtures", `${name}.json`);
     const file: ContractFile<I, E> = JSON.parse(readFileSync(path, "utf8"));
+    expect(file.contract, path).toBe(name);
+    expect(file.version, path).toBe(1);
     if (UPDATE) {
       it(`updates ${name}`, async () => {
-        for (const entry of file.cases) entry.expected = await fn(entry.input);
+        for (const entry of file.cases) {
+          const actual = await fn(entry.input);
+          if (!isDeepStrictEqual(actual, entry.expected)) {
+            process.stdout.write(`${name}: updated ${entry.name}\n`);
+          }
+          entry.expected = actual;
+        }
         compareOrUpdate(path, file, true);
       });
     } else {

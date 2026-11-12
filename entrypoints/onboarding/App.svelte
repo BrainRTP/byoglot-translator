@@ -9,6 +9,7 @@
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
   import ProviderForm from "../../lib/ui/ProviderForm.svelte";
   import { type PairErrorKind, pairErrorView } from "../../lib/ui/pair-errors";
+  import { isAndroid } from "../../lib/ui/platform";
   import Segmented from "../../lib/ui/Segmented.svelte";
   import { applyTheme } from "../../lib/ui/theme";
 
@@ -19,6 +20,7 @@
 
   let lang = $state<"ru" | "en">(resolveLang());
   let kind = $state<"opencode" | "provider">("opencode");
+  let android = $state(false);
   let mode = $state<"link" | "manual">("link");
   let phase = $state<"idle" | "connecting" | "success">("idle");
   let link = $state("");
@@ -43,12 +45,15 @@
   };
 
   onMount(() => {
-    void sendMessage("globals", undefined).then((g) => {
+    void (async () => {
+      android = await isAndroid();
+      if (android) kind = "provider";
+      const g = await sendMessage("globals", undefined);
       changeUiLang(g.uiLang);
       applyTheme(document.documentElement, g.theme);
       lang = resolveLang();
       document.documentElement.lang = lang;
-    });
+    })();
   });
 
   async function pickLang(next: "ru" | "en") {
@@ -191,6 +196,7 @@
         </div>
       {:else}
         <div class="body">
+          {#if !android}
           <Segmented
             label={tr("conn.choice")}
             value={kind}
@@ -201,6 +207,7 @@
             ]}
             onchange={(next) => (kind = next)}
           />
+          {/if}
           {#if kind === "provider"}
             <ProviderForm onsave={saveProvider} ondone={providerSaved} />
           {:else}

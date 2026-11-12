@@ -23,9 +23,9 @@ export interface PageCallbacks {
 }
 
 type Limits = { maxBlocks: number; maxChars: number; concurrency: number };
-const DEFAULT_LIMITS: Limits = { maxBlocks: 25, maxChars: 4000, concurrency: 4 };
+export const DEFAULT_LIMITS: Limits = { maxBlocks: 25, maxChars: 4000, concurrency: 4 };
 
-const GENERATE_TIMEOUT_MS = 180_000;
+export const GENERATE_TIMEOUT_MS = 180_000;
 
 function toBackendError(error: unknown, signal: AbortSignal): BackendError {
   if (error instanceof BackendError) return error;

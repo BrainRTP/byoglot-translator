@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "format": {
+      "type": "string",
+      "const": "byoglot-export"
+    },
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "exportedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+    },
+    "globals": {
+      "type": "object",
+      "properties": {
+        "sourceLang": {
+          "type": "string"
+        },
+        "targetLang": {
+          "type": "string"
+        },
+        "languagePromptEnabled": {
+          "type": "boolean"
+        },
+        "languageProfile": {
+          "type": "string"
+        },
+        "defaultTemplateId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceLang",
+        "targetLang",
+        "languagePromptEnabled",
+        "languageProfile",
+        "defaultTemplateId"
+      ],
+      "additionalProperties": false
+    },
+    "templates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "builtin": {
+            "type": "boolean"
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "prePrompt": {
+                "type": "string"
+              },
+              "targetLang": {
+                "type": "string"
+              },
+              "displayMode": {
+                "type": "string",
+                "enum": [
+                  "replace",
+                  "bilingual"
+                ]
+              },
+              "visibleOnly": {
+                "type": "boolean"
+              },
+              "pageModel": {
+                "type": "object",
+                "properties": {
+                  "providerID": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "variant": {
+                    "type": "string"
+                  },
+                  "connectionId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "providerID",
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "selectionModel": {
+                "type": "object",
+                "properties": {
+                  "providerID": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "variant": {
+                    "type": "string"
+                  },
+                  "connectionId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "providerID",
+                  "id"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "builtin",
+          "settings"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "profileOverrides": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "base": {
+            "type": "string"
+          },
+          "savedAt": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "text",
+          "base",
+          "savedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "siteRules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "pattern": {
+            "type": "string"
+          },
+          "templateId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "pattern",
+          "templateId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "preset": {
+            "type": "string",
+            "enum": [
+              "deepseek",
+              "openrouter",
+              "ollama",
+              "lmstudio",
+              "custom"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "baseUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "preset",
+          "name",
+          "baseUrl"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "format",
+    "version",
+    "exportedAt",
+    "globals",
+    "templates",
+    "profileOverrides",
+    "siteRules",
+    "connections"
+  ],
+  "additionalProperties": false
+}

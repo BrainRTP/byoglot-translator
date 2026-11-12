@@ -1,0 +1,59 @@
+{
+  "format": "byoglot-export",
+  "version": 1,
+  "exportedAt": "2026-11-12T10:00:00.000Z",
+  "globals": {
+    "sourceLang": "auto",
+    "targetLang": "ru",
+    "languagePromptEnabled": true,
+    "languageProfile": "auto",
+    "defaultTemplateId": "builtin-default"
+  },
+  "templates": [
+    {
+      "id": "builtin-default",
+      "name": "Plain translation",
+      "builtin": true,
+      "settings": {
+        "prePrompt": "Translate naturally, preserving meaning, tone and context. Keep names, code, numbers and product names as they are."
+      }
+    },
+    {
+      "id": "study",
+      "name": "Study",
+      "builtin": false,
+      "settings": {
+        "targetLang": "de",
+        "displayMode": "bilingual",
+        "selectionModel": {
+          "providerID": "deepseek",
+          "id": "deepseek-flash",
+          "variant": "high",
+          "connectionId": "c1"
+        }
+      }
+    }
+  ],
+  "profileOverrides": {
+    "ru": {
+      "text": "Keep technical terms clear.",
+      "base": "Original rules.",
+      "savedAt": 1794477600000
+    }
+  },
+  "siteRules": [
+    {
+      "id": "r1",
+      "pattern": "*.example.com",
+      "templateId": "study"
+    }
+  ],
+  "connections": [
+    {
+      "id": "c1",
+      "preset": "deepseek",
+      "name": "DeepSeek",
+      "baseUrl": "https://api.deepseek.com"
+    }
+  ]
+}

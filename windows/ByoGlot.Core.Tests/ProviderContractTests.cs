@@ -79,6 +79,7 @@ public class ProviderContractTests
 
     [Theory]
     [InlineData("{\"data\":[{\"id\":false}]}")]
+    [InlineData("{\"data\":[{\"id\":\"m\",\"context_length\":1e400}]}")]
     [InlineData("{\"data\":[{\"id\":\"m\",\"effort\":null}]}")]
     [InlineData("{\"data\":[{\"id\":\"m\",\"supported_parameters\":[1]}]}")]
     public async Task InvalidModelMetadataIsIncompatible(string body)
@@ -98,4 +99,66 @@ public class ProviderContractTests
         var client = new ProviderClient(new("c", ProviderPreset.Custom, "", "http://localhost"), null, transport);
         Assert.Equal(ErrorKind.Offline, (await Assert.ThrowsAsync<BackendException>(() => client.ListModelsAsync(CancellationToken.None))).Kind);
     }
+    [Fact]
+    public async Task DuplicateChatKeysUseTheLastValue()
+    {
+        var transport = new RecordingTransport(RecordingTransport.JsonResponse("""{"choices":[],"choices":[{"message":{"content":"first","content":"last"}}]}"""));
+        var client = new ProviderClient(new("c", ProviderPreset.Custom, "", "http://localhost"), null, transport);
+        Assert.Equal("last", await client.GenerateAsync("prompt", new("custom", "m"), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task DuplicateErrorKeysUseTheLastMessage()
+    {
+        var transport = new RecordingTransport(RecordingTransport.JsonResponse("""{"error":{},"error":{"message":"first","message":"last"}}""", 500));
+        var client = new ProviderClient(new("c", ProviderPreset.Custom, "", "http://localhost"), null, transport);
+        var error = await Assert.ThrowsAsync<BackendException>(() => client.ListModelsAsync(CancellationToken.None));
+        Assert.Equal(ErrorKind.ProviderError, error.Kind);
+        Assert.Equal("last", error.Detail);
+    }
+
+    [Fact]
+    public async Task DuplicateModelKeysAndLargeTokenCountsAreHandled()
+    {
+        var transport = new RecordingTransport(RecordingTransport.JsonResponse("""{"data":[{"id":"first","id":"last","context_length":3000000000,"max_output_tokens":3000000000}]}"""));
+        var client = new ProviderClient(new("c", ProviderPreset.Custom, "", "http://localhost"), null, transport);
+        var model = Assert.Single(await client.ListModelsAsync(CancellationToken.None));
+        Assert.Equal("last", model.Id);
+        Assert.Equal(int.MaxValue, model.ContextLimit);
+        Assert.Equal(int.MaxValue, model.OutputLimit);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PublicCleartextIsRejectedBeforeTransport(bool generate)
+    {
+        var transport = new RecordingTransport();
+        var client = new ProviderClient(new("c", ProviderPreset.Ollama, "", "http://models.example.com/v1"), null, transport);
+        var error = generate
+            ? await Assert.ThrowsAsync<BackendException>(() => client.GenerateAsync("private text", new("ollama", "m"), CancellationToken.None))
+            : await Assert.ThrowsAsync<BackendException>(() => client.ListModelsAsync(CancellationToken.None));
+        Assert.Equal(ErrorKind.Offline, error.Kind);
+        Assert.Empty(transport.Calls);
+    }
+
+    [Theory]
+    [InlineData("http://localhost:8080/v1", false)]
+    [InlineData("http://127.0.0.1:8080/v1", false)]
+    [InlineData("http://127.0.0.2:8080/v1", true)]
+    [InlineData("http://192.168.1.5:8080/v1", true)]
+    [InlineData("http://[::1]:8080/v1", true)]
+    [InlineData("http://model.local:8080/v1", true)]
+    public void CustomKeyExemptionMatchesTypeScript(string url, bool expected) => Assert.Equal(expected, ProviderEffort.NeedsKey(ProviderPreset.Custom, url));
+
+    [Fact]
+    public async Task ChatBodyKeepsUnicodeAndPlainTextUnescaped()
+    {
+        var transport = new RecordingTransport();
+        var client = new ProviderClient(new("c", ProviderPreset.Custom, "", "http://localhost"), null, transport);
+        await client.GenerateAsync("Привет <>&'", new("custom", "m"), CancellationToken.None);
+        var body = System.Text.Encoding.UTF8.GetString(Assert.Single(transport.Calls).Request.Body!);
+        Assert.Contains("Привет <>&'", body);
+    }
+
 }

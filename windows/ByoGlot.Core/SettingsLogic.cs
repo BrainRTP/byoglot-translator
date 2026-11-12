@@ -11,7 +11,8 @@ public static class SettingsLogic
     public static AppSettings Merge(ExportFile file, AppSettings into)
     {
         var connections = into.Connections.ToDictionary(c => c.Id);
-        foreach (var c in file.Connections) connections.TryAdd(c.Id, new(c.Id, c.Preset, c.Name, c.BaseUrl));
+        foreach (var c in file.Connections)
+            if (Origins.IsAllowedEndpoint(c.BaseUrl)) connections.TryAdd(c.Id, new(c.Id, c.Preset, c.Name, Origins.NormalizeBaseUrl(c.BaseUrl)!));
         ModelRef? Clean(ModelRef? model) => model?.ConnectionId is { } id && connections.ContainsKey(id) ? model : null;
         Template CleanTemplate(Template t) => t with { Settings = t.Settings with { PageModel = Clean(t.Settings.PageModel), SelectionModel = Clean(t.Settings.SelectionModel) } };
         var templates = into.Templates.ToDictionary(t => t.Id);

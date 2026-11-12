@@ -34,9 +34,9 @@ public sealed class ConnectionEditor(ISettingsRepository settings, ISecretStore 
             try { key = await secrets.GetAsync(id, origin); }
             catch (OriginMismatchException) { throw new RunnerException(new RunnerError.KeyMissing()); }
         }
-        var connection = new Connection(id, draft.Preset, draft.Name.Trim(), draft.BaseUrl.TrimEnd('/'));
+        var connection = new Connection(id, draft.Preset, draft.Name.Trim(), Origins.NormalizeBaseUrl(draft.BaseUrl)!);
         var client = new ProviderClient(connection, key, transport);
-        var models = await client.ListModelsAsync(ct);
+        var models = await ListModelsAsync(client, ct);
         var defaultModel = connection.Preset == ProviderPreset.Deepseek ? models.FirstOrDefault(m => m.Id == "deepseek-flash") : models.FirstOrDefault();
         var initial = SettingsLogic.PickInitialModels(models, defaultModel, id);
         connection = connection with { PageModel = initial.Page, SelectionModel = initial.Selection };
@@ -61,15 +61,23 @@ public sealed class ConnectionEditor(ISettingsRepository settings, ISecretStore 
 
     public async Task<IReadOnlyList<ModelInfo>> ModelsAsync(string connectionId, CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
         var state = await settings.ReadAsync();
         var connection = state.Connections.FirstOrDefault(c => c.Id == connectionId) ?? throw new RunnerException(new RunnerError.NoConnection());
         var origin = Origins.OriginOf(connection.BaseUrl) ?? throw new ArgumentException(nameof(DraftProblem.BaseUrl));
+        if (!Origins.IsAllowedEndpoint(connection.BaseUrl)) throw new RunnerException(new RunnerError.Backend(new BackendException(ErrorKind.Offline)));
         if (!Origins.IsLocalHost(new Uri(origin).Host) && !state.ConsentedOrigins.Contains(origin)) throw new RunnerException(new RunnerError.ConsentNeeded(origin));
         string? key;
         try { key = await secrets.GetAsync(connectionId, origin); }
         catch (OriginMismatchException) { throw new RunnerException(new RunnerError.KeyMissing()); }
         if (ProviderEffort.NeedsKey(connection.Preset, connection.BaseUrl) && string.IsNullOrEmpty(key)) throw new RunnerException(new RunnerError.KeyMissing());
-        return await new ProviderClient(connection, key, transport).ListModelsAsync(ct);
+        return await ListModelsAsync(new ProviderClient(connection, key, transport), ct);
+    }
+
+    private static async Task<IReadOnlyList<ModelInfo>> ListModelsAsync(ProviderClient client, CancellationToken ct)
+    {
+        try { return await client.ListModelsAsync(ct); }
+        catch (BackendException e) when (e.Kind == ErrorKind.Aborted && ct.IsCancellationRequested) { throw new OperationCanceledException(ct); }
     }
 
     public Task<bool> KeyStateAsync(string connectionId) => secrets.HasAsync(connectionId);

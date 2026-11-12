@@ -15,23 +15,24 @@ public sealed class ProviderClient(Connection connection, string? secret, IHttpT
     public async Task<IReadOnlyList<ModelInfo>> ListModelsAsync(CancellationToken ct)
     {
         var root = await CallAsync("/models", null, TimeSpan.FromSeconds(30), ct);
-        if (root is not JsonObject || root["data"] is not JsonArray data) throw Shape();
+        if (root.ValueKind != JsonValueKind.Object || Field(root, "data").ValueKind != JsonValueKind.Array) throw Shape();
         var models = new List<ModelInfo>();
-        foreach (var raw in data)
+        foreach (var raw in Field(root, "data").EnumerateArray())
         {
-            if (raw is not JsonObject model || !IsString(model["id"])) throw Shape();
-            ValidateOptional(model, "name", IsString);
-            foreach (var field in new[] { "context_window", "context_length", "max_output_tokens" }) ValidateOptional(model, field, IsNumber);
-            ValidateOptional(model, "supported_parameters", IsStringArray);
-            if (model.TryGetPropertyValue("effort", out var effort))
+            if (raw.ValueKind != JsonValueKind.Object || !IsString(Field(raw, "id"))) throw Shape();
+            ValidateOptional(raw, "name", IsString);
+            foreach (var field in new[] { "context_window", "context_length", "max_output_tokens" }) ValidateOptional(raw, field, IsNumber);
+            ValidateOptional(raw, "supported_parameters", IsStringArray);
+            if (raw.TryGetProperty("effort", out var effort))
             {
-                if (effort is not JsonObject obj) throw Shape();
-                ValidateOptional(obj, "supported_levels", IsStringArray);
+                if (effort.ValueKind != JsonValueKind.Object) throw Shape();
+                ValidateOptional(effort, "supported_levels", IsStringArray);
             }
-            models.Add(new(connection.Preset.ToString().ToLowerInvariant(), model["id"]!.GetValue<string>(),
-                model["name"]?.GetValue<string>() ?? model["id"]!.GetValue<string>(),
-                ProviderEffort.Variants(connection.Preset, Strings(model["effort"]?["supported_levels"]), Strings(model["supported_parameters"])),
-                Number(model["context_window"] ?? model["context_length"]), Number(model["max_output_tokens"])));
+            var context = raw.TryGetProperty("context_window", out var window) ? window : Field(raw, "context_length");
+            models.Add(new(connection.Preset.ToString().ToLowerInvariant(), Field(raw, "id").GetString()!,
+                raw.TryGetProperty("name", out var name) ? name.GetString()! : Field(raw, "id").GetString()!,
+                ProviderEffort.Variants(connection.Preset, Strings(Field(effort, "supported_levels")), Strings(Field(raw, "supported_parameters"))),
+                Number(context), Number(Field(raw, "max_output_tokens"))));
         }
         return models;
     }
@@ -49,18 +50,22 @@ public sealed class ProviderClient(Connection connection, string? secret, IHttpT
         body["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["content"] = prompt });
         body["stream"] = false;
         var root = await CallAsync("/chat/completions", body, TimeSpan.FromMilliseconds(Contracts.Limits.GenerateTimeoutMs), ct);
-        if (root is not JsonObject || root["choices"] is not JsonArray choices) throw Shape();
-        foreach (var choice in choices)
+        if (root.ValueKind != JsonValueKind.Object || Field(root, "choices").ValueKind != JsonValueKind.Array) throw Shape();
+        var choices = Field(root, "choices");
+        foreach (var choice in choices.EnumerateArray())
         {
-            if (choice is not JsonObject || choice["message"] is not JsonObject message) throw Shape();
-            if (message["content"] is { } content && !IsString(content)) throw Shape();
+            if (choice.ValueKind != JsonValueKind.Object || Field(choice, "message").ValueKind != JsonValueKind.Object) throw Shape();
+            var content = Field(Field(choice, "message"), "content");
+            if (content.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null) && !IsString(content)) throw Shape();
         }
-        var text = choices.FirstOrDefault()?["message"]?["content"]?.GetValue<string>();
+        var first = choices.GetArrayLength() > 0 ? Field(Field(choices[0], "message"), "content") : default;
+        var text = first.ValueKind == JsonValueKind.String ? first.GetString() : null;
         return string.IsNullOrEmpty(text) ? throw new BackendException(ErrorKind.BadResponse, detail: "empty completion") : text;
     }
 
-    private async Task<JsonNode?> CallAsync(string path, JsonObject? body, TimeSpan timeout, CancellationToken ct)
+    private async Task<JsonElement> CallAsync(string path, JsonObject? body, TimeSpan timeout, CancellationToken ct)
     {
+        if (!Origins.IsAllowedEndpoint(connection.BaseUrl)) throw new BackendException(ErrorKind.Offline);
         var headers = new Dictionary<string, string>();
         if (!string.IsNullOrEmpty(secret)) headers["authorization"] = "Bearer " + secret;
         if (body is not null) headers["content-type"] = "application/json";
@@ -73,7 +78,11 @@ public sealed class ProviderClient(Connection connection, string? secret, IHttpT
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw new BackendException(ErrorKind.Aborted); }
         catch (TransportException) { throw new BackendException(ErrorKind.Offline); }
         if (response.Status is < 200 or >= 300) throw Failure(response);
-        try { return JsonNode.Parse(response.Body); }
+        try
+        {
+            using var document = JsonDocument.Parse(response.Body);
+            return document.RootElement.Clone();
+        }
         catch (JsonException) { throw new BackendException(ErrorKind.Incompatible, detail: "response is not JSON"); }
     }
 
@@ -82,8 +91,9 @@ public sealed class ProviderClient(Connection connection, string? secret, IHttpT
         string? detail = null;
         try
         {
-            var root = JsonNode.Parse(response.Body);
-            if (root is JsonObject && root["error"] is JsonObject error && IsString(error["message"])) detail = error["message"]!.GetValue<string>();
+            using var document = JsonDocument.Parse(response.Body);
+            var message = Field(Field(document.RootElement, "error"), "message");
+            if (IsString(message)) detail = message.GetString();
         }
         catch (JsonException) { }
         return response.Status switch
@@ -113,13 +123,14 @@ public sealed class ProviderClient(Connection connection, string? secret, IHttpT
     }
 
     private static BackendException Shape() => new(ErrorKind.Incompatible, detail: "unexpected response shape");
-    private static bool IsString(JsonNode? node) => node is JsonValue v && v.TryGetValue<string>(out _);
-    private static bool IsNumber(JsonNode? node) => node is JsonValue v && v.TryGetValue<double>(out _);
-    private static bool IsStringArray(JsonNode? node) => node is JsonArray array && array.All(IsString);
-    private static void ValidateOptional(JsonObject obj, string key, Func<JsonNode?, bool> valid)
+    private static JsonElement Field(JsonElement obj, string key) => obj.ValueKind == JsonValueKind.Object && obj.TryGetProperty(key, out var value) ? value : default;
+    private static bool IsString(JsonElement node) => node.ValueKind == JsonValueKind.String;
+    private static bool IsNumber(JsonElement node) => node.ValueKind == JsonValueKind.Number && node.TryGetDouble(out var number) && double.IsFinite(number);
+    private static bool IsStringArray(JsonElement node) => node.ValueKind == JsonValueKind.Array && node.EnumerateArray().All(IsString);
+    private static void ValidateOptional(JsonElement obj, string key, Func<JsonElement, bool> valid)
     {
-        if (obj.TryGetPropertyValue(key, out var node) && !valid(node)) throw Shape();
+        if (obj.TryGetProperty(key, out var node) && !valid(node)) throw Shape();
     }
-    private static string[]? Strings(JsonNode? node) => node?.AsArray().Select(n => n!.GetValue<string>()).ToArray();
-    private static int Number(JsonNode? node) => node is null ? 0 : checked((int)node.GetValue<double>());
+    private static string[]? Strings(JsonElement node) => node.ValueKind == JsonValueKind.Undefined ? null : node.EnumerateArray().Select(n => n.GetString()!).ToArray();
+    private static int Number(JsonElement node) => node.ValueKind == JsonValueKind.Undefined ? 0 : (int)Math.Clamp(node.GetDouble(), int.MinValue, int.MaxValue);
 }

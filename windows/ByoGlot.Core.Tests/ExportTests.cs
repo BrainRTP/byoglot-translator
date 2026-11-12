@@ -86,4 +86,40 @@ public class ExportTests
         }
         Assert.Throws<JsonException>(() => ExportFile.Decode(json.ToJsonString()));
     }
+    [Theory]
+    [InlineData("casing")]
+    [InlineData("version")]
+    [InlineData("savedAt")]
+    public void ImportRejectsCoercionsAcceptedByWebJsonDefaults(string change)
+    {
+        var json = JsonNode.Parse(Sample)!;
+        switch (change)
+        {
+            case "casing": json["FORMAT"] = json["format"]!.DeepClone(); json.AsObject().Remove("format"); break;
+            case "version": json["version"] = "1"; break;
+            case "savedAt": json["profileOverrides"]!["ru"]!["savedAt"] = "123"; break;
+        }
+        Assert.Throws<JsonException>(() => ExportFile.Decode(json.ToJsonString()));
+    }
+
+    [Theory]
+    [InlineData("broken")]
+    [InlineData("ftp://models.example.com")]
+    [InlineData("http://models.example.com/v1")]
+    public void MergeDropsInvalidOrInsecureImportedConnectionsAndTheirModels(string url)
+    {
+        var file = ExportFile.Decode(Sample);
+        file = file with { Connections = [new("c1", ProviderPreset.Ollama, "Imported", url)] };
+        var merged = SettingsLogic.Merge(file, AppSettings.Initial("en"));
+        Assert.Empty(merged.Connections);
+        Assert.Null(merged.Templates.Single(t => t.Id == "study").Settings.SelectionModel);
+    }
+
+    [Fact]
+    public void ExportKeepsUnicodeUnescaped()
+    {
+        var state = AppSettings.Initial("en") with { Templates = [new("ru", "Привет", false, new())] };
+        Assert.Contains("Привет", JsonSerializer.Serialize(SettingsLogic.Export(state, DateTimeOffset.UnixEpoch), CoreJson.Options));
+    }
+
 }

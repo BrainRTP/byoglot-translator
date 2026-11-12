@@ -61,12 +61,14 @@ public class TranslationRunnerTests
     }
 
     [Fact]
-    public async Task LocalNetworkNeedsNoConsentOrKey()
+    public async Task LocalNetworkNeedsNoConsentWithAStoredCustomKey()
     {
         var transport = new RecordingTransport();
-        var runner = new TranslationRunner(new InMemorySettingsRepository(Configured("http://192.168.1.5:11434/v1", ProviderPreset.Custom, false)), new InMemorySecretStore(), transport);
+        var secrets = new InMemorySecretStore();
+        await secrets.SetAsync("lan-key", "c", "http://192.168.1.5:11434");
+        var runner = new TranslationRunner(new InMemorySettingsRepository(Configured("http://192.168.1.5:11434/v1", ProviderPreset.Custom, false)), secrets, transport);
         Assert.Equal("translated", (await runner.TranslateAsync(new("hi", 5000), CancellationToken.None)).Text);
-        Assert.False(Assert.Single(transport.Calls).Request.Headers.ContainsKey("authorization"));
+        Assert.Equal("Bearer lan-key", Assert.Single(transport.Calls).Request.Headers["authorization"]);
     }
 
     [Fact]
@@ -115,4 +117,14 @@ public class TranslationRunnerTests
         Assert.Contains("USER INSTRUCTIONS:\nUse simple words.", prompt);
         Assert.Equal("fr", (await runner.TranslateAsync(new("hello", 5000, TemplateId: "study", TargetLang: "fr"), CancellationToken.None)).TargetLang);
     }
+    [Fact]
+    public async Task ConsentedPublicCleartextStillFailsBeforeTransport()
+    {
+        var transport = new RecordingTransport();
+        var runner = await Runner(Configured("http://models.example.com/v1", ProviderPreset.Ollama), transport);
+        var error = Assert.IsType<RunnerError.Backend>((await Assert.ThrowsAsync<RunnerException>(() => runner.TranslateAsync(new("private text", 5000), CancellationToken.None))).Error);
+        Assert.Equal(ErrorKind.Offline, error.Error.Kind);
+        Assert.Empty(transport.Calls);
+    }
+
 }

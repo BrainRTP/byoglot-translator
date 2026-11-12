@@ -21,7 +21,12 @@ public sealed record ExportFile(string Format, int Version, string ExportedAt, P
                 if (template.ValueKind == JsonValueKind.Object && template.TryGetProperty("settings", out var settings) && settings.ValueKind == JsonValueKind.Object
                     && settings.TryGetProperty("displayMode", out var mode) && (mode.ValueKind != JsonValueKind.String || mode.GetString() is not ("replace" or "bilingual")))
                     throw new JsonException("Unknown display mode.");
-        var options = new JsonSerializerOptions(CoreJson.Options) { UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
+        var options = new JsonSerializerOptions(CoreJson.Options)
+        {
+            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+            PropertyNameCaseInsensitive = false,
+            NumberHandling = JsonNumberHandling.Strict
+        };
         var file = JsonSerializer.Deserialize<ExportFile>(json, options) ?? throw new JsonException("Missing export.");
         if (file.Format != "byoglot-export" || file.Version != 1) throw new JsonException("Unsupported export format or version.");
         if (!Regex.IsMatch(file.ExportedAt, @"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z$", RegexOptions.CultureInvariant)

@@ -93,6 +93,12 @@ public class ConnectionEditorTests
     [InlineData("localhost", true)]
     [InlineData("127.99.3.2", true)]
     [InlineData("::1", true)]
+    [InlineData("fc00::1", true)]
+    [InlineData("fdff::1", true)]
+    [InlineData("fe80::1", true)]
+    [InlineData("febf::1", true)]
+    [InlineData("fec0::1", false)]
+    [InlineData("2001:db8::1", false)]
     [InlineData("10.2.3.4", true)]
     [InlineData("172.16.0.1", true)]
     [InlineData("172.31.255.255", true)]
@@ -106,4 +112,46 @@ public class ConnectionEditorTests
 
     [Fact]
     public void DraftToStringDoesNotExposeKey() => Assert.DoesNotContain("test-key", Draft().ToString());
+    [Theory]
+    [InlineData(" https://api.deepseek.com/v1 ", "https://api.deepseek.com/v1")]
+    [InlineData("https://api.deepseek.com/v1/?a=b#fragment", "https://api.deepseek.com/v1")]
+    public async Task SaveNormalizesTheEndpointBeforeCheckingAndStoring(string url, string expected)
+    {
+        var repository = new InMemorySettingsRepository(AppSettings.Initial("en"));
+        var transport = new RecordingTransport(RecordingTransport.JsonResponse(Models));
+        var editor = new ConnectionEditor(repository, new InMemorySecretStore(), transport);
+        var connection = await editor.SaveAsync(Draft(url), true, CancellationToken.None);
+        Assert.Equal(expected, connection.BaseUrl);
+        Assert.Equal(expected + "/models", Assert.Single(transport.Calls).Request.Url);
+        Assert.Equal(expected, Assert.Single((await repository.ReadAsync()).Connections).BaseUrl);
+    }
+
+    [Fact]
+    public async Task ModelsRefusesConsentedPublicCleartextBeforeTransport()
+    {
+        var transport = new RecordingTransport();
+        var editor = new ConnectionEditor(new InMemorySettingsRepository(TranslationRunnerTests.Configured("http://models.example.com/v1", ProviderPreset.Ollama)), new InMemorySecretStore(), transport);
+        var error = Assert.IsType<RunnerError.Backend>((await Assert.ThrowsAsync<RunnerException>(() => editor.ModelsAsync("c", CancellationToken.None))).Error);
+        Assert.Equal(ErrorKind.Offline, error.Error.Kind);
+        Assert.Empty(transport.Calls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CancelledModelChecksSurfaceAsOperationCanceled(bool save)
+    {
+        var initial = TranslationRunnerTests.Configured();
+        var repository = new InMemorySettingsRepository(initial);
+        var secrets = new InMemorySecretStore();
+        await secrets.SetAsync("old-key", "c", "https://api.deepseek.com");
+        using var cts = new CancellationTokenSource();
+        var transport = new RecordingTransport { Handler = (_, ct) => { cts.Cancel(); throw new OperationCanceledException(ct); } };
+        var editor = new ConnectionEditor(repository, secrets, transport);
+        if (save) await Assert.ThrowsAnyAsync<OperationCanceledException>(() => editor.SaveAsync(Draft(id: "c"), true, cts.Token));
+        else await Assert.ThrowsAnyAsync<OperationCanceledException>(() => editor.ModelsAsync("c", cts.Token));
+        Assert.Same(initial, await repository.ReadAsync());
+        Assert.Equal("old-key", await secrets.GetAsync("c", "https://api.deepseek.com"));
+    }
+
 }

@@ -21,12 +21,17 @@ public static class ProviderEffort
     };
 
     public static bool NeedsKey(ProviderPreset preset, string baseUrl) => preset == ProviderPreset.Custom
-        ? Origins.OriginOf(baseUrl) is not { } origin || !Origins.IsLocalHost(new Uri(origin).Host)
+        ? Origins.OriginOf(baseUrl) is not { } origin || new Uri(origin).Host is not ("localhost" or "127.0.0.1")
         : Contracts.Presets[preset].NeedsKey;
 }
 
 public static class Origins
 {
+    public static bool IsAllowedEndpoint(string baseUrl) => OriginOf(baseUrl) is { } origin
+        && (new Uri(origin).Scheme == "https" || IsLocalHost(new Uri(origin).Host));
+
+    public static string? NormalizeBaseUrl(string baseUrl) => OriginOf(baseUrl) is null ? null : new Uri(baseUrl).GetLeftPart(UriPartial.Path).TrimEnd('/');
+
     public static string? OriginOf(string baseUrl)
     {
         if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) || uri.Scheme is not ("https" or "http") || string.IsNullOrEmpty(uri.Host) || uri.UserInfo.Length > 0)
@@ -40,6 +45,8 @@ public static class Origins
         if (host == "localhost" || host.EndsWith(".local", StringComparison.Ordinal)) return true;
         if (!IPAddress.TryParse(host, out var address)) return false;
         if (address.Equals(IPAddress.IPv6Loopback)) return true;
+        if (address.AddressFamily == AddressFamily.InterNetworkV6)
+            return address.IsIPv6LinkLocal || (address.GetAddressBytes()[0] & 0xFE) == 0xFC;
         if (address.AddressFamily != AddressFamily.InterNetwork) return false;
         var bytes = address.GetAddressBytes();
         return bytes[0] is 127 or 10 || bytes[0] == 172 && bytes[1] is >= 16 and <= 31 || bytes[0] == 192 && bytes[1] == 168 || bytes[0] == 169 && bytes[1] == 254;

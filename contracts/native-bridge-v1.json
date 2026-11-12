@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "examples": [
+    {
+      "name": "ping",
+      "request": {
+        "v": 1,
+        "type": "ping"
+      },
+      "reply": {
+        "ok": true,
+        "version": 1
+      }
+    },
+    {
+      "name": "setSecret",
+      "request": {
+        "v": 1,
+        "type": "setSecret",
+        "connectionId": "c1",
+        "origin": "https://api.deepseek.com",
+        "secret": "fixture-key"
+      },
+      "reply": {
+        "ok": true
+      }
+    },
+    {
+      "name": "deleteSecret",
+      "request": {
+        "v": 1,
+        "type": "deleteSecret",
+        "connectionId": "c1"
+      },
+      "reply": {
+        "ok": true
+      }
+    },
+    {
+      "name": "hasSecret",
+      "request": {
+        "v": 1,
+        "type": "hasSecret",
+        "connectionId": "c1"
+      },
+      "reply": {
+        "ok": true,
+        "has": true
+      }
+    },
+    {
+      "name": "fetch",
+      "request": {
+        "v": 1,
+        "type": "fetch",
+        "id": "fetch-1",
+        "connectionId": "c1",
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{}",
+        "timeoutMs": 180000
+      },
+      "reply": {
+        "ok": true,
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"choices\":[]}"
+      }
+    },
+    {
+      "name": "cancel",
+      "request": {
+        "v": 1,
+        "type": "cancel",
+        "id": "fetch-1"
+      },
+      "reply": {
+        "ok": true
+      }
+    },
+    {
+      "name": "bad_request",
+      "request": {
+        "v": 1,
+        "type": "unknown"
+      },
+      "reply": {
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "name": "unsupported_version",
+      "request": {
+        "v": 2,
+        "type": "ping"
+      },
+      "reply": {
+        "ok": false,
+        "error": "unsupported_version"
+      }
+    },
+    {
+      "name": "origin_mismatch",
+      "request": {
+        "v": 1,
+        "type": "fetch",
+        "id": "mismatch-1",
+        "connectionId": "c1",
+        "method": "POST",
+        "url": "https://evil.example/chat/completions",
+        "headers": {},
+        "timeoutMs": 180000
+      },
+      "reply": {
+        "ok": false,
+        "error": "origin_mismatch"
+      }
+    },
+    {
+      "name": "offline",
+      "request": {
+        "v": 1,
+        "type": "fetch",
+        "id": "offline-1",
+        "connectionId": "c1",
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "headers": {},
+        "timeoutMs": 180000
+      },
+      "reply": {
+        "ok": false,
+        "error": "offline"
+      }
+    },
+    {
+      "name": "timeout",
+      "request": {
+        "v": 1,
+        "type": "fetch",
+        "id": "timeout-1",
+        "connectionId": "c1",
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "headers": {},
+        "timeoutMs": 180000
+      },
+      "reply": {
+        "ok": false,
+        "error": "timeout"
+      }
+    },
+    {
+      "name": "aborted",
+      "request": {
+        "v": 1,
+        "type": "fetch",
+        "id": "aborted-1",
+        "connectionId": "c1",
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "headers": {},
+        "timeoutMs": 180000
+      },
+      "reply": {
+        "ok": false,
+        "error": "aborted"
+      }
+    },
+    {
+      "name": "keychain",
+      "request": {
+        "v": 1,
+        "type": "hasSecret",
+        "connectionId": "locked"
+      },
+      "reply": {
+        "ok": false,
+        "error": "keychain"
+      }
+    }
+  ]
+}

@@ -4,39 +4,43 @@ import { sendTabMessage } from "../messaging/protocol";
 export const SELECTION_MENU_ID = "byoglot-translate-selection";
 
 export function registerCommands(): void {
-  browser.commands.onCommand.addListener(async (command) => {
-    if (
-      command !== "translate-page" &&
-      command !== "translate-selection" &&
-      command !== "insert-selection"
-    )
-      return;
-    try {
-      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-      if (tab?.id === undefined) return;
-      if (command === "translate-page") await sendTabMessage("pageCommand", "toggle", tab.id);
-      else if (command === "insert-selection") {
-        await sendTabMessage("selectionInsertCommand", undefined, tab.id);
-      } else await sendTabMessage("selectionCommand", undefined, tab.id);
-    } catch {}
-  });
-
-  browser.runtime.onInstalled.addListener(async () => {
-    await browser.contextMenus.removeAll();
-    browser.contextMenus.create({
-      id: SELECTION_MENU_ID,
-      title: browser.i18n.getMessage("contextTranslateSelection"),
-      contexts: ["selection"],
+  if (browser.commands) {
+    browser.commands.onCommand.addListener(async (command) => {
+      if (
+        command !== "translate-page" &&
+        command !== "translate-selection" &&
+        command !== "insert-selection"
+      )
+        return;
+      try {
+        const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id === undefined) return;
+        if (command === "translate-page") await sendTabMessage("pageCommand", "toggle", tab.id);
+        else if (command === "insert-selection") {
+          await sendTabMessage("selectionInsertCommand", undefined, tab.id);
+        } else await sendTabMessage("selectionCommand", undefined, tab.id);
+      } catch {}
     });
-  });
+  }
 
-  browser.contextMenus.onClicked.addListener(async (info, tab) => {
-    if (info.menuItemId !== SELECTION_MENU_ID || tab?.id === undefined) return;
-    try {
-      await sendTabMessage("selectionCommand", undefined, {
-        tabId: tab.id,
-        ...(info.frameId !== undefined && { frameId: info.frameId }),
+  if (browser.contextMenus) {
+    browser.runtime.onInstalled.addListener(async () => {
+      await browser.contextMenus.removeAll();
+      browser.contextMenus.create({
+        id: SELECTION_MENU_ID,
+        title: browser.i18n.getMessage("contextTranslateSelection"),
+        contexts: ["selection"],
       });
-    } catch {}
-  });
+    });
+
+    browser.contextMenus.onClicked.addListener(async (info, tab) => {
+      if (info.menuItemId !== SELECTION_MENU_ID || tab?.id === undefined) return;
+      try {
+        await sendTabMessage("selectionCommand", undefined, {
+          tabId: tab.id,
+          ...(info.frameId !== undefined && { frameId: info.frameId }),
+        });
+      } catch {}
+    });
+  }
 }

@@ -10,6 +10,8 @@ describe("registerCommands", () => {
   let sendMessage: ReturnType<typeof vi.fn>;
   const create = vi.fn();
   const removeAll = vi.fn(async () => {});
+  const commands = fakeBrowser.commands;
+  const contextMenus = fakeBrowser.contextMenus;
 
   beforeEach(() => {
     fakeBrowser.reset();
@@ -31,6 +33,7 @@ describe("registerCommands", () => {
   });
 
   afterEach(() => {
+    Object.assign(fakeBrowser, { commands, contextMenus });
     vi.restoreAllMocks();
   });
 
@@ -41,6 +44,23 @@ describe("registerCommands", () => {
       data: message.data,
       options,
     }));
+
+  it("registers nothing and does not throw when commands and contextMenus are missing", () => {
+    const onInstalled = vi.spyOn(fakeBrowser.runtime.onInstalled, "addListener");
+    fakeBrowser.commands = undefined as never;
+    fakeBrowser.contextMenus = undefined as never;
+    expect(() => registerCommands()).not.toThrow();
+    expect(onInstalled).not.toHaveBeenCalled();
+  });
+
+  it("still registers the context menu when only commands is missing", () => {
+    const onInstalled = vi.spyOn(fakeBrowser.runtime.onInstalled, "addListener");
+    vi.mocked(fakeBrowser.contextMenus.onClicked.addListener).mockClear();
+    fakeBrowser.commands = undefined as never;
+    registerCommands();
+    expect(onInstalled).toHaveBeenCalledTimes(1);
+    expect(fakeBrowser.contextMenus.onClicked.addListener).toHaveBeenCalledTimes(1);
+  });
 
   it("translate-page toggles the page in the active tab", async () => {
     await (onCommand as (c: string) => Promise<void>)("translate-page");

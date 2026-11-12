@@ -170,8 +170,8 @@
   async function load() {
     loadFailed = false;
     try {
-      android = await isAndroid();
-      const [g, tpl, rl, cache, prof, conns] = await Promise.all([
+      const [mobile, g, tpl, rl, cache, prof, conns] = await Promise.all([
+        isAndroid(),
         sendMessage("globals", undefined),
         sendMessage("templates", undefined),
         sendMessage("rules", undefined),
@@ -179,6 +179,7 @@
         sendMessage("languageProfiles", undefined),
         sendMessage("connections", undefined),
       ]);
+      android = mobile;
       connections = conns;
       globals = g;
       templates = tpl;
@@ -677,7 +678,7 @@
             </label>
           </section>
 
-          <section class="sec" id="cache">
+          <section class="sec" class:last={android} id="cache">
             {@render heading("cache", flags.cache)}
             <p class="lead mu">{tr("opt.cache.lead")}</p>
             <div class="box conn gap">

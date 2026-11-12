@@ -21,6 +21,7 @@
   let lang = $state<"ru" | "en">(resolveLang());
   let kind = $state<"opencode" | "provider">("opencode");
   let android = $state(false);
+  let platformKnown = $state(false);
   let mode = $state<"link" | "manual">("link");
   let phase = $state<"idle" | "connecting" | "success">("idle");
   let link = $state("");
@@ -45,15 +46,15 @@
   };
 
   onMount(() => {
-    void (async () => {
-      android = await isAndroid();
+    void Promise.all([isAndroid(), sendMessage("globals", undefined)]).then(([mobile, g]) => {
+      android = mobile;
       if (android) kind = "provider";
-      const g = await sendMessage("globals", undefined);
       changeUiLang(g.uiLang);
       applyTheme(document.documentElement, g.theme);
       lang = resolveLang();
       document.documentElement.lang = lang;
-    })();
+      platformKnown = true;
+    });
   });
 
   async function pickLang(next: "ru" | "en") {
@@ -177,6 +178,7 @@
     />
   </header>
 
+  {#if platformKnown}
   <main>
     <div class="col">
       <div class="intro">
@@ -289,6 +291,7 @@
   </main>
 
   <footer>{tr(kind === "provider" ? "onboarding.footerProvider" : "onboarding.footer")}</footer>
+  {/if}
 </div>
 
 {#snippet alert(f: Failure)}

@@ -42,6 +42,11 @@ export function buildPagePrompt(i: {
   ].join("\n\n");
 }
 
+const FORM_RULE =
+  "The TEXT can be a single word, a phrase, a sentence or a paragraph. Translate exactly this fragment and keep its form: a term stays a term, a phrase stays a phrase, a sentence stays a sentence. Start with a lowercase letter unless the fragment starts a sentence or is a name.";
+const OUTPUT_RULE =
+  "The answer is shown to a human as plain text or simple markdown. Do not wrap it in JSON or code fences, do not repeat the source text and do not add notes unless the user instructions ask for them. The user instructions below control wording, style and any extra explanations.";
+
 export function buildSelectionPrompt(i: {
   prePrompt: string;
   languagePrompt: string;
@@ -55,14 +60,44 @@ export function buildSelectionPrompt(i: {
     [
       "You are a translation assistant inside a browser extension.",
       `A reader selected the TEXT below on a web page and wants to understand it. Translate the TEXT from ${languageName(i.sourceLang)} to ${languageName(i.targetLang)}.`,
-      "The TEXT can be a single word, a phrase, a sentence or a paragraph. Translate exactly this fragment and keep its form: a term stays a term, a phrase stays a phrase, a sentence stays a sentence. Start with a lowercase letter unless the fragment starts a sentence or is a name.",
+      FORM_RULE,
       "CONTEXT is the text around the selection. Do not translate it, but use it to pick the meaning that fits this page, especially for short terms.",
-      "The answer is shown to a human as plain text or simple markdown. Do not wrap it in JSON or code fences, do not repeat the source text and do not add notes unless the user instructions ask for them. The user instructions below control wording, style and any extra explanations.",
+      OUTPUT_RULE,
     ].join("\n"),
     ...languageBlock(i.languagePrompt),
     userInstructions(i.prePrompt),
     `The text comes from a page on ${i.hostname}.`,
     `CONTEXT (do not translate):\n${i.context}`,
+    `TEXT:\n${i.text}`,
+  ].join("\n\n");
+}
+
+export function buildTextPrompt(i: {
+  prePrompt: string;
+  languagePrompt: string;
+  sourceLang: string;
+  targetLang: string;
+  text: string;
+  context: string;
+  appName: string;
+}): string {
+  const hasContext = i.context.trim().length > 0;
+  return [
+    [
+      "You are a translation assistant.",
+      `A reader selected the TEXT below and wants to understand it. Translate the TEXT from ${languageName(i.sourceLang)} to ${languageName(i.targetLang)}.`,
+      FORM_RULE,
+      ...(hasContext
+        ? [
+            "CONTEXT is the text around the selection. Do not translate it, but use it to pick the meaning that fits, especially for short terms.",
+          ]
+        : []),
+      OUTPUT_RULE,
+    ].join("\n"),
+    ...languageBlock(i.languagePrompt),
+    userInstructions(i.prePrompt),
+    ...(i.appName.trim() ? [`The text comes from the app ${i.appName.trim()}.`] : []),
+    ...(hasContext ? [`CONTEXT (do not translate):\n${i.context}`] : []),
     `TEXT:\n${i.text}`,
   ].join("\n\n");
 }

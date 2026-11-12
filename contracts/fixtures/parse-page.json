@@ -1,0 +1,240 @@
+{
+  "contract": "parse-page",
+  "version": 1,
+  "cases": [
+    {
+      "name": "clean object",
+      "input": {
+        "raw": "{\"1\":\"Привет\",\"2\":\"Мир\"}",
+        "expected": {
+          "1": "Hello",
+          "2": "World"
+        }
+      },
+      "expected": {
+        "ok": {
+          "1": "Привет",
+          "2": "Мир"
+        },
+        "failed": []
+      }
+    },
+    {
+      "name": "object inside a json code fence",
+      "input": {
+        "raw": "```json\n{\"1\":\"Привет\",\"2\":\"Мир\"}\n```",
+        "expected": {
+          "1": "Hello",
+          "2": "World"
+        }
+      },
+      "expected": {
+        "ok": {
+          "1": "Привет",
+          "2": "Мир"
+        },
+        "failed": []
+      }
+    },
+    {
+      "name": "text before and after the object",
+      "input": {
+        "raw": "Here is the answer:\n{\"1\":\"Привет\",\"2\":\"Мир\"}\nDone.",
+        "expected": {
+          "1": "Hello",
+          "2": "World"
+        }
+      },
+      "expected": {
+        "ok": {
+          "1": "Привет",
+          "2": "Мир"
+        },
+        "failed": []
+      }
+    },
+    {
+      "name": "two objects, the first is not valid JSON",
+      "input": {
+        "raw": "{not JSON}\n{\"1\":\"Привет\",\"2\":\"Мир\"}",
+        "expected": {
+          "1": "Hello",
+          "2": "World"
+        }
+      },
+      "expected": {
+        "ok": {
+          "1": "Привет",
+          "2": "Мир"
+        },
+        "failed": []
+      }
+    },
+    {
+      "name": "nested braces inside a string value",
+      "input": {
+        "raw": "{\"1\":\"{Привет {мир}}\",\"2\":\"Мир\"}",
+        "expected": {
+          "1": "Hello",
+          "2": "World"
+        }
+      },
+      "expected": {
+        "ok": {
+          "1": "{Привет {мир}}",
+          "2": "Мир"
+        },
+        "failed": []
+      }
+    },
+    {
+      "name": "escaped quote inside a value",
+      "input": {
+        "raw": "{\"1\":\"Сказал \\\"привет\\\"\",\"2\":\"Мир\"}",
+        "expected": {
+          "1": "Hello",
+          "2": "World"
+        }
+      },
+      "expected": {
+        "ok": {
+          "1": "Сказал \"привет\"",
+          "2": "Мир"
+        },
+        "failed": []
+      }
+    },
+    {
+      "name": "missing id",
+      "input": {
+        "raw": "{\"1\":\"Привет\"}",
+        "expected": {
+          "1": "Hello",
+          "2": "World"
+        }
+      },
+      "expected": {
+        "ok": {
+          "1": "Привет"
+        },
+        "failed": [
+          "2"
+        ]
+      }
+    },
+    {
+      "name": "value is a number",
+      "input": {
+        "raw": "{\"1\":42,\"2\":\"Мир\"}",
+        "expected": {
+          "1": "Hello",
+          "2": "World"
+        }
+      },
+      "expected": {
+        "ok": {
+          "2": "Мир"
+        },
+        "failed": [
+          "1"
+        ]
+      }
+    },
+    {
+      "name": "dropped placeholder",
+      "input": {
+        "raw": "{\"1\":\"Читайте документы\"}",
+        "expected": {
+          "1": "Read <x1>docs</x1>"
+        }
+      },
+      "expected": {
+        "ok": {},
+        "failed": [
+          "1"
+        ]
+      }
+    },
+    {
+      "name": "renumbered placeholder",
+      "input": {
+        "raw": "{\"1\":\"Читайте <x2>документы</x2>\"}",
+        "expected": {
+          "1": "Read <x1>docs</x1>"
+        }
+      },
+      "expected": {
+        "ok": {},
+        "failed": [
+          "1"
+        ]
+      }
+    },
+    {
+      "name": "reordered placeholders",
+      "input": {
+        "raw": "{\"1\":\"<x2/> <x1>а</x1>\"}",
+        "expected": {
+          "1": "<x1>a</x1> <x2/>"
+        }
+      },
+      "expected": {
+        "ok": {
+          "1": "<x2/> <x1>а</x1>"
+        },
+        "failed": []
+      }
+    },
+    {
+      "name": "no object at all",
+      "input": {
+        "raw": "No translation available.",
+        "expected": {
+          "1": "Hello",
+          "2": "World"
+        }
+      },
+      "expected": {
+        "ok": {},
+        "failed": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "name": "top-level array",
+      "input": {
+        "raw": "[\"Привет\",\"Мир\"]",
+        "expected": {
+          "1": "Hello",
+          "2": "World"
+        }
+      },
+      "expected": {
+        "ok": {},
+        "failed": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "name": "extra ids are ignored",
+      "input": {
+        "raw": "{\"1\":\"Привет\",\"2\":\"Мир\",\"10\":\"Лишнее\"}",
+        "expected": {
+          "1": "Hello",
+          "2": "World"
+        }
+      },
+      "expected": {
+        "ok": {
+          "1": "Привет",
+          "2": "Мир"
+        },
+        "failed": []
+      }
+    }
+  ]
+}

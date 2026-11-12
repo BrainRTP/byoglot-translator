@@ -22,7 +22,7 @@ export interface PageCallbacks {
   onFatal(e: BackendError): void;
 }
 
-type Limits = { maxBlocks: number; maxChars: number; concurrency: number };
+export type Limits = { maxBlocks: number; maxChars: number; concurrency: number };
 export const DEFAULT_LIMITS: Limits = { maxBlocks: 25, maxChars: 4000, concurrency: 4 };
 
 export const GENERATE_TIMEOUT_MS = 180_000;
@@ -39,7 +39,7 @@ function toBackendError(error: unknown, signal: AbortSignal): BackendError {
   });
 }
 
-function packBatches(segments: Segment[], limits: Limits): Segment[][] {
+export function packBatches(segments: Segment[], limits: Limits): Segment[][] {
   const batches: Segment[][] = [];
   let current: Segment[] = [];
   let chars = 0;

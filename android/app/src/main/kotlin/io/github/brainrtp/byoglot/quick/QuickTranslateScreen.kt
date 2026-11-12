@@ -30,7 +30,7 @@ fun QuickTranslateScreen(
                 Box {
                     TextButton(onClick = { menu = true }) { Text(stringResource(R.string.template)) }
                     DropdownMenu(menu, { menu = false }) {
-                        templates.forEach { template -> DropdownMenuItem(text = { Text(template.name) }, onClick = { menu = false; onTemplate(template.id) }) }
+                        templates.forEach { template -> DropdownMenuItem(text = { Text(templateLabel(template)) }, onClick = { menu = false; onTemplate(template.id) }) }
                     }
                 }
                 when (state) {

@@ -7,7 +7,7 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material3.MaterialTheme
+import io.github.brainrtp.byoglot.ui.ByoglotTheme
 import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -36,9 +36,13 @@ class QuickTranslateActivity : ComponentActivity() {
         setContent {
             val state by vm.state.collectAsState()
             val templates by produceState(emptyList<io.github.brainrtp.byoglot.core.Template>()) { value = container.settings.read().templates }
-            MaterialTheme {
+            ByoglotTheme {
                 QuickTranslateScreen(request, state, templates, vm::useTemplate, vm::retry,
-                    onCopy = { getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText(getString(R.string.app_name), it)) },
+                    onCopy = {
+                        val clip = ClipData.newPlainText(getString(R.string.app_name), it)
+                        clip.description.extras = android.os.PersistableBundle().apply { putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true) }
+                        getSystemService(ClipboardManager::class.java).setPrimaryClip(clip)
+                    },
                     onReplace = { setResult(RESULT_OK, Intent().putExtra(Intent.EXTRA_PROCESS_TEXT, it)); finish() },
                     onOpen = { destination ->
                         startActivity(Intent(this, MainActivity::class.java).putExtra(Intent.EXTRA_TEXT, request.text).putExtra("destination", destination))

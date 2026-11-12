@@ -88,8 +88,10 @@ class HttpEngineTransport(context: Context) : HttpTransport {
                             }, executor)
                         }
                         val urlRequest = builder.build()
-                        continuation.invokeOnCancellation { urlRequest.cancel() }
-                        if (continuation.isActive) urlRequest.start()
+                        synchronized(urlRequest) {
+                            continuation.invokeOnCancellation { synchronized(urlRequest) { urlRequest.cancel() } }
+                            if (continuation.isActive) urlRequest.start()
+                        }
                     } catch (_: Exception) { fail(TransportException.Reason.Offline) }
                 }
             }

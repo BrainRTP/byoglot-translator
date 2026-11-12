@@ -17,7 +17,11 @@ class QuickTranslateViewModelTest {
     }
     @Test fun too_long_text_fails_without_calling_the_provider() = runTest {
         var calls = 0
-        val vm = QuickTranslateViewModel({ calls++; output() }, request.copy(text = "x".repeat(5001)), backgroundScope)
+        val transport = object : HttpTransport {
+            override suspend fun send(request: HttpRequest, timeoutMs: Long): HttpResponse { calls++; error("Unexpected provider call") }
+        }
+        val runner = TranslationRunner(InMemorySettingsRepository(AppSettings.initial("en")), InMemorySecretStore(), transport)
+        val vm = QuickTranslateViewModel(runner, request.copy(text = "x".repeat(5001)), backgroundScope)
         runCurrent(); assertEquals(0, calls); assertEquals(RunnerError.TooLong(5000), (vm.state.value as QuickUiState.Failed).error)
     }
     @Test fun retry_after_a_failure_calls_the_runner_again() = runTest {

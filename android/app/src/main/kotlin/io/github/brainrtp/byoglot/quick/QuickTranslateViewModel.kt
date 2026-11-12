@@ -44,7 +44,6 @@ class QuickTranslateViewModel internal constructor(
         mutableState.value = QuickUiState.Loading
         job = workScope.launch {
             val result = try {
-                if (request.text.trim().length > EXTERNAL_INPUT_LIMIT) throw RunnerException(RunnerError.TooLong(EXTERNAL_INPUT_LIMIT))
                 QuickUiState.Done(translate(RunnerInput(request.text, templateId = templateId, limit = EXTERNAL_INPUT_LIMIT)))
             } catch (e: CancellationException) { throw e }
             catch (e: RunnerException) { QuickUiState.Failed(e.error) }

@@ -13,8 +13,12 @@ sealed interface RunnerError {
     data class Backend(val error: BackendException) : RunnerError
 }
 class RunnerException(val error: RunnerError) : Exception()
-data class RunnerInput(val text: String, val context: String = "", val appName: String = "", val templateId: String? = null, val targetLang: String? = null, val limit: Int)
-data class RunnerOutput(val text: String, val sourceLang: String, val targetLang: String, val model: ModelRef)
+data class RunnerInput(val text: String, val context: String = "", val appName: String = "", val templateId: String? = null, val targetLang: String? = null, val limit: Int) {
+    override fun toString(): String = "RunnerInput(textLength=${text.length}, contextLength=${context.length}, limit=$limit)"
+}
+data class RunnerOutput(val text: String, val sourceLang: String, val targetLang: String, val model: ModelRef) {
+    override fun toString(): String = "RunnerOutput(textLength=${text.length})"
+}
 const val EXTERNAL_INPUT_LIMIT = 5000
 const val EDITOR_INPUT_LIMIT = 20000
 
@@ -24,7 +28,7 @@ class TranslationRunner(private val settings: SettingsRepository, private val se
     private var clientState: ClientState? = null
 
     suspend fun translate(input: RunnerInput): RunnerOutput {
-        val text = input.text.trim()
+        val text = input.text.jsTrim()
         if (text.isEmpty()) throw RunnerException(RunnerError.Empty)
         if (text.length > input.limit) throw RunnerException(RunnerError.TooLong(input.limit))
         val state = settings.read()

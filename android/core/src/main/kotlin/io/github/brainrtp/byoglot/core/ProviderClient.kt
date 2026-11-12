@@ -103,7 +103,7 @@ class ProviderClient(
     }
 
     private fun retryAfter(header: String?): Long? {
-        val value = header?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        val value = header?.jsTrim()?.takeIf { it.isNotEmpty() } ?: return null
         if (value.matches(Regex("[0-9]+(?:\\.[0-9]+)?"))) {
             val ms = floor((value.toDoubleOrNull() ?: return null) * 1000 + 0.5)
             return if (ms.isFinite() && ms < Long.MAX_VALUE.toDouble()) ms.toLong() else null
@@ -128,6 +128,8 @@ class ProviderClient(
     private fun JsonObject.optionalStrings(key: String): List<String>? = get(key)?.jsonArray?.map { it.stringValue() }
     private fun JsonObject.optionalInt(key: String): Int? = get(key)?.let {
         require(it is JsonPrimitive && !it.isString)
-        it.intOrNull ?: throw IllegalArgumentException()
+        val number = it.doubleOrNull ?: throw IllegalArgumentException()
+        require(number.isFinite())
+        number.toLong().coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
     }
 }

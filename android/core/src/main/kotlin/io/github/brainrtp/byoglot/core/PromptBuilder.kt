@@ -3,11 +3,13 @@ package io.github.brainrtp.byoglot.core
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class TextPromptInput(val prePrompt: String, val languagePrompt: String, val sourceLang: String, val targetLang: String, val text: String, val context: String, val appName: String)
+data class TextPromptInput(val prePrompt: String, val languagePrompt: String, val sourceLang: String, val targetLang: String, val text: String, val context: String, val appName: String) {
+    override fun toString(): String = "TextPromptInput(textLength=${text.length}, contextLength=${context.length}, prePromptLength=${prePrompt.length}, languagePromptLength=${languagePrompt.length})"
+}
 
 object PromptBuilder {
     fun text(i: TextPromptInput): String {
-        val hasContext = i.context.trim().isNotEmpty()
+        val hasContext = i.context.jsTrim().isNotEmpty()
         val rules = buildList {
             add("You are a translation assistant.")
             add("A reader selected the TEXT below and wants to understand it. Translate the TEXT from ${Contracts.languageName(i.sourceLang)} to ${Contracts.languageName(i.targetLang)}.")
@@ -17,9 +19,9 @@ object PromptBuilder {
         }
         return buildList {
             add(rules.joinToString("\n"))
-            if (i.languagePrompt.trim().isNotEmpty()) add("LANGUAGE STYLE (the user instructions below override it):\n${i.languagePrompt.trim()}")
-            add("USER INSTRUCTIONS:\n${i.prePrompt.trim().ifEmpty { "(none)" }}")
-            if (i.appName.trim().isNotEmpty()) add("The text comes from the app ${i.appName.trim()}.")
+            if (i.languagePrompt.jsTrim().isNotEmpty()) add("LANGUAGE STYLE (the user instructions below override it):\n${i.languagePrompt.jsTrim()}")
+            add("USER INSTRUCTIONS:\n${i.prePrompt.jsTrim().ifEmpty { "(none)" }}")
+            if (i.appName.jsTrim().isNotEmpty()) add("The text comes from the app ${i.appName.jsTrim()}.")
             if (hasContext) add("CONTEXT (do not translate):\n${i.context}")
             add("TEXT:\n${i.text}")
         }.joinToString("\n\n")

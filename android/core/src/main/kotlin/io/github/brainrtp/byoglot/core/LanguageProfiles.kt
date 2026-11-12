@@ -12,6 +12,6 @@ object LanguageProfiles {
         val id = if (choice in builtins) choice else if (primary in builtins) primary else Contracts.GENERIC_PROFILE
         val builtin = builtins[id] ?: ""
         val override = overrides[id]
-        return if (override != null && override.text.trim() != builtin.trim()) override.text else builtin
+        return if (override != null && override.text.jsTrim() != builtin.jsTrim()) override.text else builtin
     }
 }

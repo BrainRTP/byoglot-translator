@@ -32,7 +32,7 @@ object Contracts {
     val builtinTemplate: Template by lazy { coreJson.decodeFromString<Template>(resource("contracts/builtin-template.json")) }
     val builtinProfiles: Map<String, String> by lazy {
         (listOf(GENERIC_PROFILE) + languageCodes).distinct().mapNotNull { id ->
-            javaClass.getResourceAsStream("/profiles/$id.md")?.bufferedReader()?.use { id to it.readText().trim() }
+            javaClass.getResourceAsStream("/profiles/$id.md")?.bufferedReader()?.use { id to it.readText().jsTrim() }
         }.toMap().also { check(GENERIC_PROFILE in it) { "Missing resource: profiles/generic.md" } }
     }
 }

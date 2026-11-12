@@ -2,6 +2,7 @@ package io.github.brainrtp.byoglot.core
 
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 
@@ -10,7 +11,7 @@ class TranslatorTest {
 
     @Test fun `trims the answer and builds the text prompt`() = runBlocking<Unit> {
         var prompt = ""
-        val translator = Translator({ TextGenerator { p, m -> prompt = p; assertEquals(request.model, m); "  translated \n" } })
+        val translator = Translator({ TextGenerator { p, m -> prompt = p; assertEquals(request.model, m); "\uFEFF  translated \n\uFEFF" } })
         assertEquals("translated", translator.translate(request))
         assertEquals(PromptBuilder.text(TextPromptInput("brief", "style", "en", "ru", "hello", "surroundings", "Example")), prompt)
     }
@@ -52,4 +53,20 @@ class TranslatorTest {
         job.cancel()
         assertInstanceOf(CancellationException::class.java, runCatching { job.await() }.exceptionOrNull())
     }
+    @Test fun `cached results return while every generation permit is busy`() = runBlocking<Unit> {
+        val entered = Channel<Unit>(Contracts.limits.concurrency)
+        val release = CompletableDeferred<Unit>()
+        val translator = Translator({ TextGenerator { prompt, _ ->
+            if (!prompt.endsWith("TEXT:\nhello")) { entered.send(Unit); release.await() }
+            "result"
+        } })
+        translator.translate(request)
+        val busy = (1..Contracts.limits.concurrency).map { async { translator.translate(request.copy(text = "busy $it")) } }
+        repeat(Contracts.limits.concurrency) { entered.receive() }
+        try {
+            assertEquals("result", withTimeout(1000) { translator.translate(request) })
+        } finally { release.complete(Unit) }
+        busy.awaitAll()
+    }
+
 }

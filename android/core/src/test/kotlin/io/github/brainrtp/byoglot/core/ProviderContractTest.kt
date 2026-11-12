@@ -47,7 +47,7 @@ class ProviderContractTest {
         assertFalse(actual.toString().contains("fixture-key"))
     }
 
-    @TestFactory fun models() = ContractsFolder.fixture<JsonObject, JsonObject>("provider-models").map { c ->
+    @TestFactory fun models() = ContractsFolder.fixture<JsonObject, JsonObject>("provider-models", version = 1).map { c ->
         dynamicTest(c.name) { runBlocking {
             val (client, transport) = client(c.input)
             assertEquals(c.expected["models"], coreJson.encodeToJsonElement(client.listModels()))
@@ -57,7 +57,7 @@ class ProviderContractTest {
         } }
     }
 
-    @TestFactory fun chat() = ContractsFolder.fixture<JsonObject, JsonObject>("provider-chat").map { c ->
+    @TestFactory fun chat() = ContractsFolder.fixture<JsonObject, JsonObject>("provider-chat", version = 1).map { c ->
         dynamicTest(c.name) { runBlocking {
             val (client, transport) = client(c.input)
             val result = try {
@@ -69,7 +69,7 @@ class ProviderContractTest {
         } }
     }
 
-    @TestFactory fun errors() = ContractsFolder.fixture<JsonObject, JsonObject>("provider-errors").map { c ->
+    @TestFactory fun errors() = ContractsFolder.fixture<JsonObject, JsonObject>("provider-errors", version = 1).map { c ->
         dynamicTest(c.name) { runBlocking {
             val (client, transport) = client(c.input)
             val error = runCatching { client.listModels() }.exceptionOrNull()
@@ -86,7 +86,7 @@ class ProviderContractTest {
         } }
     }
 
-    @TestFactory fun effort() = ContractsFolder.fixture<JsonObject, JsonObject>("provider-effort").map { c ->
+    @TestFactory fun effort() = ContractsFolder.fixture<JsonObject, JsonObject>("provider-effort", version = 1).map { c ->
         dynamicTest(c.name) {
             val i = c.input
             val preset = ProviderPreset.valueOf(i.string("preset"))
@@ -99,8 +99,8 @@ class ProviderContractTest {
         }
     }
     @Test fun `origin and local host checks keep cleartext on the local network`() = runBlocking<Unit> {
-        listOf("localhost", "127.23.45.67", "[::1]", "0:0:0:0:0:0:0:1", "10.0.0.1", "172.16.0.1", "172.31.255.255", "192.168.1.5", "169.254.2.3", "server.local").forEach { assertTrue(isLocalHost(it), it) }
-        listOf("example.com", "localhost.example.com", "127.0.0.1.example.com", "10.256.0.1", "172.15.255.255", "172.32.0.1", "192.169.1.1", "169.255.1.1", "[2001:db8::1]").forEach { assertFalse(isLocalHost(it), it) }
+        listOf("localhost", "127.23.45.67", "[::1]", "0:0:0:0:0:0:0:1", "10.0.0.1", "172.16.0.1", "172.31.255.255", "192.168.1.5", "169.254.2.3", "server.local", "[fe80::1]", "[febf::1]", "[fc00::1]", "[fd12::5]").forEach { assertTrue(isLocalHost(it), it) }
+        listOf("example.com", "localhost.example.com", "127.0.0.1.example.com", "10.256.0.1", "172.15.255.255", "172.32.0.1", "192.169.1.1", "169.255.1.1", "[2001:db8::1]", "[fe7f::1]", "[fec0::1]", "[ff02::1]", "[fd12:::5]").forEach { assertFalse(isLocalHost(it), it) }
         assertEquals("https://example.com", originOf("HTTPS://EXAMPLE.COM:443/v1/"))
         assertEquals("http://[::1]", originOf("http://[::1]:80/v1"))
         assertNull(originOf("https://user:password@example.com"))
@@ -134,6 +134,25 @@ class ProviderContractTest {
         assertEquals("rejected [redacted]", error.detail)
         assertEquals("provider_auth", error.message)
         assertFalse(error.stackTraceToString().contains("fixture-key"))
+    }
+
+    @Test fun `model metadata accepts finite JSON numbers and bounds them to Int`() = runBlocking<Unit> {
+        val body = """{"data":[{"id":"float","context_length":131072.0,"max_output_tokens":4096.0},{"id":"large","context_window":2147483648,"max_output_tokens":1e100},{"id":"negative","context_window":-1e100}]}"""
+        val transport = RecordingTransport(HttpResponse(200, emptyMap(), body.toByteArray()))
+        val connection = Connection("c", ProviderPreset.ollama, "Local", "http://localhost/v1")
+        val models = ProviderClient(connection, null, transport).listModels()
+        assertEquals(listOf(131072, Int.MAX_VALUE, Int.MIN_VALUE), models.map { it.contextLimit })
+        assertEquals(listOf(4096, Int.MAX_VALUE, 0), models.map { it.outputLimit })
+        val invalid = RecordingTransport(HttpResponse(200, emptyMap(), """{"data":[{"id":"infinite","context_window":1e309}]}""".toByteArray()))
+        val error = runCatching { ProviderClient(connection, null, invalid).listModels() }.exceptionOrNull() as BackendException
+        assertEquals(ErrorKind.Incompatible, error.kind)
+    }
+
+    @Test fun `retry after uses ECMAScript whitespace`() = runBlocking<Unit> {
+        val response = HttpResponse(429, mapOf("retry-after" to "\uFEFF30\uFEFF"), "{}".toByteArray())
+        val client = ProviderClient(Connection("c", ProviderPreset.custom, "Local", "http://localhost/v1"), null, RecordingTransport(response))
+        val error = runCatching { client.listModels() }.exceptionOrNull() as BackendException
+        assertEquals(30000L, error.retryAfterMs)
     }
 
 }

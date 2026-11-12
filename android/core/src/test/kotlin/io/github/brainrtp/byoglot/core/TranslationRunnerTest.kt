@@ -32,6 +32,7 @@ class TranslationRunnerTest {
     @Test fun `reports no connection after checking empty input`() = runBlocking {
         val runner = runner(initial.copy(activeConnectionId = null))
         assertEquals(RunnerError.Empty, error(runner, input.copy(text = " \n ")))
+        assertEquals(RunnerError.Empty, error(runner, input.copy(text = "\uFEFF")))
         assertEquals(RunnerError.NoConnection, error(runner))
         assertEquals(RunnerError.NoModel, error(this@TranslationRunnerTest.runner(initial.copy(connections = listOf(connection.copy(selectionModel = null))))))
     }
@@ -46,10 +47,12 @@ class TranslationRunnerTest {
         assertEquals(RunnerError.ConsentNeeded("https://api.deepseek.com"), error(runner(initial.copy(consentedOrigins = emptyList()))))
     }
     @Test fun `local connections need no consent or key`() = runBlocking {
-        val local = connection.copy(preset = ProviderPreset.custom, baseUrl = "http://192.168.1.5:11434/v1")
-        val state = initial.copy(connections = listOf(local), consentedOrigins = emptyList())
-        val runner = TranslationRunner(InMemorySettingsRepository(state), InMemorySecretStore(), RecordingTransport(HttpResponse(200, emptyMap(), "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}".toByteArray())))
-        assertEquals("ok", runner.translate(input).text)
+        listOf("http://192.168.1.5:11434/v1", "http://[fd12::5]:11434/v1", "http://[fe80::1]:11434/v1").forEach { url ->
+            val local = connection.copy(preset = ProviderPreset.custom, baseUrl = url)
+            val state = initial.copy(connections = listOf(local), consentedOrigins = emptyList())
+            val runner = TranslationRunner(InMemorySettingsRepository(state), InMemorySecretStore(), RecordingTransport(HttpResponse(200, emptyMap(), "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}".toByteArray())))
+            assertEquals("ok", runner.translate(input).text)
+        }
     }
     @Test fun `a changed origin or missing secret requires a key`() = runBlocking {
         val changed = connection.copy(baseUrl = "https://other.example/v1")

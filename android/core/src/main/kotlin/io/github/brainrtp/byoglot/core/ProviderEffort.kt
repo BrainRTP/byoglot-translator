@@ -37,7 +37,11 @@ fun originOf(baseUrl: String): String? = try {
 fun isLocalHost(host: String): Boolean {
     val name = host.lowercase(Locale.ROOT).removePrefix("[").removeSuffix("]").removeSuffix(".")
     if (name == "localhost" || name == "::1" || name.endsWith(".local")) return true
-    if (':' in name && name.matches(Regex("[0-9a-f:]+")) && runCatching { java.net.InetAddress.getByName(name).isLoopbackAddress }.getOrDefault(false)) return true
+    if (':' in name && name.matches(Regex("[0-9a-f:]+"))) return runCatching {
+        val address = java.net.InetAddress.getByName(name)
+        address.isLoopbackAddress || address.isLinkLocalAddress ||
+            (address is java.net.Inet6Address && address.address[0].toInt() and 0xfe == 0xfc)
+    }.getOrDefault(false)
     val parts = name.split('.')
     if (parts.size != 4 || parts.any { !it.matches(Regex("[0-9]{1,3}")) }) return false
     val octets = parts.map { it.toInt() }

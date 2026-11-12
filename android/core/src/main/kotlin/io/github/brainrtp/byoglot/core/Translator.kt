@@ -5,7 +5,9 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
-data class TextRequest(val text: String, val context: String, val appName: String, val sourceLang: String, val targetLang: String, val prePrompt: String, val languagePrompt: String, val model: ModelRef)
+data class TextRequest(val text: String, val context: String, val appName: String, val sourceLang: String, val targetLang: String, val prePrompt: String, val languagePrompt: String, val model: ModelRef) {
+    override fun toString(): String = "TextRequest(textLength=${text.length}, contextLength=${context.length}, prePromptLength=${prePrompt.length}, languagePromptLength=${languagePrompt.length})"
+}
 
 class Translator(private val generator: suspend () -> TextGenerator, private val cacheLimit: Int = 200) {
     init { require(cacheLimit >= 0) }
@@ -15,13 +17,14 @@ class Translator(private val generator: suspend () -> TextGenerator, private val
 
     suspend fun translate(request: TextRequest): String {
         currentCoroutineContext().ensureActive()
+        synchronized(cache) { cache[request]?.let { return it } }
         return semaphore.withPermit {
             val epoch = synchronized(cache) {
                 cache[request]?.let { return@withPermit it }
                 generation
             }
             val prompt = PromptBuilder.text(TextPromptInput(request.prePrompt, request.languagePrompt, request.sourceLang, request.targetLang, request.text, request.context, request.appName))
-            val result = generator().generate(prompt, request.model).trim()
+            val result = generator().generate(prompt, request.model).jsTrim()
             currentCoroutineContext().ensureActive()
             synchronized(cache) {
                 if (generation == epoch && cacheLimit > 0) {

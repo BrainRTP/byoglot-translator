@@ -1,7 +1,8 @@
+import Darwin
 import Foundation
 import Testing
 import ByoGlotCore
-import ByoGlotStore
+@testable import ByoGlotStore
 
 struct SettingsStoreTests {
     func directory() -> URL {
@@ -66,4 +67,42 @@ struct SettingsStoreTests {
         #expect(try await first.read() == fresh)
         #expect(try await second.read() == fresh)
     }
+    private func holdLock(_ directory: URL) throws -> Int32 {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let descriptor = open(directory.appending(path: "settings.lock").path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
+        guard descriptor >= 0, flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+            if descriptor >= 0 { close(descriptor) }
+            throw POSIXError(.EIO)
+        }
+        return descriptor
+    }
+
+    @Test func aBusySettingsLockHasABoundedWait() async throws {
+        let directory = directory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let descriptor = try holdLock(directory)
+        defer { close(descriptor) }
+        let store = SettingsStore(directory: directory, lockTimeout: .milliseconds(20))
+        do {
+            _ = try await store.read()
+            Issue.record("Expected lock contention")
+        } catch { #expect((error as? POSIXError)?.code == .EWOULDBLOCK) }
+        #expect(!FileManager.default.fileExists(atPath: directory.appending(path: "settings.json").path))
+    }
+
+    @Test func waitingForASettingsLockIsCancellable() async throws {
+        let directory = directory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let descriptor = try holdLock(directory)
+        defer { close(descriptor) }
+        let store = SettingsStore(directory: directory)
+        let task = Task { try await store.read() }
+        try await Task.sleep(for: .milliseconds(20))
+        task.cancel()
+        do {
+            _ = try await task.value
+            Issue.record("Expected cancellation")
+        } catch { #expect(error is CancellationError) }
+    }
+
 }

@@ -17,3 +17,5 @@ All Apple targets reserve these identifiers:
 - App Group: `group.io.github.brainrtp.byoglot`
 - Keychain service: `io.github.brainrtp.byoglot`
 - Keychain access group: `$(AppIdentifierPrefix)io.github.brainrtp.byoglot.shared`
+
+Signed test targets can link `ByoGlotStoreTesting` and call the public `SecretStoreChecks` methods with a `KeychainSecretStore` configured for their service and access group.

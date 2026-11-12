@@ -4,19 +4,31 @@ import Security
 public struct KeychainSecretStore: SecretStore {
     private let service: String
     private let accessGroup: String?
+    private let client: any KeychainClient
 
     public init(service: String = "io.github.brainrtp.byoglot", accessGroup: String? = nil) {
+        self.init(service: service, accessGroup: accessGroup, client: SystemKeychainClient())
+    }
+
+    init(service: String, accessGroup: String?, client: any KeychainClient) {
         self.service = service
         self.accessGroup = accessGroup
+        self.client = client
     }
 
     public func set(_ secret: String, connectionId: String, origin: String) throws(SecretError) {
-        try delete(connectionId: connectionId)
-        var item = query(connectionId)
-        item[kSecAttrComment] = origin
-        item[kSecValueData] = Data(secret.utf8)
-        item[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        let status = SecItemAdd(item as CFDictionary, nil)
+        let query = query(connectionId)
+        let attributes: [CFString: Any] = [
+            kSecAttrComment: origin,
+            kSecValueData: Data(secret.utf8),
+            kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+        ]
+        var status = client.update(query, attributes: attributes)
+        if status == errSecItemNotFound {
+            let item = query.merging(attributes) { _, new in new }
+            status = client.add(item)
+            if status == errSecDuplicateItem { status = client.update(query, attributes: attributes) }
+        }
         guard status == errSecSuccess else { throw .keychain(status) }
     }
 
@@ -33,12 +45,12 @@ public struct KeychainSecretStore: SecretStore {
     }
 
     public func delete(connectionId: String) throws(SecretError) {
-        let status = SecItemDelete(query(connectionId) as CFDictionary)
+        let status = client.delete(query(connectionId))
         guard status == errSecSuccess || status == errSecItemNotFound else { throw .keychain(status) }
     }
 
     private func query(_ connectionId: String) -> [CFString: Any] {
-        var query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: connectionId]
+        var query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: connectionId, kSecUseDataProtectionKeychain: true]
         if let accessGroup { query[kSecAttrAccessGroup] = accessGroup }
         return query
     }
@@ -48,11 +60,30 @@ public struct KeychainSecretStore: SecretStore {
         query[kSecReturnAttributes] = true
         query[kSecReturnData] = withData
         query[kSecMatchLimit] = kSecMatchLimitOne
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        let (status, item) = client.copy(query)
         if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess else { throw .keychain(status) }
-        guard let item = result as? [String: Any] else { throw .keychain(errSecDecode) }
+        guard let item else { throw .keychain(errSecDecode) }
         return item
     }
+}
+
+protocol KeychainClient: Sendable {
+    func update(_ query: [CFString: Any], attributes: [CFString: Any]) -> OSStatus
+    func add(_ attributes: [CFString: Any]) -> OSStatus
+    func copy(_ query: [CFString: Any]) -> (OSStatus, [String: Any]?)
+    func delete(_ query: [CFString: Any]) -> OSStatus
+}
+
+private struct SystemKeychainClient: KeychainClient {
+    func update(_ query: [CFString: Any], attributes: [CFString: Any]) -> OSStatus {
+        SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+    }
+    func add(_ attributes: [CFString: Any]) -> OSStatus { SecItemAdd(attributes as CFDictionary, nil) }
+    func copy(_ query: [CFString: Any]) -> (OSStatus, [String: Any]?) {
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        return (status, result as? [String: Any])
+    }
+    func delete(_ query: [CFString: Any]) -> OSStatus { SecItemDelete(query as CFDictionary) }
 }

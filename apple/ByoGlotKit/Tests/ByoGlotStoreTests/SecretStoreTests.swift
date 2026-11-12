@@ -1,52 +1,8 @@
 import Foundation
 import Testing
 import ByoGlotStore
+import ByoGlotStoreTesting
 
-enum SecretStoreChecks {
-    static func roundTrip<S: SecretStore>(_ store: S) throws {
-        let id = UUID().uuidString
-        defer { try? store.delete(connectionId: id) }
-        try store.set("fixture-key", connectionId: id, origin: "https://api.deepseek.com")
-        #expect(try store.has(connectionId: id))
-        #expect(try store.secret(connectionId: id, origin: "https://api.deepseek.com") == "fixture-key")
-    }
-
-    static func refusesAnotherOrigin<S: SecretStore>(_ store: S) throws {
-        let id = UUID().uuidString
-        defer { try? store.delete(connectionId: id) }
-        try store.set("fixture-key", connectionId: id, origin: "https://api.deepseek.com")
-        #expect(throws: SecretError.originMismatch) {
-            try store.secret(connectionId: id, origin: "https://evil.example")
-        }
-    }
-
-    static func missingSecretIsNil<S: SecretStore>(_ store: S) throws {
-        let id = UUID().uuidString
-        #expect(try !store.has(connectionId: id))
-        #expect(try store.secret(connectionId: id, origin: "https://example.com") == nil)
-    }
-
-    static func deleteRemovesIt<S: SecretStore>(_ store: S) throws {
-        let id = UUID().uuidString
-        defer { try? store.delete(connectionId: id) }
-        try store.set("fixture-key", connectionId: id, origin: "https://api.deepseek.com")
-        try store.delete(connectionId: id)
-        try store.delete(connectionId: id)
-        #expect(try !store.has(connectionId: id))
-        #expect(try store.secret(connectionId: id, origin: "https://api.deepseek.com") == nil)
-    }
-
-    static func setReplacesSecretAndOrigin<S: SecretStore>(_ store: S) throws {
-        let id = UUID().uuidString
-        defer { try? store.delete(connectionId: id) }
-        try store.set("old", connectionId: id, origin: "https://api.deepseek.com")
-        try store.set("new", connectionId: id, origin: "https://example.com")
-        #expect(try store.secret(connectionId: id, origin: "https://example.com") == "new")
-        #expect(throws: SecretError.originMismatch) {
-            try store.secret(connectionId: id, origin: "https://api.deepseek.com")
-        }
-    }
-}
 
 struct SecretStoreTests {
     @Test func roundTrip() throws { try SecretStoreChecks.roundTrip(InMemorySecretStore()) }

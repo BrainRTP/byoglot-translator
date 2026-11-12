@@ -1,0 +1,23 @@
+{
+  "kinds": [
+    "offline",
+    "unauthorized",
+    "rate_limit",
+    "provider_auth",
+    "provider_error",
+    "bad_response",
+    "incompatible",
+    "no_model",
+    "aborted"
+  ],
+  "fatal": [
+    "offline",
+    "unauthorized",
+    "rate_limit",
+    "provider_auth",
+    "provider_error",
+    "incompatible",
+    "no_model",
+    "aborted"
+  ]
+}

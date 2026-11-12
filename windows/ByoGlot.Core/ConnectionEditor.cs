@@ -8,6 +8,8 @@ public enum DraftProblem { BaseUrl, ApiKey, InsecureRemote }
 
 public sealed class ConnectionEditor(ISettingsRepository settings, ISecretStore secrets, IHttpTransport transport)
 {
+    private readonly SemaphoreSlim saveGate = new(1, 1);
+
     public DraftProblem? Validate(ConnectionDraft draft, bool hasStoredKey)
     {
         if (Origins.OriginOf(draft.BaseUrl) is not { } origin) return DraftProblem.BaseUrl;
@@ -17,6 +19,13 @@ public sealed class ConnectionEditor(ISettingsRepository settings, ISecretStore 
     }
 
     public async Task<Connection> SaveAsync(ConnectionDraft draft, bool consent, CancellationToken ct)
+    {
+        await saveGate.WaitAsync(ct);
+        try { return await SaveCoreAsync(draft, consent, ct); }
+        finally { saveGate.Release(); }
+    }
+
+    private async Task<Connection> SaveCoreAsync(ConnectionDraft draft, bool consent, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var origin = Origins.OriginOf(draft.BaseUrl) ?? throw new ArgumentException(nameof(DraftProblem.BaseUrl));
@@ -41,15 +50,32 @@ public sealed class ConnectionEditor(ISettingsRepository settings, ISecretStore 
         var initial = SettingsLogic.PickInitialModels(models, defaultModel, id);
         connection = connection with { PageModel = initial.Page, SelectionModel = initial.Selection };
         ct.ThrowIfCancellationRequested();
-        // Keep the previous record intact until the provider check succeeds.
-        if (changedOrigin) await secrets.DeleteAsync(id);
-        if (!string.IsNullOrEmpty(key)) await secrets.SetAsync(key, id, origin);
-        await settings.UpdateAsync(s => s with
+        var oldOrigin = old is null ? null : Origins.OriginOf(old.BaseUrl);
+        string? oldKey = null;
+        if (oldOrigin is not null)
         {
-            Connections = s.Connections.Any(c => c.Id == id) ? s.Connections.Select(c => c.Id == id ? connection : c).ToArray() : [.. s.Connections, connection],
-            ActiveConnectionId = id,
-            ConsentedOrigins = consent && !s.ConsentedOrigins.Contains(origin) ? [.. s.ConsentedOrigins, origin] : s.ConsentedOrigins
-        });
+            try { oldKey = await secrets.GetAsync(id, oldOrigin); }
+            catch (OriginMismatchException) { }
+        }
+        ct.ThrowIfCancellationRequested();
+        // Once persistence starts, complete or roll back without caller cancellation.
+        if (!string.IsNullOrEmpty(key)) await secrets.SetAsync(key, id, origin);
+        else if (changedOrigin) await secrets.DeleteAsync(id);
+        try
+        {
+            await settings.UpdateAsync(s => s with
+            {
+                Connections = s.Connections.Any(c => c.Id == id) ? s.Connections.Select(c => c.Id == id ? connection : c).ToArray() : [.. s.Connections, connection],
+                ActiveConnectionId = id,
+                ConsentedOrigins = consent && !s.ConsentedOrigins.Contains(origin) ? [.. s.ConsentedOrigins, origin] : s.ConsentedOrigins
+            });
+        }
+        catch
+        {
+            if (oldKey is not null && oldOrigin is not null) await secrets.SetAsync(oldKey, id, oldOrigin);
+            else await secrets.DeleteAsync(id);
+            throw;
+        }
         return connection;
     }
 

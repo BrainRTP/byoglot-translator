@@ -1,3 +1,22 @@
 <resources>
     <string name="app_name">ByoGlot</string>
+    <string name="quick_label">Перевести в ByoGlot</string>
+    <string name="template">Шаблон</string>
+    <string name="translating">Перевод...</string>
+    <string name="copy">Копировать</string>
+    <string name="replace">Заменить</string>
+    <string name="retry">Повторить</string>
+    <string name="open_in_app">Открыть в ByoGlot</string>
+    <string name="fix_in_settings">Открыть настройки</string>
+    <string name="error_no_connection">Сначала добавьте провайдера в ByoGlot.</string>
+    <string name="error_no_model">Выберите модель в ByoGlot.</string>
+    <string name="error_key_missing">Для этого провайдера не задан API-ключ.</string>
+    <string name="error_consent">Подтвердите в ByoGlot отправку текста на %1$s.</string>
+    <string name="error_too_long">Текст длиннее %1$d символов.</string>
+    <string name="error_empty">Нет текста для перевода.</string>
+    <string name="error_local_network">Разрешите ByoGlot доступ к локальной сети в настройках системы.</string>
+    <string name="error_offline">Провайдер не ответил. Проверьте соединение.</string>
+    <string name="error_auth">Провайдер отклонил API-ключ (HTTP %1$d).</string>
+    <string name="error_rate_limit">Достигнут лимит провайдера. Повторите позже.</string>
+    <string name="error_provider">Провайдер вернул ошибку: %1$s</string>
 </resources>

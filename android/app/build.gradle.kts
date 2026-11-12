@@ -15,6 +15,7 @@ android {
         versionCode = providers.gradleProperty("VERSION_CODE").get().toInt()
         versionName = providers.gradleProperty("VERSION_NAME").get()
     }
+    testOptions { unitTests.all { it.useJUnitPlatform() } }
     buildFeatures { compose = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -27,6 +28,10 @@ dependencies {
     implementation(libs.coroutines.core)
     implementation(libs.datastore)
     implementation(libs.serialization.json)
+    implementation(libs.lifecycle.viewmodel)
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.launcher)
+    testImplementation(libs.coroutines.test)
     implementation(project(":core"))
     implementation(libs.activity.compose)
     implementation(libs.compose.ui)

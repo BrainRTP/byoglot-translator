@@ -1,0 +1,37 @@
+package io.github.brainrtp.byoglot.core
+
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+
+data class TextRequest(val text: String, val context: String, val appName: String, val sourceLang: String, val targetLang: String, val prePrompt: String, val languagePrompt: String, val model: ModelRef)
+
+class Translator(private val generator: suspend () -> TextGenerator, private val cacheLimit: Int = 200) {
+    init { require(cacheLimit >= 0) }
+    private val semaphore = Semaphore(Contracts.limits.concurrency)
+    private val cache = LinkedHashMap<TextRequest, String>(16, 0.75f, true)
+    private var generation = 0L
+
+    suspend fun translate(request: TextRequest): String {
+        currentCoroutineContext().ensureActive()
+        return semaphore.withPermit {
+            val epoch = synchronized(cache) {
+                cache[request]?.let { return@withPermit it }
+                generation
+            }
+            val prompt = PromptBuilder.text(TextPromptInput(request.prePrompt, request.languagePrompt, request.sourceLang, request.targetLang, request.text, request.context, request.appName))
+            val result = generator().generate(prompt, request.model).trim()
+            currentCoroutineContext().ensureActive()
+            synchronized(cache) {
+                if (generation == epoch && cacheLimit > 0) {
+                    cache[request] = result
+                    while (cache.size > cacheLimit) cache.remove(cache.keys.first())
+                }
+            }
+            result
+        }
+    }
+
+    fun clearCache() { synchronized(cache) { cache.clear(); generation++ } }
+}

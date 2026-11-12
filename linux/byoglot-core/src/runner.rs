@@ -1,7 +1,7 @@
 use crate::{
     BackendError, ErrorKind, HttpTransport, ModelRef, ProviderClient, SecretError, SecretStore,
     SettingsRepository, TextRequest, Translator, contracts, effective, language_prompt_text,
-    needs_key, origin_of,
+    needs_key,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -88,7 +88,9 @@ impl<S: SettingsRepository, K: SecretStore, T: HttpTransport + Send> Translation
         let resolved = effective(template, &settings);
         let target_lang = input.target_lang.unwrap_or(resolved.target_lang);
         let model = resolved.model.ok_or(RunnerError::NoModel)?;
-        let origin = origin_of(&connection.base_url).ok_or_else(invalid_base_url)?;
+        let origin = crate::effort::permitted_endpoint(&connection.base_url)
+            .ok_or_else(invalid_base_url)?
+            .origin;
         if !crate::effort::local_origin(&origin) && !settings.consented_origins.contains(&origin) {
             return Err(RunnerError::ConsentNeeded { origin });
         }

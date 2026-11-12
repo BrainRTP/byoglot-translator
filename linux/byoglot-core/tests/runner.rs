@@ -118,7 +118,16 @@ async fn remote_origin_needs_consent_and_local_origin_does_not() {
     );
     s.connections[0].preset = ProviderPreset::Custom;
     s.connections[0].base_url = "http://192.168.1.2/v1".into();
-    assert!(run(s, None, input()).await.0.is_ok());
+    assert_eq!(
+        run(s.clone(), None, input()).await.0,
+        Err(RunnerError::KeyMissing)
+    );
+    assert!(
+        run(s, Some(("key", "http://192.168.1.2")), input())
+            .await
+            .0
+            .is_ok()
+    );
 }
 #[tokio::test]
 async fn missing_or_wrong_origin_key_is_rejected() {
@@ -158,4 +167,19 @@ async fn builds_language_prompt_and_translates_with_selected_model() {
     assert!(prompt.contains(&contracts::builtin_profiles()["ru"]));
     assert!(prompt.ends_with("TEXT:\nhello"));
     assert_eq!(output.source_lang, "auto");
+}
+
+#[tokio::test]
+async fn insecure_remote_origins_are_refused_even_after_consent() {
+    let mut s = settings();
+    s.connections[0].preset = ProviderPreset::Ollama;
+    s.connections[0].base_url = "http://evil.example/v1".into();
+    for consent in [false, true] {
+        if consent {
+            s.consented_origins.push("http://evil.example".into());
+        }
+        let (result, transport) = run(s.clone(), None, input()).await;
+        assert!(matches!(result, Err(RunnerError::Backend(_))));
+        assert!(transport.requests.lock().unwrap().is_empty());
+    }
 }

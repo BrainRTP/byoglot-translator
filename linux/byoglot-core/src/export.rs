@@ -13,9 +13,19 @@ pub struct ExportFile {
     pub exported_at: String,
     pub globals: PortableGlobals,
     pub templates: Vec<Template>,
+    #[serde(serialize_with = "sorted_overrides")]
     pub profile_overrides: HashMap<String, ProfileOverride>,
     pub site_rules: Vec<SiteRule>,
     pub connections: Vec<ExportConnection>,
+}
+fn sorted_overrides<S: serde::Serializer>(
+    overrides: &HashMap<String, ProfileOverride>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    overrides
+        .iter()
+        .collect::<std::collections::BTreeMap<_, _>>()
+        .serialize(serializer)
 }
 #[derive(Debug, thiserror::Error)]
 pub enum ExportError {
@@ -133,7 +143,9 @@ pub fn merge_export(file: ExportFile, mut into: AppSettings) -> AppSettings {
         }
     }
     for connection in file.connections {
-        if !into.connections.iter().any(|c| c.id == connection.id) {
+        if crate::effort::permitted_endpoint(&connection.base_url).is_some()
+            && !into.connections.iter().any(|c| c.id == connection.id)
+        {
             into.connections.push(Connection {
                 id: connection.id,
                 preset: connection.preset,

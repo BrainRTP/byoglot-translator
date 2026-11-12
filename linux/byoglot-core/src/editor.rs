@@ -80,7 +80,7 @@ impl<S: SettingsRepository, K: SecretStore, T: HttpTransport + Send> ConnectionE
             .and_then(|id| settings.connections.iter().find(|c| &c.id == id));
         let origin_changed =
             previous.is_some_and(|c| origin_of(&c.base_url).as_ref() != Some(&origin));
-        let stored = if origin_changed {
+        let stored = if origin_changed || !draft.api_key.trim().is_empty() {
             None
         } else if let Some(connection) = previous {
             self.secrets
@@ -132,19 +132,8 @@ impl<S: SettingsRepository, K: SecretStore, T: HttpTransport + Send> ConnectionE
             (connection.page_model, connection.selection_model) =
                 pick_initial_models(&models, default, &connection.id);
         }
-        if origin_changed {
-            self.secrets
-                .delete(&connection.id)
-                .await
-                .map_err(secret_failure)?;
-        }
-        if let Some(secret) = secret {
-            self.secrets
-                .set(&secret, &connection.id, &origin)
-                .await
-                .map_err(secret_failure)?;
-        }
         let saved = connection.clone();
+        let consent_origin = origin.clone();
         self.settings
             .update(Box::new(move |mut settings| {
                 if let Some(existing) = settings.connections.iter_mut().find(|c| c.id == saved.id) {
@@ -155,19 +144,26 @@ impl<S: SettingsRepository, K: SecretStore, T: HttpTransport + Send> ConnectionE
                 if settings.active_connection_id.is_none() {
                     settings.active_connection_id = Some(saved.id);
                 }
-                if consent && !settings.consented_origins.contains(&origin) {
-                    settings.consented_origins.push(origin);
+                if consent && !settings.consented_origins.contains(&consent_origin) {
+                    settings.consented_origins.push(consent_origin);
                 }
                 settings
             }))
             .await;
+        if let Some(secret) = secret {
+            self.secrets
+                .set(&secret, &connection.id, &origin)
+                .await
+                .map_err(secret_failure)?;
+        } else if origin_changed {
+            self.secrets
+                .delete(&connection.id)
+                .await
+                .map_err(secret_failure)?;
+        }
         Ok(connection)
     }
     pub async fn remove(&self, connection_id: &str) -> Result<(), RunnerError> {
-        self.secrets
-            .delete(connection_id)
-            .await
-            .map_err(secret_failure)?;
         let id = connection_id.to_owned();
         self.settings
             .update(Box::new(move |mut settings| {
@@ -192,6 +188,10 @@ impl<S: SettingsRepository, K: SecretStore, T: HttpTransport + Send> ConnectionE
                 settings
             }))
             .await;
+        self.secrets
+            .delete(connection_id)
+            .await
+            .map_err(secret_failure)?;
         Ok(())
     }
     pub async fn models(&self, connection_id: &str) -> Result<Vec<ModelInfo>, RunnerError> {
@@ -201,7 +201,9 @@ impl<S: SettingsRepository, K: SecretStore, T: HttpTransport + Send> ConnectionE
             .iter()
             .find(|c| c.id == connection_id)
             .ok_or(RunnerError::NoConnection)?;
-        let origin = origin_of(&connection.base_url).ok_or_else(invalid_base_url)?;
+        let origin = crate::effort::permitted_endpoint(&connection.base_url)
+            .ok_or_else(invalid_base_url)?
+            .origin;
         if !crate::effort::local_origin(&origin) && !settings.consented_origins.contains(&origin) {
             return Err(RunnerError::ConsentNeeded { origin });
         }

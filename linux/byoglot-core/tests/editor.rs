@@ -171,3 +171,172 @@ async fn remove_deletes_connection_and_secret() {
     assert!(s.connections.is_empty());
     assert!(s.active_connection_id.is_none());
 }
+
+struct ControlledSecrets {
+    inner: MemorySecretStore,
+    block: bool,
+    deletes: std::sync::atomic::AtomicUsize,
+}
+impl ControlledSecrets {
+    async fn interrupt(&self) -> Result<(), SecretError> {
+        if self.block {
+            std::future::pending::<()>().await;
+        }
+        Err(SecretError::Unavailable("store failure".into()))
+    }
+}
+impl SecretStore for ControlledSecrets {
+    async fn set(&self, _: &str, _: &str, _: &str) -> Result<(), SecretError> {
+        self.interrupt().await
+    }
+    async fn get(&self, connection_id: &str, origin: &str) -> Result<Option<String>, SecretError> {
+        self.inner.get(connection_id, origin).await
+    }
+    async fn has(&self, connection_id: &str) -> Result<bool, SecretError> {
+        self.inner.has(connection_id).await
+    }
+    async fn delete(&self, _: &str) -> Result<(), SecretError> {
+        self.deletes
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.interrupt().await
+    }
+}
+#[tokio::test]
+async fn interrupted_secret_write_keeps_new_settings_without_deleting_the_old_key() {
+    use std::{
+        future::{Future, poll_fn},
+        sync::atomic::{AtomicUsize, Ordering},
+        task::Poll,
+    };
+    for block in [false, true] {
+        let repository = Arc::new(MemorySettingsRepository::new(settings()));
+        let secrets = Arc::new(ControlledSecrets {
+            inner: MemorySecretStore::new(),
+            block,
+            deletes: AtomicUsize::new(0),
+        });
+        secrets
+            .inner
+            .set("old-key", "c1", "https://api.deepseek.com")
+            .await
+            .unwrap();
+        let editor = ConnectionEditor::new(
+            repository.clone(),
+            secrets.clone(),
+            RecordingTransport::models(),
+        );
+        let mut d = draft();
+        d.id = Some("c1".into());
+        d.base_url = "https://other.example/v1".into();
+        d.api_key = "new-key".into();
+        let mut future = Box::pin(editor.save(d, true));
+        if block {
+            poll_fn(|cx| {
+                assert!(future.as_mut().poll(cx).is_pending());
+                Poll::Ready(())
+            })
+            .await;
+            drop(future);
+        } else {
+            assert!(future.await.is_err());
+        }
+        assert_eq!(
+            repository.read().await.connections[0].base_url,
+            "https://other.example/v1"
+        );
+        assert_eq!(secrets.deletes.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            secrets
+                .inner
+                .get("c1", "https://api.deepseek.com")
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("old-key")
+        );
+        assert_eq!(
+            secrets.inner.get("c1", "https://other.example").await,
+            Err(SecretError::OriginMismatch)
+        );
+    }
+}
+#[tokio::test]
+async fn interrupted_secret_delete_keeps_the_connection_removed() {
+    use std::{
+        future::{Future, poll_fn},
+        sync::atomic::AtomicUsize,
+        task::Poll,
+    };
+    for block in [false, true] {
+        let repository = Arc::new(MemorySettingsRepository::new(settings()));
+        let secrets = Arc::new(ControlledSecrets {
+            inner: MemorySecretStore::new(),
+            block,
+            deletes: AtomicUsize::new(0),
+        });
+        secrets
+            .inner
+            .set("old-key", "c1", "https://api.deepseek.com")
+            .await
+            .unwrap();
+        let editor = ConnectionEditor::new(
+            repository.clone(),
+            secrets.clone(),
+            RecordingTransport::models(),
+        );
+        let mut future = Box::pin(editor.remove("c1"));
+        if block {
+            poll_fn(|cx| {
+                assert!(future.as_mut().poll(cx).is_pending());
+                Poll::Ready(())
+            })
+            .await;
+            drop(future);
+        } else {
+            assert!(future.await.is_err());
+        }
+        assert!(repository.read().await.connections.is_empty());
+        assert!(secrets.inner.has("c1").await.unwrap());
+    }
+}
+#[tokio::test]
+async fn models_refuses_insecure_remote_urls_before_consent_or_io() {
+    let mut s = settings();
+    s.connections[0].base_url = "http://evil.example/v1".into();
+    for consent in [false, true] {
+        if consent {
+            s.consented_origins.push("http://evil.example".into());
+        }
+        let transport = RecordingTransport::models();
+        let (editor, _, _) = editor(s.clone(), transport.clone());
+        assert!(matches!(
+            editor.models("c1").await,
+            Err(RunnerError::Backend(_))
+        ));
+        assert!(transport.requests.lock().unwrap().is_empty());
+    }
+}
+
+#[tokio::test]
+async fn reentering_a_key_repairs_an_interrupted_origin_change() {
+    let mut s = settings();
+    s.connections[0].base_url = "https://other.example/v1".into();
+    let (editor, _, secrets) = editor(s, RecordingTransport::models());
+    secrets
+        .set("old-key", "c1", "https://api.deepseek.com")
+        .await
+        .unwrap();
+    let mut d = draft();
+    d.id = Some("c1".into());
+    d.base_url = "https://other.example/v1".into();
+    d.api_key = "new-key".into();
+    editor.save(d, true).await.unwrap();
+    assert_eq!(
+        secrets
+            .get("c1", "https://other.example")
+            .await
+            .unwrap()
+            .as_deref(),
+        Some("new-key")
+    );
+}

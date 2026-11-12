@@ -34,7 +34,9 @@ pub fn effort_params(preset: ProviderPreset, variant: Option<&str>) -> Map<Strin
     }
 }
 pub fn needs_key(preset: ProviderPreset, base_url: &str) -> bool {
-    if preset == ProviderPreset::Custom && local_origin(base_url) {
+    if preset == ProviderPreset::Custom
+        && endpoint(base_url).is_some_and(|url| url.host == "localhost" || url.host == "127.0.0.1")
+    {
         return false;
     }
     contracts::presets()[&preset].needs_key
@@ -111,6 +113,9 @@ pub(crate) fn endpoint(url: &str) -> Option<Endpoint> {
         secure: scheme == "https",
     })
 }
+pub(crate) fn permitted_endpoint(url: &str) -> Option<Endpoint> {
+    endpoint(url).filter(|url| url.secure || is_local_host(&url.host))
+}
 pub fn origin_of(base_url: &str) -> Option<String> {
     endpoint(base_url).map(|url| url.origin)
 }
@@ -127,7 +132,8 @@ pub fn is_local_host(host: &str) -> bool {
         return true;
     }
     if let Ok(ip) = host.parse::<Ipv6Addr>() {
-        return ip == Ipv6Addr::LOCALHOST;
+        let first = ip.segments()[0];
+        return ip == Ipv6Addr::LOCALHOST || first & 0xfe00 == 0xfc00 || first & 0xffc0 == 0xfe80;
     }
     if let Ok(ip) = host.parse::<Ipv4Addr>() {
         let [a, b, _, _] = ip.octets();

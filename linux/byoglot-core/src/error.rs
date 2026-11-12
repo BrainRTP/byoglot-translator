@@ -50,7 +50,7 @@ pub struct BackendError {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<u16>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub retry_after_ms: Option<u64>,
+    pub retry_after_ms: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
 }

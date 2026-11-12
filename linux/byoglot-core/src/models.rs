@@ -49,8 +49,8 @@ pub struct ModelInfo {
     pub id: String,
     pub name: String,
     pub variants: Vec<String>,
-    pub context_limit: u32,
-    pub output_limit: u32,
+    pub context_limit: f64,
+    pub output_limit: f64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

@@ -101,8 +101,8 @@ fn initial_models_prefer_favorite_and_fall_back_to_default() {
         id: "deepseek-flash".into(),
         name: "Flash".into(),
         variants: vec!["none".into(), "high".into()],
-        context_limit: 0,
-        output_limit: 0,
+        context_limit: 0.0,
+        output_limit: 0.0,
     };
     let other = ModelInfo {
         id: "other".into(),
@@ -117,4 +117,55 @@ fn initial_models_prefer_favorite_and_fall_back_to_default() {
     assert_eq!(page, selection);
     assert_eq!(page.unwrap().variant.as_deref(), Some("low"));
     assert_eq!(pick_initial_models(&[], None, "c1"), (None, None));
+}
+
+#[test]
+fn merge_skips_invalid_and_insecure_remote_connections() {
+    let mut file = ExportFile::decode(&sample().to_string()).unwrap();
+    let base = file.connections[0].clone();
+    file.connections.clear();
+    for (id, base_url) in [
+        ("invalid", "broken url"),
+        ("insecure", "http://evil.example/v1"),
+        ("secure", "https://evil.example/v1"),
+        ("lan", "http://192.168.1.1/v1"),
+        ("ula", "http://[fd00::1]/v1"),
+        ("link", "http://[fe80::1]/v1"),
+    ] {
+        file.connections.push(ExportConnection {
+            id: id.into(),
+            base_url: base_url.into(),
+            ..base.clone()
+        });
+    }
+    let merged = merge_export(file, AppSettings::initial(None));
+    assert_eq!(
+        merged
+            .connections
+            .iter()
+            .map(|c| c.id.as_str())
+            .collect::<Vec<_>>(),
+        ["secure", "lan", "ula", "link"]
+    );
+}
+#[test]
+fn override_exports_have_stable_key_order() {
+    let mut first = ExportFile::decode(&sample().to_string()).unwrap();
+    let mut second = first.clone();
+    first.profile_overrides.clear();
+    second.profile_overrides.clear();
+    let rule = ProfileOverride {
+        text: "text".into(),
+        base: "base".into(),
+        saved_at: 0.0,
+    };
+    for key in ["ru", "de", "generic"] {
+        first.profile_overrides.insert(key.into(), rule.clone());
+    }
+    for key in ["generic", "de", "ru"] {
+        second.profile_overrides.insert(key.into(), rule.clone());
+    }
+    let serialized = serde_json::to_string(&first).unwrap();
+    assert_eq!(serialized, serde_json::to_string(&second).unwrap());
+    assert!(serialized.find("\"de\":").unwrap() < serialized.find("\"ru\":").unwrap());
 }

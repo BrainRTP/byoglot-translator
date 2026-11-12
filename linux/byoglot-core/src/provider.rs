@@ -52,6 +52,9 @@ impl<T: HttpTransport> ProviderClient<T> {
         body: Option<Value>,
         timeout: Duration,
     ) -> Result<D, BackendError> {
+        if crate::effort::permitted_endpoint(&self.connection.base_url).is_none() {
+            return Err(incompatible("invalid or insecure base URL"));
+        }
         let mut headers = std::collections::BTreeMap::new();
         if let Some(secret) = self.secret.as_deref().filter(|s| !s.is_empty()) {
             headers.insert("authorization".into(), format!("Bearer {secret}"));
@@ -108,8 +111,8 @@ impl<T: HttpTransport> ProviderClient<T> {
                     raw.supported_parameters.as_deref(),
                 ),
                 id: raw.id,
-                context_limit: raw.context_window.or(raw.context_length).unwrap_or(0),
-                output_limit: raw.max_output_tokens.unwrap_or(0),
+                context_limit: raw.context_window.or(raw.context_length).unwrap_or(0.0),
+                output_limit: raw.max_output_tokens.unwrap_or(0.0),
             })
             .collect())
     }
@@ -161,9 +164,9 @@ struct ModelList {
 struct RawModel {
     id: String,
     name: Option<String>,
-    context_window: Option<u32>,
-    context_length: Option<u32>,
-    max_output_tokens: Option<u32>,
+    context_window: Option<f64>,
+    context_length: Option<f64>,
+    max_output_tokens: Option<f64>,
     effort: Option<Effort>,
     supported_parameters: Option<Vec<String>>,
 }
@@ -211,7 +214,7 @@ fn failure(response: HttpResponse, now: SystemTime) -> BackendError {
     }
     e
 }
-fn retry_after(value: &str, now: SystemTime) -> Option<u64> {
+fn retry_after(value: &str, now: SystemTime) -> Option<f64> {
     let value = value.trim();
     let mut pieces = value.split('.');
     let integer = pieces.next()?;
@@ -222,8 +225,7 @@ fn retry_after(value: &str, now: SystemTime) -> Option<u64> {
         && pieces.next().is_none()
     {
         let milliseconds = (value.parse::<f64>().ok()? * 1000.0).round();
-        return (milliseconds.is_finite() && milliseconds < u64::MAX as f64)
-            .then_some(milliseconds as u64);
+        return milliseconds.is_finite().then_some(milliseconds);
     }
     if value.len() != 29
         || value.get(3..5)? != ", "
@@ -259,7 +261,7 @@ fn retry_after(value: &str, now: SystemTime) -> Option<u64> {
         Ok(d) => d.as_millis() as i128,
         Err(e) => -(e.duration().as_millis() as i128),
     };
-    Some((i128::from(timestamp) - now).clamp(0, u64::MAX as i128) as u64)
+    Some((i128::from(timestamp) - now).max(0) as f64)
 }
 pub(crate) fn digits(value: &str) -> Option<u32> {
     if value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {

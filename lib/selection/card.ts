@@ -5,7 +5,7 @@ import type { Template } from "../settings/types";
 import { describeError } from "../ui/errors";
 import type { InsertOutcome } from "./insert";
 import { renderSafeMarkdown } from "./markdown";
-import { attachWindow, type WindowShell } from "./window";
+import { attachWindow, type WindowRect, type WindowShell } from "./window";
 
 export type SelectionTranslation =
   | { text: string; sourceLang?: string; targetLang?: string; model?: ModelRef }
@@ -72,6 +72,11 @@ const PINNED_MIN_HEIGHT = 420;
 const MARGIN = 8;
 const COPIED_MS = 1500;
 const SVG_NS = "http://www.w3.org/2000/svg";
+
+export function sheetRect(vw: number, vh: number, contentHeight: number): WindowRect {
+  const height = Math.min(contentHeight, Math.round(vh * 0.6));
+  return { left: 8, width: vw - 16, height, top: vh - 8 - height };
+}
 
 export function svgIcon(doc: Document, size: number, paths: string[], width = 2): SVGElement {
   const svg = doc.createElementNS(SVG_NS, "svg");
@@ -150,6 +155,7 @@ export function templateLabel(tpl: Template): string {
 export function createCard(root: HTMLElement, deps: CardDeps) {
   const doc = root.ownerDocument;
   const win = doc.defaultView as Window;
+  const touch = win.matchMedia?.("(pointer: coarse)").matches === true;
   let card: HTMLElement | null = null;
   let feed: HTMLElement | null = null;
   let select: HTMLSelectElement | null = null;
@@ -171,13 +177,17 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
 
   // anchor-based placement and content-height fit for a card the user has not resized
   function layout() {
-    if (!card || !shell || !anchor || isFree()) return;
+    if (!card || !shell || !anchor || (!touch && isFree())) return;
     const vw = win.innerWidth;
     const vh = win.innerHeight;
-    const width = Math.min(WIDTH, Math.max(0, vw - 2 * MARGIN));
+    const width = touch ? vw - 2 * MARGIN : Math.min(WIDTH, Math.max(0, vw - 2 * MARGIN));
     card.style.width = `${width}px`;
     card.style.height = "";
     const height = card.offsetHeight;
+    if (touch) {
+      shell.setRect(sheetRect(vw, vh, height));
+      return;
+    }
     const cur = shell.rect();
     if (placed && (cur.left !== placed.left || cur.top !== placed.top)) moved = true;
     let left = cur.left;
@@ -204,7 +214,7 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
     const group = h(doc, "div", "btns");
     group.append(...btns);
     bar.append(group);
-    if (mode === "oneshot") bar.append(h(doc, "kbd", undefined, "Esc"));
+    if (mode === "oneshot" && !touch) bar.append(h(doc, "kbd", undefined, "Esc"));
     return bar;
   }
 
@@ -432,7 +442,7 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
     close();
     anchor = req.anchor;
     initialTemplateId = undefined;
-    card = h(doc, "div", "card");
+    card = h(doc, "div", touch ? "card sheet" : "card");
     card.setAttribute("role", "dialog");
     card.setAttribute("aria-label", t("selection.dialog"));
 

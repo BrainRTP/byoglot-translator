@@ -28,3 +28,6 @@ pub use settings::*;
 pub use stores::*;
 pub use translator::*;
 pub use transport::*;
+
+pub mod quick;
+pub use quick::*;

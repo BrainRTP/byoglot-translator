@@ -42,3 +42,9 @@ updates:
     schedule:
       interval: weekly
     labels: ["dependencies", "area:android"]
+
+  - package-ecosystem: cargo
+    directory: /linux
+    schedule:
+      interval: weekly
+    labels: ["dependencies", "area:linux"]

@@ -132,6 +132,7 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
       .catch(() => {});
   let icon: HTMLButtonElement | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let scrollTimer: ReturnType<typeof setTimeout> | undefined;
 
   // the snapshot is read before the await: the inserter clears the page selection itself
   async function act(snap: Snapshot, open: (snap: Snapshot) => void) {
@@ -144,6 +145,7 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
   }
 
   function hideIcon() {
+    clearTimeout(scrollTimer);
     icon?.remove();
     icon = null;
   }
@@ -240,11 +242,21 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
     if (!sel || sel.isCollapsed) hideIcon();
     if (touch) {
       clearTimeout(timer);
-      timer = setTimeout(() => check(false), TOUCH_DEBOUNCE_MS);
+      timer = setTimeout(() => check(true), TOUCH_DEBOUNCE_MS);
     }
   };
   const onScroll = () => {
-    if (!touch) hideIcon();
+    if (!touch) {
+      hideIcon();
+      return;
+    }
+    if (!icon) return;
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      const snap = readSelection(doc);
+      if (icon && snap) showIcon(snap);
+      else hideIcon();
+    }, DEBOUNCE_MS);
   };
 
   doc.addEventListener("mouseup", onMouseUp, true);
@@ -272,6 +284,7 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
     },
     destroy() {
       clearTimeout(timer);
+      hideIcon();
       doc.removeEventListener("mouseup", onMouseUp, true);
       doc.removeEventListener("keyup", onKeyUp, true);
       doc.removeEventListener("mousedown", onMouseDown, true);

@@ -12,3 +12,14 @@ playwright-report/
 .DS_Store
 .idea/
 tests/quality/.data/
+
+# native platforms
+apple/**/.build/
+apple/**/DerivedData/
+apple/**/xcuserdata/
+android/**/build/
+android/.gradle/
+android/local.properties
+windows/**/bin/
+windows/**/obj/
+linux/target/

@@ -1,64 +1,188 @@
 package io.github.brainrtp.byoglot.core
 
 import java.net.URI
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 sealed interface RunnerError {
     data object NoConnection : RunnerError
+
     data object NoModel : RunnerError
+
     data object KeyMissing : RunnerError
+
     data class ConsentNeeded(val origin: String) : RunnerError
+
     data class TooLong(val limit: Int) : RunnerError
+
     data object Empty : RunnerError
+
     data object LocalNetworkDenied : RunnerError
+
     data class Backend(val error: BackendException) : RunnerError
 }
+
 class RunnerException(val error: RunnerError) : Exception()
-data class RunnerInput(val text: String, val context: String = "", val appName: String = "", val templateId: String? = null, val targetLang: String? = null, val limit: Int) {
-    override fun toString(): String = "RunnerInput(textLength=${text.length}, contextLength=${context.length}, limit=$limit)"
+
+data class RunnerInput(
+    val text: String,
+    val context: String = "",
+    val appName: String = "",
+    val templateId: String? = null,
+    val targetLang: String? = null,
+    val limit: Int,
+    val sourceLang: String? = null,
+    val mainModel: Boolean = false,
+) {
+    override fun toString(): String =
+        "RunnerInput(textLength=${text.length}, contextLength=${context.length}, limit=$limit)"
 }
-data class RunnerOutput(val text: String, val sourceLang: String, val targetLang: String, val model: ModelRef) {
+
+data class RunnerOutput(
+    val text: String,
+    val sourceLang: String,
+    val targetLang: String,
+    val model: ModelRef,
+) {
     override fun toString(): String = "RunnerOutput(textLength=${text.length})"
 }
+
 const val EXTERNAL_INPUT_LIMIT = 5000
 const val EDITOR_INPUT_LIMIT = 20000
 
-class TranslationRunner(private val settings: SettingsRepository, private val secrets: SecretStore, private val transport: HttpTransport) {
-    private class ClientState(val connection: Connection, val secret: String?, val translator: Translator)
+class TranslationRunner(
+    private val settings: SettingsRepository,
+    private val secrets: SecretStore,
+    private val transport: HttpTransport,
+) {
+    private class ClientState(
+        val connection: Connection,
+        val secret: String?,
+        val translator: Translator,
+    )
+
     private val clientLock = Any()
     private var clientState: ClientState? = null
 
+    private data class Prepared(val translator: Translator, val request: TextRequest)
+
     suspend fun translate(input: RunnerInput): RunnerOutput {
-        val text = input.text.jsTrim()
-        if (text.isEmpty()) throw RunnerException(RunnerError.Empty)
-        if (text.length > input.limit) throw RunnerException(RunnerError.TooLong(input.limit))
-        val state = settings.read()
-        val connection = state.connections.find { it.id == state.activeConnectionId } ?: throw RunnerException(RunnerError.NoConnection)
-        val template = state.templates.find { it.id == input.templateId }
-            ?: state.templates.find { it.id == state.globals.defaultTemplateId } ?: Contracts.builtinTemplate
-        val effective = SettingsLogic.effective(template, state)
-        val target = input.targetLang ?: effective.targetLang
-        val model = effective.model ?: throw RunnerException(RunnerError.NoModel)
-        val origin = originOf(connection.baseUrl) ?: throw RunnerException(RunnerError.Backend(BackendException(ErrorKind.Offline)))
-        val local = isLocalHost(URI(origin).host)
-        if (!local && origin !in state.consentedOrigins) throw RunnerException(RunnerError.ConsentNeeded(origin))
-        val secret = try { secrets.secret(connection.id, origin) }
-        catch (_: OriginMismatchException) { throw RunnerException(RunnerError.KeyMissing) }
-        if (secret.isNullOrEmpty() && ProviderEffort.needsKey(connection.preset, connection.baseUrl)) throw RunnerException(RunnerError.KeyMissing)
-        val language = LanguageProfiles.text(state.globals.languagePromptEnabled, state.globals.languageProfile, target, Contracts.builtinProfiles, state.profileOverrides)
-        val translator = synchronized(clientLock) {
-            val cached = clientState
-            if (cached != null && cached.connection == connection && cached.secret == secret) cached.translator
-            else {
-                val client = ProviderClient(connection, secret, transport)
-                Translator({ client }).also { clientState = ClientState(connection, secret, it) }
+        val prepared = prepare(input)
+        return backend {
+            val result = prepared.translator.translate(prepared.request)
+            RunnerOutput(
+                result,
+                prepared.request.sourceLang,
+                prepared.request.targetLang,
+                prepared.request.model,
+            )
+        }
+    }
+
+    fun stream(input: RunnerInput): Flow<RunnerStreamOutput> = flow {
+        val prepared = prepare(input)
+        backend {
+            prepared.translator.stream(prepared.request).collect { chunk ->
+                emit(
+                    RunnerStreamOutput(
+                        RunnerOutput(
+                            chunk.text,
+                            prepared.request.sourceLang,
+                            prepared.request.targetLang,
+                            prepared.request.model,
+                        ),
+                        chunk.complete,
+                        chunk.incomplete,
+                    ),
+                )
             }
         }
-        val result = try {
-            translator.translate(TextRequest(text, input.context, input.appName, state.globals.sourceLang, target, effective.prePrompt, language, model))
-        } catch (e: BackendException) { throw RunnerException(RunnerError.Backend(e)) }
-        catch (e: TransportException) {
-            throw RunnerException(if (e.reason == TransportException.Reason.LocalNetworkDenied) RunnerError.LocalNetworkDenied else RunnerError.Backend(BackendException(ErrorKind.Offline)))
-        }
-        return RunnerOutput(result, state.globals.sourceLang, target, model)
     }
+
+    private suspend fun prepare(input: RunnerInput): Prepared {
+        val text = input.text.jsTrim()
+        if (text.isEmpty()) throw RunnerException(RunnerError.Empty)
+        if (input.text.length > input.limit) throw RunnerException(RunnerError.TooLong(input.limit))
+        val state = settings.read()
+        val connection =
+            state.connections.find { it.id == state.activeConnectionId }
+                ?: throw RunnerException(RunnerError.NoConnection)
+        val template =
+            state.templates.find { it.id == input.templateId }
+                ?: state.templates.find { it.id == state.globals.defaultTemplateId }
+                ?: Contracts.builtinTemplate
+        val effective =
+            if (input.mainModel) SettingsLogic.effectiveMain(template, state)
+            else SettingsLogic.effective(template, state)
+        val target = input.targetLang ?: effective.targetLang
+        val model = effective.model ?: throw RunnerException(RunnerError.NoModel)
+        val origin =
+            originOf(connection.baseUrl)
+                ?: throw RunnerException(RunnerError.Backend(BackendException(ErrorKind.Offline)))
+        val local = isLocalHost(URI(origin).host)
+        if (!local && origin !in state.consentedOrigins)
+            throw RunnerException(RunnerError.ConsentNeeded(origin))
+        val secret =
+            try {
+                secrets.secret(connection.id, origin)
+            } catch (_: OriginMismatchException) {
+                throw RunnerException(RunnerError.KeyMissing)
+            }
+        if (
+            secret.isNullOrEmpty() && ProviderEffort.needsKey(connection.preset, connection.baseUrl)
+        )
+            throw RunnerException(RunnerError.KeyMissing)
+        val language =
+            LanguageProfiles.text(
+                state.globals.languagePromptEnabled,
+                state.globals.languageProfile,
+                target,
+                Contracts.builtinProfiles,
+                state.profileOverrides,
+            )
+        val translator =
+            synchronized(clientLock) {
+                val cached = clientState
+                if (cached != null && cached.connection == connection && cached.secret == secret)
+                    cached.translator
+                else {
+                    val client = ProviderClient(connection, secret, transport)
+                    Translator({ client }).also {
+                        clientState = ClientState(connection, secret, it)
+                    }
+                }
+            }
+        return Prepared(
+            translator,
+            TextRequest(
+                text,
+                input.context,
+                input.appName,
+                input.sourceLang ?: state.globals.sourceLang,
+                target,
+                effective.prePrompt,
+                language,
+                model,
+            ),
+        )
+    }
+
+    private suspend fun <T> backend(block: suspend () -> T): T =
+        try {
+            block()
+        } catch (e: BackendException) {
+            throw RunnerException(RunnerError.Backend(e))
+        } catch (e: TransportException) {
+            throw RunnerException(
+                if (e.reason == TransportException.Reason.LocalNetworkDenied)
+                    RunnerError.LocalNetworkDenied
+                else RunnerError.Backend(BackendException(ErrorKind.Offline)),
+            )
+        }
 }
+
+data class RunnerStreamOutput(
+    val output: RunnerOutput,
+    val complete: Boolean,
+    val incomplete: Boolean = false,
+)

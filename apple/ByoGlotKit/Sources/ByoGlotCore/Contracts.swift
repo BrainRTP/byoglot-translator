@@ -42,7 +42,7 @@ public enum Contracts: Sendable {
         }
     )
     public static let presetOrder: [ProviderPreset] = {
-        guard let url = Bundle.module.resourceURL?.appending(path: "Resources/contracts/presets.json"), let data = try? Data(contentsOf: url) else { return ProviderPreset.allCases }
+        guard let url = Bundle.module.resourceURL?.appending(path: "contracts/presets.json"), let data = try? Data(contentsOf: url) else { return ProviderPreset.allCases }
         return presetOrder(in: data)
     }()
 
@@ -60,7 +60,7 @@ public enum Contracts: Sendable {
     public static let limits: Limits = load("limits")
     public static let builtinTemplate: Template = load("builtin-template")
     public static let builtinProfiles: [String: String] = {
-        let folder = Bundle.module.resourceURL!.appending(path: "Resources/profiles")
+        let folder = Bundle.module.resourceURL!.appending(path: "profiles")
         do {
             let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
             var profiles: [String: String] = [:]
@@ -79,7 +79,7 @@ public enum Contracts: Sendable {
     }
 
     private static func load<T: Decodable>(_ name: String) -> T {
-        let file = "Resources/contracts/\(name).json"
+        let file = "contracts/\(name).json"
         do {
             let url = Bundle.module.resourceURL!.appending(path: file)
             return try JSONDecoder().decode(T.self, from: Data(contentsOf: url))

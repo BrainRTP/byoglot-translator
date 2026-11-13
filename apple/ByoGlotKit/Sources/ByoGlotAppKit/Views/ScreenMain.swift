@@ -62,8 +62,8 @@ public struct ScreenMain: View {
     }
     private var modelMenu: some View {
         Button { showModels = true } label: {
-            Text(model.model.map { "\($0.id) · \($0.variant ?? "none")" } ?? AppStrings.text("main.chooseModel"))
-                .modifier(ByoTypography(13, mono: true)).foregroundStyle(ByoColor.muted).frame(minHeight: 44)
+            Text(model.model.map { "\($0.id) · \(AppStrings.effort($0.variant))" } ?? AppStrings.text("main.chooseModel"))
+                .modifier(ByoTypography(13, mono: true)).foregroundStyle(ByoColor.muted).frame(minHeight: 44).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityLabel(AppStrings.text("model.title")).modifier(ByoFocusRing())
     }
     @ViewBuilder private var effortPicker: some View {
@@ -75,7 +75,7 @@ public struct ScreenMain: View {
                 selected.variant = variant
                 model.chooseModel(selected)
             })) {
-                ForEach(levels, id: \.self) { Text($0).tag($0) }
+                ForEach(levels, id: \.self) { Text(AppStrings.effort($0)).tag($0) }
             }.modifier(ByoTypography(13, mono: true)).frame(minHeight: 44)
         }
     }
@@ -98,6 +98,7 @@ public struct ScreenMain: View {
 
 public struct LangBar: View {
     @Bindable var model: AppModel
+    @Environment(\.dynamicTypeSize) private var typeSize
     let swap: () -> Void
     public init(model: AppModel, swap: @escaping () -> Void) { self.model = model; self.swap = swap }
     private var sourceLabel: String {
@@ -125,7 +126,7 @@ public struct LangBar: View {
             .accessibilityElement(children: .contain)
     }
     private func languageLabel(_ label: String) -> some View {
-        HStack(spacing: 4) { Text(label).lineLimit(1); Image(systemName: "chevron.down").font(.caption2).accessibilityHidden(true) }
+        HStack(spacing: 4) { Text(label).lineLimit(typeSize.isAccessibilitySize ? 2 : 1); Image(systemName: "chevron.down").font(.caption2).accessibilityHidden(true) }
             .modifier(ByoTypography(15)).frame(maxWidth: .infinity, minHeight: 44).padding(.horizontal, 4).contentShape(Rectangle())
     }
 }
@@ -141,22 +142,24 @@ public struct TranslatorBlock: View {
         self.model = model; _text = text; self.openProviders = openProviders; self.openModels = openModels
     }
     public var body: some View {
-        GeometryReader { geometry in
-            let available = max(0, geometry.size.height - 68)
-            let needsScroll = typeSize.isAccessibilitySize || available < 260
-            if needsScroll {
-                ScrollView {
-                    VStack(spacing: 8) {
-                        languages
-                        source.frame(height: typeSize.isAccessibilitySize ? 340 : 180)
-                        output.frame(minHeight: typeSize.isAccessibilitySize ? 420 : 220)
-                    }
-                }
-            } else {
+        Group {
+            if typeSize.isAccessibilitySize {
                 VStack(spacing: 8) {
                     languages
-                    source.frame(height: available * (editing ? 0.4 : 0.5))
-                    output.frame(maxHeight: .infinity)
+                    source.frame(height: 340)
+                    output.frame(minHeight: 420)
+                }
+            } else {
+                GeometryReader { geometry in
+                    let available = max(260, geometry.size.height - 68)
+                    let fraction = editing ? 0.4 : 0.5
+                    ScrollView {
+                        VStack(spacing: 8) {
+                            languages
+                            source.frame(height: max(120, available * fraction))
+                            output.frame(height: max(180, available * (1 - fraction)))
+                        }.frame(minHeight: geometry.size.height, alignment: .top)
+                    }.scrollBounceBehavior(.basedOnSize).scrollDismissesKeyboard(.immediately)
                 }
             }
         }.padding(.horizontal, 16).padding(.bottom, 12)
@@ -186,9 +189,7 @@ public struct TranslatorBlock: View {
                     .accessibilityLabel(AppStrings.format("main.counter", ["n": String(AppModel.inputCount(text))]))
                 Spacer()
                 if text.isEmpty {
-                    PasteButton(payloadType: String.self) { values in
-                        if let value = values.first { text = value; model.edit(value, pasted: true) }
-                    }.labelStyle(.titleAndIcon).frame(minHeight: 44).accessibilityLabel(AppStrings.text("main.paste"))
+                    ByoPasteButton { value in text = value; model.edit(value, pasted: true) }
                 } else {
                     ByoIconButton(title: "main.clear", symbol: "xmark") { text = ""; model.edit("") }
                 }
@@ -198,7 +199,7 @@ public struct TranslatorBlock: View {
                     .fixedSize(horizontal: false, vertical: true).padding(.horizontal, 14).padding(.bottom, 8)
             }
         }.background(ByoColor.background, in: RoundedRectangle(cornerRadius: 10))
-            .overlay { RoundedRectangle(cornerRadius: 10).stroke(editing ? ByoColor.accent : ByoColor.border, lineWidth: editing ? 2 : 1) }
+            .overlay { RoundedRectangle(cornerRadius: 10).stroke(editing ? ByoColor.accent : ByoColor.border, lineWidth: editing ? 2 : 1).allowsHitTesting(false) }
     }
     private var output: some View {
         VStack(spacing: 0) {
@@ -207,20 +208,9 @@ public struct TranslatorBlock: View {
                 Spacer()
                 if model.running { ProgressView().controlSize(.small).accessibilityLabel(AppStrings.text("main.running")) }
             }.padding(.horizontal, 14).padding(.top, 10)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    if model.result.isEmpty && model.error == nil && !model.running {
-                        Text(AppStrings.text("main.resultPlaceholder")).foregroundStyle(ByoColor.muted)
-                    } else if !model.result.isEmpty || model.running {
-                        StreamingResult(text: model.result, running: model.running)
-                    }
-                    if let error = model.error { ScreenMainErrors(error: error, errorAt: model.errorAt, provider: model.providerName, retry: model.translate, providers: openProviders, models: openModels, clear: { text = ""; model.edit("") }) }
-                    else if model.incomplete {
-                        Banner(title: AppStrings.text("main.incomplete"), message: AppStrings.text("main.incompleteBody"), warning: true, actionTitle: "err.otherModel", action: openModels)
-                    } else if model.settings.connections.isEmpty {
-                        Banner(title: AppStrings.text("providers.firstTitle"), message: AppStrings.text("providers.firstBody"), actionTitle: "providers.add", action: openProviders)
-                    }
-                }.modifier(ByoTypography(17)).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14).padding(.vertical, 6)
+            Group {
+                if typeSize.isAccessibilitySize { resultContent }
+                else { ScrollView { resultContent }.scrollDismissesKeyboard(.immediately) }
             }.accessibilityLabel(AppStrings.text("main.title")).accessibilityElement(children: .contain)
             HStack {
                 Spacer(minLength: 0)
@@ -228,6 +218,7 @@ public struct TranslatorBlock: View {
                 else {
                     ByoIconButton(title: "main.copy", symbol: "doc.on.doc", action: copy).disabled(model.result.isEmpty)
                     ShareLink(item: model.result) { Image(systemName: "square.and.arrow.up").font(.system(size: 20)).frame(minWidth: 44, minHeight: 44) }
+                        .foregroundStyle(model.result.isEmpty ? ByoColor.strongBorder : ByoColor.text)
                         .accessibilityLabel(AppStrings.text("main.share")).disabled(model.result.isEmpty).modifier(ByoFocusRing())
                     ByoIconButton(title: "main.retranslate", symbol: "arrow.clockwise", action: model.translate).disabled(!model.canTranslate)
                         .keyboardShortcut(.return, modifiers: .command)
@@ -235,6 +226,21 @@ public struct TranslatorBlock: View {
             }.padding(.horizontal, 4).padding(.bottom, 4)
         }.background(ByoColor.surface, in: RoundedRectangle(cornerRadius: 10))
             .overlay { RoundedRectangle(cornerRadius: 10).stroke(ByoColor.border) }
+    }
+    private var resultContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if model.result.isEmpty && model.error == nil && !model.running {
+                Text(AppStrings.text("main.resultPlaceholder")).foregroundStyle(ByoColor.muted)
+            } else if !model.result.isEmpty || model.running {
+                StreamingResult(text: model.result, running: model.running)
+            }
+            if let error = model.error { ScreenMainErrors(error: error, errorAt: model.errorAt, provider: model.providerName, retry: model.translate, providers: openProviders, models: openModels, clear: { text = ""; model.edit("") }) }
+            else if model.incomplete {
+                Banner(title: AppStrings.text("main.incomplete"), message: AppStrings.text("main.incompleteBody"), warning: true, actionTitle: "err.otherModel", action: openModels)
+            } else if model.settings.connections.isEmpty {
+                Banner(title: AppStrings.text("providers.firstTitle"), message: AppStrings.text("providers.firstBody"), actionTitle: "providers.add", action: openProviders)
+            }
+        }.modifier(ByoTypography(17)).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14).padding(.vertical, 6)
     }
     private func copy() {
         #if canImport(UIKit)
@@ -267,12 +273,21 @@ public struct ScreenMainErrors: View {
 private struct StreamingResult: View {
     let text: String
     let running: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
-        TimelineView(.animation(minimumInterval: 0.5, paused: !running || reduceMotion)) { context in
+        Text(text.isEmpty ? " " : text).textSelection(.enabled).lineSpacing(5)
+            .overlay(alignment: .bottomTrailing) {
+                if running { StreamingCaret().offset(x: 4) }
+            }
+    }
+}
+
+private struct StreamingCaret: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric private var height: CGFloat = 20
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 0.5, paused: reduceMotion)) { context in
             let visible = reduceMotion || context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1) < 0.5
-            Text("\(Text(text))\(Text(running ? " ▏" : "").foregroundColor(ByoColor.accent.opacity(visible ? 1 : 0)))")
-                .textSelection(.enabled).lineSpacing(5)
-        }
+            Rectangle().fill(ByoColor.accent).frame(width: 2, height: height).opacity(visible ? 1 : 0)
+        }.accessibilityHidden(true)
     }
 }

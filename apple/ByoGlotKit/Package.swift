@@ -14,7 +14,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "ByoGlotAppKit", dependencies: ["ByoGlotCore", "ByoGlotStore"], resources: [.process("Resources")]),
-        .target(name: "ByoGlotCore", resources: [.copy("Resources")]),
+        .target(name: "ByoGlotCore", resources: [.copy("Resources/contracts"), .copy("Resources/profiles")]),
         .target(name: "ByoGlotStore", dependencies: ["ByoGlotCore"]),
         .target(name: "ByoGlotStoreTesting", dependencies: ["ByoGlotStore"]),
         .target(name: "ByoGlotBridge", dependencies: ["ByoGlotCore", "ByoGlotStore"]),

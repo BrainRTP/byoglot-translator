@@ -93,7 +93,7 @@ public struct Segment: View {
                 Text(option).modifier(ByoTypography(15, weight: option == selection ? .semibold : .regular, mono: true))
                     .frame(maxWidth: .infinity, minHeight: 44).padding(.horizontal, 4)
                     .foregroundStyle(option == selection ? ByoColor.background : ByoColor.text)
-                    .background(option == selection ? ByoColor.text : .clear, in: RoundedRectangle(cornerRadius: 4))
+                    .background(option == selection ? ByoColor.text : .clear, in: RoundedRectangle(cornerRadius: 4)).contentShape(Rectangle())
             }.buttonStyle(.plain).disabled(disabled.contains(option))
                 .accessibilityAddTraits(option == selection ? .isSelected : [])
                 .modifier(ByoFocusRing())

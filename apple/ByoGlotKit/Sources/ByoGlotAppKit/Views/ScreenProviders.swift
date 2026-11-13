@@ -68,6 +68,7 @@ private struct ProviderKeyScreen: View {
     @State private var invalidURL = false
     @State private var consentOrigin: String?
     @State private var deleteConfirm = false
+    @State private var deleting = false
     @State private var saving: Task<Void, Never>?
     @Environment(\.dismiss) private var dismiss
     @FocusState private var keyFocused: Bool
@@ -142,19 +143,21 @@ private struct ProviderKeyScreen: View {
                     .textInputAutocapitalization(.never).autocorrectionDisabled().textContentType(nil)
                     #endif
                 ByoIconButton(title: showKey ? "key.hide" : "key.show", symbol: showKey ? "eye.slash" : "eye") { showKey.toggle() }
-                PasteButton(payloadType: String.self) { values in if let value = values.first { key = value } }
-                    .labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44).accessibilityLabel(AppStrings.text("key.paste"))
+                ByoPasteButton(iconOnly: true, label: "key.paste") { key = $0 }
             }.frame(minHeight: 48).overlay { RoundedRectangle(cornerRadius: 6).stroke(authError ? ByoColor.error : keyFocused ? ByoColor.accent : ByoColor.strongBorder, lineWidth: keyFocused ? 2 : 1) }
                 .disabled(checking)
         }
     }
     @ViewBuilder private var savedContent: some View {
         if let connection {
+            if let failure {
+                Banner(title: AppStrings.text("err.generic"), message: String(localized: UserFacingError.message(failure)), actionTitle: "err.retry", action: deleteSavedConnection)
+            }
             Label(AppStrings.text(hasKey ? "key.ok" : "providers.keyMissing"), systemImage: hasKey ? "checkmark.circle.fill" : "exclamationmark.circle")
                 .foregroundStyle(hasKey ? ByoColor.success : ByoColor.error)
             Text("••••••••").modifier(ByoTypography(14, mono: true)).accessibilityLabel(AppStrings.text("key.label"))
             if let list = model.models[connection.id] {
-                Text(AppStrings.format("key.okModels", ["provider": connection.name, "n": String(list.count)]))
+                Text(AppStrings.format(list.count == 1 ? "key.okModel" : "key.okModels", ["provider": connection.name, "n": String(list.count)]))
                     .modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
                 if list.isEmpty { Text(AppStrings.text("providers.noModels")) }
                 else {
@@ -189,12 +192,16 @@ private struct ProviderKeyScreen: View {
             .accessibilityElement(children: .contain)
     }
     private var deleteButton: some View {
-        ByoButton("common.delete", kind: .danger) {
-            guard let id = connection?.id else { return }
-            saving = Task {
-                do { try await model.removeConnection(id); key = ""; dismiss() }
-                catch { failure = .appGroupUnavailable; deleteConfirm = false; replacing = true }
-            }
+        ByoButton("common.delete", kind: .danger, busy: deleting, action: deleteSavedConnection)
+    }
+    private func deleteSavedConnection() {
+        guard !deleting, let id = connection?.id else { return }
+        deleting = true
+        failure = nil
+        saving = Task {
+            defer { deleting = false }
+            do { try await model.removeConnection(id); key = ""; dismiss() }
+            catch { failure = .appGroupUnavailable; deleteConfirm = false }
         }
     }
     private func check() {

@@ -66,6 +66,10 @@ public enum AppStrings {
     public static func format(_ key: String, _ values: [String: String]) -> String {
         values.reduce(text(key)) { $0.replacingOccurrences(of: "{\($1.key)}", with: $1.value) }
     }
+    public static func effort(_ value: String?) -> String {
+        let value = value ?? "none"
+        return ["none", "low", "medium", "high", "max"].contains(value) ? text("effort." + value) : value
+    }
     public static func language(_ code: String) -> String {
         Locale.current.localizedString(forLanguageCode: code) ?? code
     }

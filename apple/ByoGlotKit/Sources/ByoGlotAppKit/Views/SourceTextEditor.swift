@@ -16,6 +16,8 @@ struct SourceTextEditor: UIViewRepresentable {
         view.didPaste = { [weak coordinator = context.coordinator] text in coordinator?.parent.paste(text) }
         view.delegate = context.coordinator
         view.backgroundColor = .clear
+        view.keyboardDismissMode = .interactive
+        view.alwaysBounceVertical = true
         view.textContainerInset = UIEdgeInsets(top: 12, left: 9, bottom: 8, right: 9)
         view.adjustsFontForContentSizeCategory = true
         view.accessibilityLabel = AppStrings.text("main.source")

@@ -153,6 +153,22 @@ struct BridgeHandlerTests {
         #expect(await transport.requests.isEmpty)
     }
 
+    @Test func fetchRedactsJSONEscapedSecrets() async throws {
+        for (secret, body) in [
+            ("fixture/key", #"{"error":"fixture\/key"}"#),
+            (#"fixture"key"#, #"{"error":"fixture\"key"}"#),
+            (#"fixture\key"#, #"{"error":"fixture\\key"}"#),
+        ] {
+            let store = InMemorySecretStore()
+            try store.set(secret, connectionId: "c1", origin: "https://api.deepseek.com")
+            let bridge = BridgeHandler(secrets: store, transport: CannedTransport(headers: ["Retry-After": body], body: body))
+            let result = try JSONDecoder().decode(BridgeReply.self, from: await bridge.handle(fetch()))
+            #expect(result.ok)
+            #expect(result.body == #"{"error":"[redacted]"}"#)
+            #expect(result.headers == ["retry-after": #"{"error":"[redacted]"}"#])
+        }
+    }
+
     @Test func fetchWithoutASecretSendsNoAuthorization() async throws {
         let transport = CannedTransport()
         let bridge = BridgeHandler(secrets: InMemorySecretStore(), transport: transport)

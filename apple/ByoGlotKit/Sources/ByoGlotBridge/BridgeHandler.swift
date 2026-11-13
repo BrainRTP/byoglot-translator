@@ -98,6 +98,9 @@ public actor BridgeHandler {
 
     private static func redact(_ value: String, secret: String?) -> String {
         guard let secret, !secret.isEmpty else { return value }
-        return value.replacingOccurrences(of: secret, with: "[redacted]")
+        let json = (try? JSONEncoder().encode(secret)).map { String(decoding: $0, as: UTF8.self) }
+        let escaped = json.map { String($0.dropFirst().dropLast()) } ?? secret
+        let redacted = value.replacingOccurrences(of: escaped, with: "[redacted]")
+        return escaped == secret ? redacted : redacted.replacingOccurrences(of: secret, with: "[redacted]")
     }
 }

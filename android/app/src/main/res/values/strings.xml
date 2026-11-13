@@ -10,7 +10,7 @@
     <string name="error_consent">Confirm in ByoGlot that text may be sent to %1$s.</string>
     <string name="error_too_long">The text is longer than %1$d characters.</string>
     <string name="error_empty">There is no text to translate.</string>
-    <string name="error_local_network">Allow ByoGlot network access in system settings.</string>
+    <string name="error_local_network">Allow ByoGlot to use the local network in system settings.</string>
     <string name="error_offline">The provider did not answer. Check the connection.</string>
     <string name="error_auth">The provider rejected the API key (HTTP %1$d).</string>
     <string name="error_rate_limit">The provider limit is reached. Try again later.</string>
@@ -69,6 +69,7 @@
     <string name="err_down_unknown">The provider did not respond. Retry in a minute or choose another model.</string>
     <string name="providers_key_unchecked">The key was not checked. Check your connection and retry.</string>
     <string name="https_only">Enter a valid HTTPS address.</string>
+    <string name="legacy_https_only">This address is not HTTPS. Delete it and add the provider again.</string>
     <string name="key_mask">••••••••</string>
     <string name="providers_title">Providers</string>
     <string name="providers_firstTitle">Connect a provider</string>

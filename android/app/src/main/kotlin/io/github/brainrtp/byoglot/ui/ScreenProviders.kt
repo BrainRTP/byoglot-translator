@@ -119,7 +119,7 @@ fun ProviderKeyScreen(
         ScreenColumn {
             Text(initial.baseUrl, style = ByoType.mono)
             if (PhoneProviderPolicy.origin(initial.baseUrl) == null)
-                Text(stringResource(R.string.https_only), style = ByoType.body)
+                Text(stringResource(R.string.legacy_https_only), style = ByoType.body)
             else
                 ByoButton(
                     stringResource(R.string.use_connection),

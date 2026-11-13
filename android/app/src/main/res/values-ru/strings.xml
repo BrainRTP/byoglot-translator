@@ -10,7 +10,7 @@
     <string name="error_consent">Подтвердите в ByoGlot отправку текста на %1$s.</string>
     <string name="error_too_long">Текст длиннее %1$d символов.</string>
     <string name="error_empty">Нет текста для перевода.</string>
-    <string name="error_local_network">Разрешите ByoGlot доступ к сети в настройках системы.</string>
+    <string name="error_local_network">Разрешите ByoGlot доступ к локальной сети в настройках системы.</string>
     <string name="error_offline">Провайдер не ответил. Проверьте соединение.</string>
     <string name="error_auth">Провайдер отклонил API-ключ (HTTP %1$d).</string>
     <string name="error_rate_limit">Достигнут лимит провайдера. Повторите позже.</string>
@@ -69,6 +69,7 @@
     <string name="err_down_unknown">Провайдер не ответил. Повторите через минуту или выберите другую модель.</string>
     <string name="providers_key_unchecked">Ключ не проверен. Проверьте сеть и повторите.</string>
     <string name="https_only">Введите действительный адрес HTTPS.</string>
+    <string name="legacy_https_only">Этот адрес не использует HTTPS. Удалите провайдера и добавьте его заново.</string>
     <string name="key_mask">••••••••</string>
     <string name="providers_title">Провайдеры</string>
     <string name="providers_firstTitle">Подключите провайдера</string>

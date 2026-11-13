@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -14,6 +15,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import io.github.brainrtp.byoglot.R
@@ -32,7 +34,7 @@ fun ScreenShare(
     val settings by vm.settings.collectAsState()
     val params by vm.parameters.collectAsState()
     val recent by vm.recentLanguages.collectAsState()
-    var picker by remember { mutableStateOf<String?>(null) }
+    var picker by rememberSaveable { mutableStateOf<String?>(null) }
     val current = settings
     val context = LocalContext.current
     val reducedMotion =
@@ -87,7 +89,12 @@ fun ScreenShare(
                     val template =
                         current.templates.find { it.id == params.templateId }
                             ?: Contracts.builtinTemplate
-                    PickerField("", templateLabel(template), { picker = "template" })
+                    PickerField(
+                        stringResource(R.string.template),
+                        templateLabel(template),
+                        { picker = "template" },
+                        showLabel = false,
+                    )
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         ByoButton(
                             if (params.sourceLang == "auto")
@@ -99,7 +106,12 @@ fun ScreenShare(
                             Modifier.weight(1f),
                             style = ButtonStyle.Text,
                         )
-                        Text("→", color = ByoTheme.colors.mu, style = ByoType.body)
+                        Text(
+                            "→",
+                            Modifier.clearAndSetSemantics {},
+                            color = ByoTheme.colors.mu,
+                            style = ByoType.body,
+                        )
                         ByoButton(
                             languageLabel(params.targetLang),
                             { picker = "target" },
@@ -166,13 +178,7 @@ fun ScreenShare(
                             val limit =
                                 (error as? RunnerError.Backend)?.error?.kind == ErrorKind.RateLimit
                             if (error is RunnerError.TooLong)
-                                Banner(
-                                    errorMessage(error),
-                                    "",
-                                    stringResource(R.string.err_openSettings),
-                                    { onSettings("settings") },
-                                    warning = true,
-                                )
+                                Banner(errorMessage(error), "", warning = true)
                             else
                                 ScreenMainErrors(
                                     error,
@@ -182,7 +188,12 @@ fun ScreenShare(
                                         .orEmpty(),
                                     state.errorAtMs ?: System.currentTimeMillis(),
                                     actionLabel =
-                                        if (limit) stringResource(R.string.err_openSettings)
+                                        if (
+                                            limit ||
+                                                mainError(error).kind == MainErrorKind.Key ||
+                                                error == RunnerError.KeyMissing
+                                        )
+                                            stringResource(R.string.err_openSettings)
                                         else null,
                                 ) { action ->
                                     if (limit) onSettings("settings")
@@ -203,6 +214,14 @@ fun ScreenShare(
                             stringResource(R.string.err_otherModel),
                             { picker = "model" },
                             warning = true,
+                        )
+                    if (vm.needsConfirmation)
+                        Text(
+                            vm.request.text.jsTrim(),
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                            style = ByoType.original,
+                            color = ByoTheme.colors.mu,
                         )
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (state.working) ByoButton(stringResource(R.string.main_stop), vm::cancel)

@@ -354,8 +354,8 @@ fun Segment(
 fun Banner(
     title: String,
     body: String,
-    action: String,
-    onAction: () -> Unit,
+    action: String? = null,
+    onAction: () -> Unit = {},
     modifier: Modifier = Modifier,
     warning: Boolean = false,
 ) {
@@ -374,7 +374,7 @@ fun Banner(
     ) {
         Text(title, color = status, style = ByoType.original, fontWeight = FontWeight.SemiBold)
         if (body.isNotEmpty()) Text(body, color = c.tx, style = ByoType.original)
-        ByoButton(action, onAction)
+        if (action != null) ByoButton(action, onAction)
     }
 }
 
@@ -412,7 +412,9 @@ fun ListRow(
             subtitle?.let { Text(it, style = ByoType.label, color = c.mu) }
         }
         value?.let { Text(it, style = ByoType.label, color = c.mu) }
-        if (trailing != null) trailing() else if (!danger) ByoIconImage(ByoIcon.Chevron, c.mu)
+        if (selected) Text("✓", Modifier.clearAndSetSemantics {}, color = c.ac)
+        if (trailing != null) trailing()
+        else if (!danger && !selected) ByoIconImage(ByoIcon.Chevron, c.mu)
     }
     HorizontalDivider(color = c.bd)
 }

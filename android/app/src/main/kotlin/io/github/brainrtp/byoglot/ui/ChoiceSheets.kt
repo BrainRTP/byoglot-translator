@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -15,6 +16,7 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import io.github.brainrtp.byoglot.R
 import io.github.brainrtp.byoglot.core.*
+import java.util.Locale
 
 @Composable
 internal fun SectionLabel(text: String) {
@@ -89,17 +91,17 @@ internal fun InlineConfirm(
 internal fun EffortSegment(model: ModelRef?, info: ModelInfo?, onModel: (ModelRef) -> Unit) {
     SectionLabel(stringResource(R.string.effort_label))
     val levels = info?.variants.orEmpty().ifEmpty { listOf("none") }
+    val effort = model?.variant?.takeIf { it in levels } ?: "none"
     Segment(
         listOf("none", "low", "medium", "high", "max").map { it to effortLabel(it) },
-        model?.variant ?: "none",
+        effort,
         { value -> model?.let { onModel(it.copy(variant = value)) } },
         enabled = model != null && info != null,
         optionEnabled = { it in levels },
         mono = true,
     )
     if (levels.none { it != "none" }) Note(stringResource(R.string.model_noThinking))
-    else if (model?.variant != null && model.variant != "none")
-        Note(stringResource(R.string.effort_note))
+    else if (effort != "none") Note(stringResource(R.string.effort_note))
 }
 
 @Composable
@@ -115,10 +117,11 @@ fun ScreenModelSheet(
     showEffort: Boolean = true,
 ) {
     val groups by catalogue.groups.collectAsState()
+    val current = catalogue.clamp(selected)
     var reload by remember { mutableIntStateOf(0) }
     LaunchedEffect(reload) { onRefresh() }
     ByoBottomSheet(stringResource(R.string.model_title), onDismiss) {
-        if (showEffort) EffortSegment(selected, catalogue.info(selected), onModel)
+        if (showEffort) EffortSegment(current, catalogue.info(current), onModel)
         if (settings.connections.isEmpty()) Note(stringResource(R.string.error_no_connection))
         settings.connections
             .filter { connectionId == null || it.id == connectionId }
@@ -142,11 +145,11 @@ fun ScreenModelSheet(
                                 model.providerID,
                                 model.id,
                                 if (
-                                    selected?.id == model.id &&
-                                        selected.connectionId == connection.id &&
-                                        selected.variant in model.variants
+                                    current?.id == model.id &&
+                                        current.connectionId == connection.id &&
+                                        current.variant in model.variants
                                 )
-                                    selected.variant
+                                    current.variant
                                 else model.variants.firstOrNull(),
                                 connection.id,
                             )
@@ -160,14 +163,8 @@ fun ScreenModelSheet(
                                     else R.string.thinking_no,
                                 ),
                             selected =
-                                selected?.id == model.id && selected.connectionId == connection.id,
-                            trailing = {
-                                if (
-                                    selected?.id == model.id &&
-                                        selected.connectionId == connection.id
-                                )
-                                    Text("✓", color = ByoTheme.colors.ac)
-                            },
+                                current?.id == model.id && current.connectionId == connection.id,
+                            trailing = {},
                         )
                     }
                 }
@@ -188,10 +185,16 @@ fun ScreenLanguageSheet(
     detected: String? = null,
     inherit: Boolean = false,
 ) {
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
     val languages =
         Contracts.languageCodes.map { it to languageLabel(it) }.sortedBy { it.second.lowercase() }
-    val filtered = languages.filter { (_, name) -> name.contains(query, ignoreCase = true) }
+    val filtered = languages.filter { (code, name) ->
+        name.contains(query, ignoreCase = true) ||
+            code.contains(query, ignoreCase = true) ||
+            Locale.forLanguageTag(code)
+                .getDisplayLanguage(Locale.ENGLISH)
+                .contains(query, ignoreCase = true)
+    }
     ByoBottomSheet(
         stringResource(if (source) R.string.lang_srcTitle else R.string.lang_dstTitle),
         onDismiss,
@@ -275,10 +278,11 @@ internal fun PickerField(
     mono: Boolean = false,
     inherited: Boolean = false,
     enabled: Boolean = true,
+    showLabel: Boolean = true,
 ) {
     val c = ByoTheme.colors
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (label.isNotEmpty()) SectionLabel(label)
+        if (showLabel && label.isNotEmpty()) SectionLabel(label)
         Row(
             Modifier.fillMaxWidth()
                 .heightIn(min = 48.dp)
@@ -286,6 +290,7 @@ internal fun PickerField(
                 .border(1.dp, c.bd2, RoundedCornerShape(6.dp))
                 .background(c.bg, RoundedCornerShape(6.dp))
                 .clickable(enabled, role = Role.Button, onClick = onClick)
+                .semantics { contentDescription = "$label: $value" }
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -312,10 +317,10 @@ fun ScreenParamsSheet(
     val parameters by vm.parameters.collectAsState()
     val template =
         settings.templates.find { it.id == parameters.templateId } ?: Contracts.builtinTemplate
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by rememberSaveable { mutableStateOf(false) }
     var confirming by remember { mutableStateOf(false) }
-    var saving by remember { mutableStateOf(false) }
-    var name by remember { mutableStateOf("") }
+    var saving by rememberSaveable { mutableStateOf(false) }
+    var name by rememberSaveable { mutableStateOf("") }
     val updateFocus = remember { FocusRequester() }
     var restoreFocus by remember { mutableStateOf(false) }
     LaunchedEffect(confirming) {
@@ -345,7 +350,7 @@ fun ScreenParamsSheet(
                 if (parameters.changed) Chip(stringResource(R.string.changed))
             }
             if (parameters.changed) {
-                if (confirming)
+                if (confirming && parameters.templateChanges)
                     InlineConfirm(
                         stringResource(R.string.update_template_confirm, templateLabel(template)),
                         {
@@ -357,7 +362,7 @@ fun ScreenParamsSheet(
                             confirming = false
                         },
                     )
-                else if (!template.builtin)
+                else if (!template.builtin && parameters.templateChanges)
                     ByoButton(
                         stringResource(R.string.update_template),
                         { confirming = true },

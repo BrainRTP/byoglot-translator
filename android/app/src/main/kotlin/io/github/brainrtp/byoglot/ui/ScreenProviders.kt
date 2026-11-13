@@ -334,7 +334,18 @@ fun ProviderKeyScreen(
                 ListRow(
                     saved?.pageModel?.id ?: stringResource(R.string.choose_model),
                     { id?.let(onModel) },
-                    subtitle = saved?.pageModel?.variant?.let { effortLabel(it) },
+                    subtitle =
+                        saved?.pageModel?.let { ref ->
+                            effortLabel(
+                                ref.variant?.takeIf {
+                                    it in
+                                        models
+                                            .find { model -> model.id == ref.id }
+                                            ?.variants
+                                            .orEmpty()
+                                } ?: "none",
+                            )
+                        },
                 )
             }
             ByoButton(

@@ -46,9 +46,9 @@ fun AppNavigation(
     var connectionId by rememberSaveable { mutableStateOf<String?>(null) }
     var preset by rememberSaveable { mutableStateOf(ProviderPreset.deepseek) }
     var templateId by rememberSaveable { mutableStateOf<String?>(null) }
-    var sheet by remember { mutableStateOf<String?>(null) }
-    var modelReturn by remember { mutableStateOf<String?>(null) }
-    var modelMain by remember { mutableStateOf(true) }
+    var sheet by rememberSaveable { mutableStateOf<String?>(null) }
+    var modelReturn by rememberSaveable { mutableStateOf<String?>(null) }
+    var modelMain by rememberSaveable { mutableStateOf(true) }
     val navigate: (String) -> Unit = { stack = stack + it }
     val back: () -> Unit = {
         if (stack.size > 1) stack = stack.dropLast(1)
@@ -280,7 +280,7 @@ fun AppNavigation(
                 ScreenModelSheet(
                     state,
                     vm.catalogue,
-                    SettingsLogic.fallbackModel(state, true),
+                    state.fallbackModel,
                     { model -> vm.action { vm.setFallbackModel(model) } },
                     closeModel,
                     vm::refreshModels,

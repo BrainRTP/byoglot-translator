@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -97,7 +98,8 @@ fun ScreenLanguageSettings(
     interfaceLanguage: String,
     onInterfaceLanguage: (String) -> Unit,
 ) {
-    var interfaceSheet by remember { mutableStateOf(false) }
+    val interfacePrimary = LanguageProfiles.primaryLang(interfaceLanguage)
+    var interfaceSheet by rememberSaveable { mutableStateOf(false) }
     ScreenColumn {
         ByoGroup {
             ListRow(
@@ -110,7 +112,7 @@ fun ScreenLanguageSettings(
                 { interfaceSheet = true },
                 value =
                     if (interfaceLanguage.isEmpty()) stringResource(R.string.settings_system)
-                    else languageLabel(interfaceLanguage),
+                    else languageLabel(interfacePrimary),
             )
         }
         SectionLabel(stringResource(R.string.settings_theme))
@@ -145,7 +147,7 @@ fun ScreenLanguageSettings(
                             interfaceSheet = false
                             onInterfaceLanguage(id)
                         },
-                        selected = interfaceLanguage == id,
+                        selected = interfacePrimary == id,
                         trailing = {},
                     )
                 }
@@ -159,9 +161,10 @@ fun ScreenModelSettings(
     onModel: (Boolean) -> Unit,
     onFallback: () -> Unit,
 ) {
+    val groups by vm.catalogue.groups.collectAsState()
     ScreenColumn {
         listOf(true, false).forEach { main ->
-            val model = SettingsLogic.defaultModel(settings, main)
+            val model = vm.catalogue.clamp(SettingsLogic.defaultModel(settings, main))
             SectionLabel(
                 stringResource(if (main) R.string.models_main else R.string.models_external),
             )
@@ -171,14 +174,13 @@ fun ScreenModelSettings(
                 { onModel(main) },
                 mono = true,
             )
-            EffortSegment(model, vm.catalogue.info(model)) {
+            EffortSegment(model, groups[model?.connectionId]?.models?.find { it.id == model?.id }) {
                 vm.action { vm.setDefaultModel(it, main) }
             }
         }
         PickerField(
             stringResource(R.string.models_fallback),
-            SettingsLogic.fallbackModel(settings, true)?.id
-                ?: stringResource(R.string.choose_model),
+            settings.fallbackModel?.id ?: stringResource(R.string.choose_model),
             onFallback,
             mono = true,
         )
@@ -207,12 +209,12 @@ fun ScreenLanguagePrompt(vm: MainViewModel, settings: AppSettings, onBack: () ->
             )
     val base = Contracts.builtinProfiles[id].orEmpty()
     val saved = settings.profileOverrides[id]?.text ?: base
-    var draft by remember(id, saved) { mutableStateOf(saved) }
+    var draft by rememberSaveable(id, saved) { mutableStateOf(saved) }
     val dirty = draft != saved
-    var profileSheet by remember { mutableStateOf(false) }
-    var discard by remember { mutableStateOf(false) }
-    var reset by remember { mutableStateOf(false) }
-    var pendingProfile by remember { mutableStateOf<String?>(null) }
+    var profileSheet by rememberSaveable { mutableStateOf(false) }
+    var discard by rememberSaveable { mutableStateOf(false) }
+    var reset by rememberSaveable { mutableStateOf(false) }
+    var pendingProfile by rememberSaveable { mutableStateOf<String?>(null) }
     val back = {
         if (dirty) {
             pendingProfile = null
@@ -346,7 +348,7 @@ fun ScreenLanguagePrompt(vm: MainViewModel, settings: AppSettings, onBack: () ->
 
 @Composable
 fun ScreenTemplateSettings(settings: AppSettings, onEdit: (String?) -> Unit) {
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
     ScreenColumn {
         ByoTextField(query, { query = it }, stringResource(R.string.search_templates))
         listOf(true, false).forEach { builtin ->
@@ -394,15 +396,17 @@ fun ScreenTemplateEditor(
     original: Template?,
     onBack: () -> Unit,
 ) {
-    var name by remember {
+    var name by rememberSaveable {
         mutableStateOf(original?.let { if (it.builtin) "" else it.name }.orEmpty())
     }
-    var prompt by remember { mutableStateOf(original?.settings?.prePrompt.orEmpty()) }
-    var target by remember { mutableStateOf(original?.settings?.targetLang.orEmpty()) }
-    var model by remember { mutableStateOf(original?.settings?.pageModel) }
-    var modelEdited by remember { mutableStateOf(false) }
-    var picker by remember { mutableStateOf<String?>(null) }
-    var deleting by remember { mutableStateOf(false) }
+    var prompt by rememberSaveable { mutableStateOf(original?.settings?.prePrompt.orEmpty()) }
+    var target by rememberSaveable { mutableStateOf(original?.settings?.targetLang.orEmpty()) }
+    var model by
+        rememberSaveable(saver = ModelDraftSaver) { mutableStateOf(original?.settings?.pageModel) }
+    var modelEdited by rememberSaveable { mutableStateOf(false) }
+    var picker by rememberSaveable { mutableStateOf<String?>(null) }
+    var deleting by rememberSaveable { mutableStateOf(false) }
+    val groups by vm.catalogue.groups.collectAsState()
     val readOnly = original?.builtin == true
     val copyName =
         stringResource(R.string.template_copy_name, original?.let { templateLabel(it) }.orEmpty())
@@ -436,7 +440,7 @@ fun ScreenTemplateEditor(
             enabled = !readOnly,
         )
         if (!readOnly && model != null) {
-            EffortSegment(model, vm.catalogue.info(model)) {
+            EffortSegment(model, groups[model?.connectionId]?.models?.find { it.id == model?.id }) {
                 model = it
                 modelEdited = true
             }

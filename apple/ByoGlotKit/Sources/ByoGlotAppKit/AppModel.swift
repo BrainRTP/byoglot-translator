@@ -3,6 +3,13 @@ import ByoGlotStore
 import Foundation
 import Observation
 
+public enum AppActivity: Sendable { case active, inactive, background }
+
+@MainActor public protocol TranslationBackgroundTask: AnyObject {
+    func begin(expiration: @escaping @MainActor @Sendable () -> Void)
+    func end()
+}
+
 @MainActor @Observable
 public final class AppModel {
     public typealias Stream = @Sendable (RunnerInput) -> AsyncThrowingStream<RunnerStreamOutput, any Error>
@@ -21,6 +28,7 @@ public final class AppModel {
     public private(set) var detectedSourceLang: String?
     public private(set) var completionID: UUID?
     public private(set) var online = false
+    public private(set) var activity = AppActivity.active
     public private(set) var models: [String: [ModelInfo]] = [:]
     public private(set) var keyStates: [String: Bool] = [:]
     public private(set) var catalogueErrors: [String: RunnerError] = [:]
@@ -28,6 +36,8 @@ public final class AppModel {
     @ObservationIgnored private let store: SettingsStore
     @ObservationIgnored private let stream: Stream
     @ObservationIgnored private let delay: Duration
+    @ObservationIgnored private let backgroundTask: (any TranslationBackgroundTask)?
+    @ObservationIgnored private var latestChunk: RunnerStreamOutput?
     @ObservationIgnored private var pending: Task<Void, Never>?
     @ObservationIgnored private var request: Task<Void, Never>?
     private var composing = false
@@ -35,20 +45,22 @@ public final class AppModel {
     private var manualModel: ModelRef?
     private var manualPrompt: String?
 
-    public init(settings: SettingsStore, editor: ConnectionEditor, runner: TranslationRunner, online: Bool = false) {
+    public init(settings: SettingsStore, editor: ConnectionEditor, runner: TranslationRunner, online: Bool = false, backgroundTask: (any TranslationBackgroundTask)? = nil) {
         self.store = settings
         self.editor = editor
         self.stream = { input in runner.stream(input) }
         self.delay = .milliseconds(800)
         self.online = online
+        self.backgroundTask = backgroundTask
     }
 
-    init(settings: SettingsStore, editor: ConnectionEditor, stream: @escaping Stream, online: Bool = true, delay: Duration = .milliseconds(800)) {
+    init(settings: SettingsStore, editor: ConnectionEditor, stream: @escaping Stream, online: Bool = true, delay: Duration = .milliseconds(800), backgroundTask: (any TranslationBackgroundTask)? = nil) {
         self.store = settings
         self.editor = editor
         self.stream = stream
         self.delay = delay
         self.online = online
+        self.backgroundTask = backgroundTask
     }
 
     public var targetLang: String { selection.targetLang }
@@ -66,21 +78,25 @@ public final class AppModel {
     public var canTranslate: Bool { !composing && !jsTrim(inputText).isEmpty && !overLimit }
     public var providerName: String { model.flatMap { SettingsLogic.modelConnection($0, settings: settings)?.name } ?? "ByoGlot" }
 
+    private struct ConnectionInput: Equatable {
+        let id: String
+        let preset: ProviderPreset
+        let baseURL: String
+        init(_ connection: Connection) { id = connection.id; preset = connection.preset; baseURL = connection.baseUrl }
+    }
     private struct Inputs: Equatable {
         let text: String
         let source: String
         let target: String
         let prompt: String
         let model: ModelRef?
-        let connection: Connection?
-        let languageEnabled: Bool
-        let languageProfile: String
-        let profiles: [String: ProfileOverride]
+        let connection: ConnectionInput?
+        let languagePrompt: String
     }
     private var inputs: Inputs {
-        Inputs(text: inputText, source: sourceLang, target: targetLang, prompt: prePrompt, model: model,
-               connection: model.flatMap { SettingsLogic.modelConnection($0, settings: settings) },
-               languageEnabled: settings.globals.languagePromptEnabled, languageProfile: settings.globals.languageProfile, profiles: settings.profileOverrides)
+        Inputs(text: jsTrim(inputText), source: sourceLang, target: targetLang, prompt: prePrompt, model: model,
+               connection: model.flatMap { SettingsLogic.modelConnection($0, settings: settings) }.map(ConnectionInput.init),
+               languagePrompt: LanguageProfiles.text(enabled: settings.globals.languagePromptEnabled, profile: settings.globals.languageProfile, targetLang: targetLang, builtins: Contracts.builtinProfiles, overrides: settings.profileOverrides))
     }
 
     public func refresh() async {
@@ -128,7 +144,7 @@ public final class AppModel {
 
     private func schedule() {
         pending?.cancel()
-        guard loaded, settings.autoTranslate, canTranslate else { return }
+        guard loaded, activity != .background, settings.autoTranslate, canTranslate else { return }
         pending = Task { [weak self, delay] in
             do { try await Task.sleep(for: delay) } catch { return }
             guard !Task.isCancelled else { return }
@@ -139,8 +155,8 @@ public final class AppModel {
     public func keyboardTranslate() { if !settings.autoTranslate { translate() } }
 
     public func translate() {
-        guard !composing else { return }
-        stop()
+        guard !composing, activity != .background else { return }
+        cancelTasks()
         error = nil
         errorAt = nil
         complete = false
@@ -160,7 +176,8 @@ public final class AppModel {
                 for try await chunk in stream(input) {
                     guard !Task.isCancelled, let self, self.requestId == id, chunk.requestId == id else { continue }
                     latest = chunk
-                    if chunk.complete || lastPaint.duration(to: .now) >= .milliseconds(50) {
+                    self.latestChunk = chunk
+                    if chunk.complete || self.result.isEmpty || lastPaint.duration(to: .now) >= .milliseconds(50) {
                         self.apply(chunk)
                         lastPaint = .now
                     }
@@ -168,13 +185,15 @@ public final class AppModel {
                 guard !Task.isCancelled, let self, self.requestId == id else { return }
                 if let latest { self.apply(latest) }
                 self.running = false
-                if !self.complete { self.error = .backend(BackendError(kind: .badResponse)); self.errorAt = .now }
+                if !self.complete { self.error = self.activity == .background ? .interrupted : .backend(BackendError(kind: .badResponse)); self.errorAt = .now }
+                self.backgroundTask?.end()
             } catch {
                 guard !Task.isCancelled, let self, self.requestId == id else { return }
                 if let latest { self.apply(latest) }
                 self.running = false
-                self.error = (error as? RunnerError) ?? .backend(BackendError(kind: .providerError))
+                self.error = self.activity == .background ? .interrupted : runnerError(error)
                 self.errorAt = .now
+                self.backgroundTask?.end()
             }
         }
     }
@@ -184,23 +203,61 @@ public final class AppModel {
         complete = chunk.complete
         incomplete = chunk.incomplete
         running = !chunk.complete
-        if chunk.complete {
+        if chunk.complete { backgroundTask?.end() }
+        if chunk.complete && !chunk.incomplete {
             detectedSourceLang = chunk.output.detectedSourceLang
             if completionID != chunk.requestId { completionID = chunk.requestId }
         }
     }
 
     public func stop() {
+        let interrupted = running
+        if let latestChunk, latestChunk.requestId == requestId { apply(latestChunk) }
+        cancelTasks()
+        if interrupted { markInterrupted() }
+    }
+
+    private func cancelTasks() {
         requestId = nil
+        latestChunk = nil
         pending?.cancel()
         request?.cancel()
         pending = nil
         request = nil
         running = false
+        backgroundTask?.end()
+    }
+
+    private func markInterrupted() {
+        complete = false
+        incomplete = false
+        error = .interrupted
+        errorAt = .now
+    }
+
+    public func sceneChanged(_ value: AppActivity) {
+        guard value != activity else { return }
+        activity = value
+        switch value {
+        case .inactive: break
+        case .active:
+            backgroundTask?.end()
+            if !running && result.isEmpty { schedule() }
+        case .background:
+            pending?.cancel()
+            pending = nil
+            guard running, let id = requestId else { return }
+            backgroundTask?.begin { [weak self] in
+                guard let self, self.activity == .background, self.running, self.requestId == id else { return }
+                if let chunk = self.latestChunk { self.apply(chunk) }
+                self.cancelTasks()
+                self.markInterrupted()
+            }
+        }
     }
 
     private func invalidate() {
-        stop()
+        cancelTasks()
         result = ""
         complete = false
         incomplete = false
@@ -211,7 +268,8 @@ public final class AppModel {
         let restored = !online && available
         online = available
         if !available && running {
-            stop()
+            if let latestChunk { apply(latestChunk) }
+            cancelTasks()
             error = .backend(BackendError(kind: .offline))
             errorAt = .now
         } else if restored, settings.autoTranslate, case .backend(let backend) = error, backend.kind == .offline { translate() }
@@ -265,7 +323,7 @@ public final class AppModel {
         let oldResult = result
         let ready = complete && !incomplete && error == nil
         let oldTarget = targetLang
-        stop()
+        cancelTasks()
         sourceLang = oldTarget
         _ = selection.selectTarget(source)
         detectedSourceLang = nil

@@ -27,7 +27,7 @@ struct ByoGlotApp: App {
         let cache = ModelCapabilitiesCache()
         let runner = TranslationRunner(settings: settings, secrets: secrets, transport: transport, modelCapabilities: cache)
         let editor = ConnectionEditor(settings: settings, secrets: secrets, transport: transport, modelCapabilities: cache)
-        model = AppModel(settings: settings, editor: editor, runner: runner)
+        model = AppModel(settings: settings, editor: editor, runner: runner, backgroundTask: ApplicationBackgroundTask())
     }
 }
 
@@ -35,6 +35,7 @@ private struct RootView: View {
     @Bindable var model: AppModel
     @State private var providers = false
     @State private var network = NetworkObserver()
+    @State private var privacyCover = PrivacyCover()
     @Environment(\.scenePhase) private var phase
     private var scheme: ColorScheme? {
         switch model.settings.theme { case .system: nil; case .light: .light; case .dark: .dark }
@@ -49,15 +50,21 @@ private struct RootView: View {
             }
                 .navigationDestination(isPresented: $providers) { ScreenProviders(model: model) }
         }.preferredColorScheme(scheme)
-            .overlay { if phase != .active { ByoColor.background.ignoresSafeArea().overlay { Text("ByoGlot").font(.title) }.accessibilityHidden(true) } }
+            .background(PrivacySceneAttachment(cover: privacyCover).frame(width: 0, height: 0))
             .task {
                 await model.refresh()
                 if model.loaded && model.settings.connections.isEmpty { providers = true }
                 network.start(model: model)
             }
             .onChange(of: phase) { _, value in
-                if value == .active { Task { await model.refresh() } }
-                else { model.stop() }
+                switch value {
+                case .active:
+                    model.sceneChanged(.active)
+                    Task { await model.refresh() }
+                case .inactive: model.sceneChanged(.inactive)
+                case .background: model.sceneChanged(.background)
+                @unknown default: break
+                }
             }
     }
 }

@@ -16,6 +16,8 @@ public struct MainErrorPresentation {
         var actionTitle = "err.retry"
         var warning = false
         switch error {
+        case .interrupted:
+            title = AppStrings.text("main.interrupted")
         case .noConnection, .keyMissing:
             title = AppStrings.text(error == .noConnection ? "providers.firstTitle" : "err.key.t")
             action = .providers

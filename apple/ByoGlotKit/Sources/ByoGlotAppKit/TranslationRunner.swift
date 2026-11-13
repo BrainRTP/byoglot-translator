@@ -8,7 +8,7 @@ public let editorInputLimit = Contracts.limits.maxEditorText
 public let extensionTimeoutSeconds = 55
 
 public enum RunnerError: Error, Equatable, Sendable {
-    case noConnection, noModel, keyMissing, consentNeeded(origin: String), deviceLocked, tooLong(limit: Int), empty, appGroupUnavailable
+    case noConnection, noModel, keyMissing, consentNeeded(origin: String), deviceLocked, tooLong(limit: Int), empty, appGroupUnavailable, interrupted
     case backend(BackendError)
 }
 

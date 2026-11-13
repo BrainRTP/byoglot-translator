@@ -30,10 +30,10 @@ private actor ModelStream {
     }
 }
 
-@MainActor private func makeModel(_ fixture: AppFixture, _ streams: ModelStream, auto: Bool = false, delay: Duration = .milliseconds(800)) async throws -> AppModel {
+@MainActor private func makeModel(_ fixture: AppFixture, _ streams: ModelStream, auto: Bool = false, delay: Duration = .milliseconds(800), backgroundTask: (any TranslationBackgroundTask)? = nil) async throws -> AppModel {
     try await fixture.connect()
     _ = try await fixture.settings.update { $0.autoTranslate = auto }
-    let model = AppModel(settings: fixture.settings, editor: fixture.editor, stream: { streams.stream($0) }, delay: delay)
+    let model = AppModel(settings: fixture.settings, editor: fixture.editor, stream: { streams.stream($0) }, delay: delay, backgroundTask: backgroundTask)
     await model.refresh()
     return model
 }
@@ -124,6 +124,13 @@ private actor ModelStream {
     await model.chooseTemplate(model.template)
     if let ref = model.model { model.chooseModel(ref) }
     await model.updateSettings { $0.theme = .dark; $0.externalModel = ModelRef(providerID: "custom", id: "other", connectionId: "c1") }
+    if let pinned = model.model { model.chooseModel(pinned) }
+    await model.updateSettings { state in state.mainModel = ModelRef(providerID: "custom", id: "model", variant: "none", connectionId: "c1") }
+    await model.setDefaultModel(connectionId: "c1", model: ModelRef(providerID: "custom", id: "another-default", connectionId: "c1"))
+    await model.updateSettings { state in
+        state.connections[0].name = "Renamed provider"
+        state.profileOverrides["unused"] = ProfileOverride(text: "Unused instructions", base: "", savedAt: 1)
+    }
     #expect(model.complete && model.result == "done")
     #expect(await stream.count == 1)
     model.stop()
@@ -199,5 +206,97 @@ private actor ModelStream {
     model.edit("composing", composing: false)
     try await eventually { await stream.count == 1 }
     #expect(model.canTranslate)
+    model.stop()
+}
+
+@MainActor private final class FakeBackgroundTask: TranslationBackgroundTask {
+    var expiration: (@MainActor @Sendable () -> Void)?
+    var active = false
+    var begins = 0
+    func begin(expiration: @escaping @MainActor @Sendable () -> Void) { self.expiration = expiration; active = true; begins += 1 }
+    func end() { active = false }
+    func expire() { expiration?() }
+}
+
+@MainActor @Test func inactiveKeepsStreamingAndBackgroundExpirationPreservesPartial() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let background = FakeBackgroundTask()
+    let model = try await makeModel(f, stream, backgroundTask: background)
+    model.edit("Hello"); model.translate()
+    try await eventually { await stream.count == 1 }
+    model.sceneChanged(.inactive)
+    #expect(model.running && model.error == nil)
+    model.sceneChanged(.background)
+    #expect(background.active && background.begins == 1)
+    await stream.emit(0, text: "partial")
+    try await Task.sleep(for: .milliseconds(10))
+    background.expire()
+    #expect(!model.running && !model.complete && model.result == "partial")
+    #expect(model.error == .interrupted && !background.active)
+    #expect(MainErrorPresentation(error: .interrupted, provider: "Provider").action == .retry)
+    await stream.emit(0, text: "late", complete: true)
+    #expect(model.result == "partial")
+    model.sceneChanged(.active)
+    #expect(model.error == .interrupted)
+}
+
+@MainActor @Test func backgroundCompletionEndsAssertionAndFailureShowsInterrupted() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let background = FakeBackgroundTask()
+    let model = try await makeModel(f, stream, backgroundTask: background)
+    model.edit("Hello"); model.translate()
+    try await eventually { await stream.count == 1 }
+    model.sceneChanged(.background)
+    await stream.emit(0, text: "finished", complete: true)
+    try await eventually { model.complete }
+    #expect(!background.active && model.error == nil && model.result == "finished")
+    model.sceneChanged(.active)
+    model.translate()
+    try await eventually { await stream.count == 2 }
+    model.sceneChanged(.background)
+    await stream.emit(1, text: "partial failure")
+    await stream.fail(1)
+    try await eventually { model.error != nil }
+    #expect(model.error == .interrupted && !model.complete && !background.active)
+    #expect(model.result == "partial failure")
+}
+
+@MainActor @Test func inactivePreservesDebounceAndActiveReschedulesBackgroundInput() async throws {
+    let f = AppFixture(); let stream = ModelStream()
+    let model = try await makeModel(f, stream, auto: true, delay: .milliseconds(30))
+    model.edit("inactive")
+    model.sceneChanged(.inactive)
+    try await eventually { await stream.count == 1 }
+    #expect(model.running)
+    model.sceneChanged(.active)
+    model.edit("background")
+    model.sceneChanged(.background)
+    try await Task.sleep(for: .milliseconds(60))
+    #expect(await stream.count == 1)
+    model.sceneChanged(.active)
+    try await eventually { await stream.count == 2 }
+    model.stop()
+    await model.updateSettings { $0.autoTranslate = false }
+    model.edit("manual")
+    model.sceneChanged(.background)
+    model.sceneChanged(.active)
+    try await Task.sleep(for: .milliseconds(60))
+    #expect(await stream.count == 2)
+}
+
+@MainActor @Test func foregroundReschedulesAnExpiredEmptyRequestOnlyWithAutoTranslate() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let background = FakeBackgroundTask()
+    let model = try await makeModel(f, stream, auto: true, delay: .milliseconds(20), backgroundTask: background)
+    model.edit("Hello", pasted: true)
+    try await eventually { await stream.count == 1 }
+    model.sceneChanged(.background)
+    background.expire()
+    #expect(model.error == .interrupted && model.result.isEmpty)
+    model.sceneChanged(.active)
+    try await eventually { await stream.count == 2 }
+    await model.updateSettings { $0.autoTranslate = false }
+    model.sceneChanged(.background)
+    background.expire()
+    model.sceneChanged(.active)
+    try await Task.sleep(for: .milliseconds(60))
+    #expect(await stream.count == 2)
     model.stop()
 }

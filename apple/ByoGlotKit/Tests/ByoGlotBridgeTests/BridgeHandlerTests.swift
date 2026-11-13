@@ -199,6 +199,19 @@ struct BridgeHandlerTests {
         #expect(try reply(await bridge.handle(fetch())) == failure("timeout"))
     }
 
+    @Test func cancelBeforeFetchRegistrationPreventsTheRequest() async throws {
+        let transport = CannedTransport()
+        let bridge = BridgeHandler(secrets: try boundStore(), transport: transport)
+        let otherHandler = BridgeHandler(secrets: InMemorySecretStore(), transport: CannedTransport())
+        let id = UUID().uuidString
+        let cancel = try message(["type": .string("cancel"), "id": .string(id)])
+        #expect(try reply(await otherHandler.handle(cancel)) == .object(["ok": .bool(true)]))
+        for _ in 0..<2 {
+            #expect(try reply(await bridge.handle(fetch(id: id))) == failure("aborted"))
+        }
+        #expect(await transport.requests.isEmpty)
+    }
+
     @Test func garbageInputIsBadRequest() async throws {
         let bridge = BridgeHandler(secrets: InMemorySecretStore(), transport: CannedTransport())
         for text in ["not JSON", "[]", "{}", #"{"v":true,"type":"ping"}"#, #"{"v":1,"type":"unknown"}"#, #"{"v":1,"type":"setSecret"}"#, #"{"v":1,"type":"hasSecret","connectionId":""}"#, #"{"v":1,"type":"setSecret","connectionId":"c1","origin":"file:///tmp","secret":"x"}"#] {

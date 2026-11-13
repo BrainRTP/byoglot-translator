@@ -126,6 +126,8 @@ class ConnectionEditor(
                     val remaining = state.connections.filterNot { it.id == id }
                     state.copy(
                         connections = remaining,
+                        mainModel = state.mainModel?.takeUnless { it.connectionId == id },
+                        externalModel = state.externalModel?.takeUnless { it.connectionId == id },
                         activeConnectionId =
                             state.activeConnectionId?.takeUnless { it == id }
                                 ?: remaining

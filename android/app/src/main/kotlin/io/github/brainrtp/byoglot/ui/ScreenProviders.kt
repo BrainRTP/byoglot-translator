@@ -70,6 +70,16 @@ fun ScreenProviders(
                             stringResource(R.string.active_connection)
                         else null,
                     selected = connection.id == settings.activeConnectionId,
+                    trailing = {
+                        Box(
+                            Modifier.size(8.dp)
+                                .background(
+                                    if (keys[connection.id] == true) c.ok else c.bd2,
+                                    androidx.compose.foundation.shape.CircleShape,
+                                ),
+                        )
+                        ByoIconImage(ByoIcon.Chevron, c.mu)
+                    },
                 )
                 if (legacyLocalConnection(connection)) ConnectionDelete(vm, connection) {}
             }
@@ -100,6 +110,7 @@ fun ProviderKeyScreen(
     preset: ProviderPreset,
     onPaste: () -> String?,
     onDone: () -> Unit,
+    onModel: (String) -> Unit,
 ) {
     if (initial != null && legacyLocalConnection(initial)) {
         ScreenColumn {
@@ -320,33 +331,11 @@ fun ProviderKeyScreen(
                     color = c.mu,
                 )
                 val saved = settings.connections.find { it.id == id }
-                ChoiceMenu(
-                    stringResource(R.string.default_model),
+                ListRow(
                     saved?.pageModel?.id ?: stringResource(R.string.choose_model),
-                    models.map { it.id to it.id },
-                    mono = true,
-                ) { modelId ->
-                    val model = models.first { it.id == modelId }
-                    vm.action {
-                        vm.setModel(
-                            id!!,
-                            ModelRef(model.providerID, model.id, model.variants.firstOrNull(), id),
-                            true,
-                        )
-                    }
-                }
-                val selected = models.find { it.id == saved?.pageModel?.id }
-                if (!selected?.variants.isNullOrEmpty())
-                    ChoiceMenu(
-                        stringResource(R.string.effort_label),
-                        effortLabel(saved?.pageModel?.variant ?: "none"),
-                        selected!!.variants.map { it to effortLabel(it) },
-                        mono = true,
-                    ) { effort ->
-                        vm.action {
-                            vm.setModel(id!!, saved!!.pageModel!!.copy(variant = effort), true)
-                        }
-                    }
+                    { id?.let(onModel) },
+                    subtitle = saved?.pageModel?.variant?.let { effortLabel(it) },
+                )
             }
             ByoButton(
                 stringResource(R.string.done),

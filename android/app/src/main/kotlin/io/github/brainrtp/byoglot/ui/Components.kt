@@ -257,6 +257,7 @@ fun ByoTextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     trailing: @Composable RowScope.() -> Unit = {},
+    singleLine: Boolean = true,
 ) {
     val c = ByoTheme.colors
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -273,7 +274,7 @@ fun ByoTextField(
                 )
                 .semantics { if (error != null) error(error) },
             enabled = enabled,
-            singleLine = true,
+            singleLine = singleLine,
             textStyle = (if (mono) ByoType.mono else ByoType.body).copy(color = c.tx),
             cursorBrush = SolidColor(c.ac),
             visualTransformation = visualTransformation,
@@ -281,7 +282,13 @@ fun ByoTextField(
             keyboardActions = keyboardActions,
             decorationBox = { input ->
                 Row(
-                    Modifier.heightIn(min = 48.dp).padding(start = 12.dp, end = 4.dp),
+                    Modifier.heightIn(min = if (singleLine) 48.dp else 120.dp)
+                        .padding(
+                            start = 12.dp,
+                            end = 4.dp,
+                            top = if (singleLine) 0.dp else 10.dp,
+                            bottom = if (singleLine) 0.dp else 10.dp,
+                        ),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(Modifier.weight(1f)) { input() }
@@ -302,6 +309,8 @@ fun Segment(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    optionEnabled: (String) -> Boolean = { true },
+    mono: Boolean = false,
 ) {
     val c = ByoTheme.colors
     Row(
@@ -321,7 +330,7 @@ fun Segment(
                     )
                     .selectable(
                         selected == id,
-                        enabled = enabled,
+                        enabled = enabled && optionEnabled(id),
                         role = Role.RadioButton,
                         onClick = { onSelect(id) },
                     )
@@ -330,8 +339,10 @@ fun Segment(
             ) {
                 Text(
                     label,
-                    style = ByoType.body,
-                    color = if (!enabled) c.mu else if (selected == id) c.bg else c.tx,
+                    style = if (mono) ByoType.mono else ByoType.body,
+                    color =
+                        if (!enabled || !optionEnabled(id)) c.mu
+                        else if (selected == id) c.bg else c.tx,
                     fontWeight = if (selected == id) FontWeight.SemiBold else FontWeight.Normal,
                 )
             }
@@ -377,6 +388,7 @@ fun ListRow(
     danger: Boolean = false,
     selected: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
+    mono: Boolean = false,
 ) {
     val c = ByoTheme.colors
     Row(
@@ -392,7 +404,11 @@ fun ListRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = ByoType.body, color = if (danger) c.er else c.tx)
+            Text(
+                title,
+                style = if (mono) ByoType.mono else ByoType.body,
+                color = if (danger) c.er else c.tx,
+            )
             subtitle?.let { Text(it, style = ByoType.label, color = c.mu) }
         }
         value?.let { Text(it, style = ByoType.label, color = c.mu) }

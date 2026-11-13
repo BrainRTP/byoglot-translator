@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.brainrtp.byoglot.core.*
 import java.time.Instant
-import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -27,7 +26,13 @@ data class MainParameters(
     val targetLang: String = "en",
     val changed: Boolean = false,
     val detectedSourceLang: String? = null,
+    val prePrompt: String = "",
+    val model: ModelRef? = null,
+    val missingModel: ModelRef? = null,
 ) {
+    override fun toString() =
+        "MainParameters(templateId=$templateId, promptLength=${prePrompt.length}, changed=$changed)"
+
     val canSwap: Boolean
         get() = sourceLang != "auto" || detectedSourceLang != null
 }
@@ -55,10 +60,15 @@ class MainViewModel(
     private val mutableParameters = MutableStateFlow(MainParameters())
     val parameters = mutableParameters.asStateFlow()
     private var manualTarget: String? = null
+    private var manualModel: ModelRef? = null
+    private var manualPrompt: String? = null
     private var networkAvailable = false
     private var autoJob: Job? = null
     private var detectionJob: Job? = null
     val editor = ConnectionEditor(repository, secrets, transport)
+    val catalogue = ModelCatalogue(editor, repository, networkOnline)
+    private val mutableRecentLanguages = MutableStateFlow<List<String>>(emptyList())
+    val recentLanguages = mutableRecentLanguages.asStateFlow()
     private val mutableSettings = MutableStateFlow<AppSettings?>(null)
     val settings = mutableSettings.asStateFlow()
     private val mutableTranslation = MutableStateFlow(TranslationState())
@@ -117,20 +127,107 @@ class MainViewModel(
         val template =
             state.templates.find { it.id == state.globals.defaultTemplateId }
                 ?: Contracts.builtinTemplate
-        if (mutableParameters.value.templateId != template.id) manualTarget = null
+        if (mutableParameters.value.templateId != template.id) {
+            manualTarget = null
+            manualModel = null
+            manualPrompt = null
+        }
         val effective = SettingsLogic.effectiveMain(template, state)
+        val requested = manualModel ?: template.settings.pageModel
+        val missing = requested?.takeUnless { catalogue.available(it, state) }
+        val model =
+            if (missing != null) catalogue.fallback(state, true) else manualModel ?: effective.model
         val target = manualTarget ?: effective.targetLang
+        val prompt = manualPrompt ?: effective.prePrompt
         mutableParameters.value =
             mutableParameters.value.copy(
                 templateId = template.id,
                 sourceLang = state.globals.sourceLang,
                 targetLang = target,
-                changed = target != effective.targetLang,
+                prePrompt = prompt,
+                model = model,
+                missingModel = missing,
+                changed =
+                    target != effective.targetLang ||
+                        (manualModel != null && manualModel != effective.model) ||
+                        prompt != effective.prePrompt,
                 detectedSourceLang =
                     if (state.globals.sourceLang == "auto")
                         mutableParameters.value.detectedSourceLang
                     else null,
             )
+    }
+
+    suspend fun refreshModels() {
+        catalogue.refresh()
+        val previous = parameters.value.model
+        settings.value?.let(::syncParameters)
+        if (previous != parameters.value.model) {
+            cancel()
+            mutableTranslation.value = TranslationState()
+            translateChoice()
+        }
+    }
+
+    private fun rememberLanguage(code: String) {
+        if (code != "auto") mutableRecentLanguages.update { (listOf(code) + it).distinct().take(5) }
+    }
+
+    private fun translateChoice() {
+        if (text.value.isNotBlank()) translate()
+    }
+
+    fun setPrePrompt(value: String) {
+        cancel()
+        manualPrompt = value
+        settings.value?.let(::syncParameters)
+        mutableTranslation.value = TranslationState()
+        schedule()
+    }
+
+    fun chooseModel(model: ModelRef) {
+        val state = settings.value ?: return
+        if (!catalogue.available(model, state)) return
+        manualModel = model
+        syncParameters(state)
+        translateChoice()
+    }
+
+    suspend fun resetParameters() {
+        manualTarget = null
+        manualModel = null
+        manualPrompt = null
+        settings.value?.let(::syncParameters)
+        translateChoice()
+    }
+
+    suspend fun storeCurrentTemplate(name: String? = null) {
+        val params = parameters.value
+        val state = repository.read()
+        val template =
+            state.templates.find { it.id == params.templateId } ?: Contracts.builtinTemplate
+        if (name == null && template.builtin) return
+        val saved =
+            template.copy(
+                id = if (name == null) template.id else UUID.randomUUID().toString(),
+                name = name?.trim() ?: template.name,
+                builtin = false,
+                settings =
+                    template.settings.copy(
+                        targetLang = params.targetLang,
+                        pageModel = params.model,
+                    ),
+            )
+        // The parameter sheet's prompt is transient, even when saving other parameters.
+        manualModel = null
+        manualTarget = null
+        update {
+            it.copy(
+                templates = it.templates.filterNot { t -> t.id == saved.id } + saved,
+                globals = it.globals.copy(defaultTemplateId = saved.id),
+            )
+        }
+        translateChoice()
     }
 
     fun setText(text: String) {
@@ -184,11 +281,14 @@ class MainViewModel(
                 limit = EDITOR_INPUT_LIMIT,
                 sourceLang = params.sourceLang,
                 mainModel = true,
+                model = params.model,
+                prePrompt = params.prePrompt,
             )
         val validation =
             when {
                 text.isBlank() -> RunnerError.Empty
                 InputCounter.editor(text).overLimit -> RunnerError.TooLong(EDITOR_INPUT_LIMIT)
+                params.missingModel != null && params.model == null -> RunnerError.NoModel
                 !networkOnline() -> RunnerError.Backend(BackendException(ErrorKind.Offline))
                 else -> null
             }
@@ -254,7 +354,7 @@ class MainViewModel(
             detectionJob = workScope.launch {
                 val detected =
                     try {
-                        confidentSource(sourceLanguageDetector.detect(input.text))
+                        confidentSourceLanguage(sourceLanguageDetector.detect(input.text))
                     } catch (e: CancellationException) {
                         throw e
                     } catch (_: RuntimeException) {
@@ -270,16 +370,6 @@ class MainViewModel(
                 }
             }
         }
-    }
-
-    private fun confidentSource(candidates: List<LanguageHypothesis>): String? {
-        val top =
-            candidates
-                .filter { it.confidence.isFinite() && it.confidence in 0f..1f }
-                .maxByOrNull { it.confidence } ?: return null
-        if (top.confidence < SOURCE_LANGUAGE_CONFIDENCE) return null
-        val language = Locale.forLanguageTag(top.languageTag).language.lowercase(Locale.ROOT)
-        return language.takeIf { it in Contracts.languageCodes }
     }
 
     fun isNetworkOnline() = networkOnline()
@@ -327,8 +417,10 @@ class MainViewModel(
         cancel()
         mutableTranslation.value = TranslationState()
         manualTarget = null
+        manualModel = null
+        manualPrompt = null
         update { it.copy(globals = it.globals.copy(defaultTemplateId = id)) }
-        schedule()
+        translateChoice()
     }
 
     suspend fun setTargetLanguage(code: String) {
@@ -337,7 +429,8 @@ class MainViewModel(
         mutableTranslation.value = TranslationState()
         manualTarget = code
         update { it.copy(globals = it.globals.copy(targetLang = code)) }
-        schedule()
+        rememberLanguage(code)
+        translateChoice()
     }
 
     suspend fun setSourceLanguage(code: String) {
@@ -345,7 +438,8 @@ class MainViewModel(
         cancel()
         mutableParameters.value = mutableParameters.value.copy(detectedSourceLang = null)
         update { it.copy(globals = it.globals.copy(sourceLang = code)) }
-        schedule()
+        rememberLanguage(code)
+        translateChoice()
     }
 
     suspend fun swap() {
@@ -392,35 +486,69 @@ class MainViewModel(
                     },
             )
         }
+        if (page) translateChoice()
     }
 
-    suspend fun saveTemplate(id: String?, name: String, instructions: String, target: String?) {
+    suspend fun saveTemplate(template: Template) {
         update { s ->
-            val old = s.templates.find { it.id == id }
-            if (id == Contracts.builtinTemplate.id || old?.builtin == true) s
-            else {
-                val template =
-                    Template(
-                        id ?: UUID.randomUUID().toString(),
-                        name.trim(),
-                        false,
-                        (old?.settings ?: TemplateSettings()).copy(
-                            prePrompt = instructions,
-                            targetLang = target,
-                        ),
-                    )
-                s.copy(templates = s.templates.filterNot { it.id == template.id } + template)
-            }
+            if (
+                template.id == Contracts.builtinTemplate.id ||
+                    s.templates.any { it.id == template.id && it.builtin }
+            )
+                s
+            else
+                s.copy(
+                    templates =
+                        s.templates.filterNot { it.id == template.id } +
+                            template.copy(name = template.name.trim(), builtin = false),
+                )
         }
     }
 
-    suspend fun duplicate(template: Template, name: String) {
+    suspend fun saveTemplate(id: String?, name: String, instructions: String, target: String?) {
+        val old = settings.value?.templates?.find { it.id == id }
         saveTemplate(
-            null,
-            name,
-            template.settings.prePrompt.orEmpty(),
-            template.settings.targetLang,
+            Template(
+                id ?: UUID.randomUUID().toString(),
+                name,
+                false,
+                (old?.settings ?: TemplateSettings()).copy(
+                    prePrompt = instructions.takeIf { it.isNotBlank() },
+                    targetLang = target,
+                ),
+            ),
         )
+    }
+
+    suspend fun duplicate(template: Template, name: String) {
+        saveTemplate(template.copy(id = UUID.randomUUID().toString(), name = name, builtin = false))
+    }
+
+    suspend fun setDefaultModel(model: ModelRef, main: Boolean) {
+        update { if (main) it.copy(mainModel = model) else it.copy(externalModel = model) }
+        if (main) {
+            manualModel = null
+            settings.value?.let(::syncParameters)
+            translateChoice()
+        }
+    }
+
+    suspend fun saveProfile(id: String, text: String) {
+        require(text.length <= Contracts.limits.maxProfileText)
+        val base = Contracts.builtinProfiles[id] ?: return
+        update { s ->
+            s.copy(
+                profileOverrides =
+                    if (text.jsTrim() == base.jsTrim()) s.profileOverrides - id
+                    else
+                        s.profileOverrides +
+                            (id to ProfileOverride(text, base, nowMs().toDouble())),
+            )
+        }
+    }
+
+    suspend fun resetProfile(id: String) {
+        update { it.copy(profileOverrides = it.profileOverrides - id) }
     }
 
     suspend fun deleteTemplate(id: String) {

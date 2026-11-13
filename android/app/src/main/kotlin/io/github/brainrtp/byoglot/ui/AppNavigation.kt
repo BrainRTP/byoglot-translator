@@ -24,89 +24,104 @@ fun AppNavigation(
     onExport: () -> Unit,
     onImport: () -> Unit,
     onLink: (String) -> Unit,
+    interfaceLanguage: String = "",
+    onInterfaceLanguage: (String) -> Unit = {},
 ) {
     val settings by vm.settings.collectAsState()
     val error by vm.error.collectAsState()
     val navigation by vm.navigation.collectAsState()
-    var route by rememberSaveable {
+    val parameters by vm.parameters.collectAsState()
+    val recent by vm.recentLanguages.collectAsState()
+    var stack by rememberSaveable {
         mutableStateOf(
-            if (initialDestination in listOf("connections", "network")) "connections"
-            else "translate",
+            when (initialDestination) {
+                "connections",
+                "network" -> listOf("translate", "settings", "connections")
+                "settings" -> listOf("translate", "settings")
+                else -> listOf("translate")
+            },
         )
     }
+    val route = stack.last()
     var connectionId by rememberSaveable { mutableStateOf<String?>(null) }
     var preset by rememberSaveable { mutableStateOf(ProviderPreset.deepseek) }
     var templateId by rememberSaveable { mutableStateOf<String?>(null) }
-    var sourcePicker by rememberSaveable { mutableStateOf(true) }
+    var sheet by remember { mutableStateOf<String?>(null) }
+    var modelReturn by remember { mutableStateOf<String?>(null) }
+    var modelMain by remember { mutableStateOf(true) }
+    val navigate: (String) -> Unit = { stack = stack + it }
+    val back: () -> Unit = {
+        if (stack.size > 1) stack = stack.dropLast(1)
+        vm.dismissError()
+    }
+    val closeModel: () -> Unit = { sheet = modelReturn }
     LaunchedEffect(navigation?.id) {
         navigation?.let {
-            route =
-                if (it.destination in listOf("connections", "network")) "connections"
-                else "translate"
+            sheet = null
+            stack =
+                when (it.destination) {
+                    "connections",
+                    "network" -> listOf("translate", "settings", "connections")
+                    "settings" -> listOf("translate", "settings")
+                    else -> listOf("translate")
+                }
             vm.navigationHandled(it.id)
         }
     }
+    LaunchedEffect(route) {
+        if (route == "settings" || route == "models" || route == "template") vm.refreshModels()
+    }
+    BackHandler(stack.size > 1 && route != "prompt", onBack = back)
     val state = settings
-    val firstRun = state?.connections?.isEmpty() == true && route == "translate"
-    val visibleRoute = if (firstRun) "connections" else route
-    val fix: (String) -> Unit = {
-        if (it == "network") onNetworkSettings() else route = "connections"
-    }
-    val back: () -> Unit = {
-        route =
-            when (route) {
-                "provider" -> "connections"
-                "template" -> "templates"
-                else -> "translate"
-            }
-        vm.dismissError()
-    }
-    BackHandler(route != "translate", onBack = back)
+    val visibleRoute =
+        if (state?.connections?.isEmpty() == true && route == "translate") "connections" else route
     Surface(Modifier.fillMaxSize(), color = ByoTheme.colors.bg) {
         Column(Modifier.safeDrawingPadding()) {
-            val title =
-                when (visibleRoute) {
-                    "connections" -> R.string.providers_title
-                    "provider" -> R.string.providers_title
-                    "settings" -> R.string.settings
-                    "parameters" -> R.string.params_title
-                    "languages" ->
-                        if (sourcePicker) R.string.lang_srcTitle else R.string.lang_dstTitle
-                    "templates",
-                    "template" -> R.string.templates
-                    else -> R.string.main_title
-                }
-            Row(
-                Modifier.fillMaxWidth()
-                    .heightIn(min = 64.dp)
-                    .padding(start = if (route == "translate") 16.dp else 4.dp, end = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (route != "translate")
-                    ByoIconButton(ByoIcon.Back, stringResource(R.string.back), back)
-                Text(
-                    if (route == "provider")
-                        state?.connections?.find { it.id == connectionId }?.name
-                            ?: presetLabel(preset)
-                    else stringResource(title),
-                    Modifier.weight(1f),
-                    style = ByoType.title,
-                )
-                if (route == "translate")
-                    ByoIconButton(
-                        ByoIcon.Settings,
-                        stringResource(R.string.settings),
-                        { route = "settings" },
+            if (route != "prompt")
+                Row(
+                    Modifier.fillMaxWidth()
+                        .heightIn(min = 64.dp)
+                        .padding(start = if (stack.size == 1) 16.dp else 4.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (stack.size > 1)
+                        ByoIconButton(ByoIcon.Back, stringResource(R.string.back), back)
+                    val title =
+                        when (visibleRoute) {
+                            "connections",
+                            "provider" -> R.string.providers_title
+                            "settings" -> R.string.settings
+                            "language" -> R.string.settings_language
+                            "models" -> R.string.models
+                            "templates",
+                            "template" -> R.string.templates
+                            "about" -> R.string.about
+                            else -> R.string.main_title
+                        }
+                    Text(
+                        if (route == "provider")
+                            state?.connections?.find { it.id == connectionId }?.name
+                                ?: presetLabel(preset)
+                        else stringResource(title),
+                        Modifier.weight(1f),
+                        style = ByoType.title,
                     )
-            }
-            if (error != null)
+                    if (stack.size == 1)
+                        ByoIconButton(
+                            ByoIcon.Settings,
+                            stringResource(R.string.settings),
+                            { navigate("settings") },
+                        )
+                }
+            error?.let {
                 Banner(
-                    errorMessage(error!!),
+                    errorMessage(it),
                     "",
                     stringResource(R.string.dismiss),
                     vm::dismissError,
                     Modifier.padding(16.dp),
                 )
+            }
             if (state == null) LinearProgressIndicator(Modifier.fillMaxWidth())
             else
                 Box(Modifier.weight(1f)) {
@@ -118,27 +133,22 @@ fun AppNavigation(
                                 onPaste,
                                 onCopy,
                                 onShare,
-                                { route = "parameters" },
+                                { sheet = "params" },
                                 {
-                                    connectionId = state.activeConnectionId
-                                    val active = state.connections.find { it.id == connectionId }
-                                    if (active == null) route = "connections"
-                                    else {
-                                        preset = active.preset
-                                        route = "provider"
-                                    }
+                                    modelReturn = null
+                                    sheet = "model"
                                 },
-                                { source ->
-                                    sourcePicker = source
-                                    route = "languages"
+                                { sheet = if (it) "source" else "target" },
+                                {
+                                    if (it == "network") onNetworkSettings()
+                                    else navigate("connections")
                                 },
-                                fix,
                             )
                         "connections" ->
                             ScreenProviders(vm, state) { id, p ->
                                 connectionId = id
                                 preset = p
-                                route = "provider"
+                                navigate("provider")
                             }
                         "provider" ->
                             key(connectionId, preset) {
@@ -148,69 +158,125 @@ fun AppNavigation(
                                     state.connections.find { it.id == connectionId },
                                     preset,
                                     onPaste,
-                                    { route = "translate" },
+                                    back,
+                                    onModel = { id ->
+                                        connectionId = id
+                                        modelReturn = null
+                                        sheet = "providerModel"
+                                    },
                                 )
                             }
-                        "settings" ->
-                            Column {
-                                ListRow(
-                                    stringResource(R.string.providers_title),
-                                    { route = "connections" },
-                                )
-                                ListRow(stringResource(R.string.templates), { route = "templates" })
-                                Box(Modifier.weight(1f)) {
-                                    SettingsScreen(vm, state, version, onExport, onImport, onLink)
-                                }
+                        "settings" -> ScreenSettingsSections(state, version, navigate)
+                        "language" ->
+                            ScreenLanguageSettings(
+                                vm,
+                                state,
+                                { sheet = "target" },
+                                interfaceLanguage,
+                                onInterfaceLanguage,
+                            )
+                        "models" ->
+                            ScreenModelSettings(vm, state) { main ->
+                                modelMain = main
+                                modelReturn = null
+                                sheet = "defaultModel"
                             }
+                        "prompt" -> ScreenLanguagePrompt(vm, state, back)
                         "templates" ->
-                            TemplatesScreen(vm, state) { id ->
+                            ScreenTemplateSettings(state) { id ->
                                 templateId = id
-                                route = "template"
+                                navigate("template")
                             }
                         "template" ->
-                            TemplateFormScreen(vm, state.templates.find { it.id == templateId }) {
-                                route = "templates"
-                            }
-                        "parameters" ->
-                            ScreenColumn {
-                                val parameters by vm.parameters.collectAsState()
-                                ChoiceMenu(
-                                    stringResource(R.string.template),
-                                    state.templates
-                                        .find { it.id == parameters.templateId }
-                                        ?.let { templateLabel(it) }
-                                        .orEmpty(),
-                                    state.templates.map { it.id to templateLabel(it) },
-                                ) { id ->
-                                    vm.action { vm.selectTemplate(id) }
-                                }
-                                ByoButton(
-                                    stringResource(R.string.templates),
-                                    { route = "templates" },
+                            key(templateId) {
+                                ScreenTemplateEditor(
+                                    vm,
+                                    state,
+                                    state.templates.find { it.id == templateId },
+                                    back,
                                 )
                             }
-                        "languages" ->
-                            ScreenColumn {
-                                val params by vm.parameters.collectAsState()
-                                val codes =
-                                    (if (sourcePicker) listOf("auto") else emptyList()) +
-                                        Contracts.languageCodes
-                                ChoiceMenu(
-                                    stringResource(title),
-                                    languageLabel(
-                                        if (sourcePicker) params.sourceLang else params.targetLang,
-                                    ),
-                                    codes.map { it to languageLabel(it) },
-                                ) { code ->
-                                    vm.action {
-                                        if (sourcePicker) vm.setSourceLanguage(code)
-                                        else vm.setTargetLanguage(code)
-                                        route = "translate"
-                                    }
-                                }
-                            }
+                        "about" -> ScreenAbout(version, onExport, onImport, onLink)
                     }
                 }
         }
     }
+    if (state != null)
+        when (sheet) {
+            "params" -> {
+                LaunchedEffect(Unit) { vm.refreshModels() }
+                ScreenParamsSheet(
+                    vm,
+                    state,
+                    { sheet = "templates" },
+                    {
+                        modelReturn = "params"
+                        sheet = "model"
+                    },
+                    { sheet = null },
+                )
+            }
+            "templates" ->
+                ScreenTemplateSheet(
+                    state,
+                    parameters.templateId,
+                    { id ->
+                        vm.action { vm.selectTemplate(id) }
+                        sheet = "params"
+                    },
+                    { sheet = "params" },
+                    {
+                        sheet = null
+                        navigate("templates")
+                    },
+                )
+            "source",
+            "target" ->
+                ScreenLanguageSheet(
+                    sheet == "source",
+                    if (sheet == "source") parameters.sourceLang else parameters.targetLang,
+                    recent,
+                    { code ->
+                        val source = sheet == "source"
+                        sheet = null
+                        vm.action {
+                            if (source) vm.setSourceLanguage(code) else vm.setTargetLanguage(code)
+                        }
+                    },
+                    { sheet = null },
+                    parameters.detectedSourceLang,
+                )
+            "model" ->
+                ScreenModelSheet(
+                    state,
+                    vm.catalogue,
+                    parameters.model,
+                    vm::chooseModel,
+                    closeModel,
+                    vm::refreshModels,
+                    {
+                        sheet = null
+                        navigate("connections")
+                    },
+                )
+            "defaultModel" ->
+                ScreenModelSheet(
+                    state,
+                    vm.catalogue,
+                    SettingsLogic.defaultModel(state, modelMain),
+                    { model -> vm.action { vm.setDefaultModel(model, modelMain) } },
+                    closeModel,
+                    vm::refreshModels,
+                )
+            "providerModel" ->
+                ScreenModelSheet(
+                    state,
+                    vm.catalogue,
+                    state.connections.find { it.id == connectionId }?.pageModel,
+                    { model -> vm.action { vm.setModel(model.connectionId!!, model, true) } },
+                    closeModel,
+                    vm::refreshModels,
+                    connectionId = connectionId,
+                )
+        }
 }

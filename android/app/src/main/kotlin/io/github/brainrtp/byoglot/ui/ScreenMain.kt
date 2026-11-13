@@ -31,7 +31,7 @@ fun ScreenMain(
     val parameters by vm.parameters.collectAsState()
     val template =
         settings.templates.find { it.id == parameters.templateId } ?: Contracts.builtinTemplate
-    val model = SettingsLogic.effectiveMain(template, settings).model
+    val model = parameters.model
     val c = ByoTheme.colors
     Column(Modifier.fillMaxSize().imePadding()) {
         Row(
@@ -100,7 +100,9 @@ fun ScreenMain(
                 ScreenMainErrors(
                     error,
                     settings.connections
-                        .find { it.id == settings.activeConnectionId }
+                        .find {
+                            it.id == (parameters.model?.connectionId ?: settings.activeConnectionId)
+                        }
                         ?.name
                         .orEmpty(),
                     errorAtMs = state.errorAtMs ?: System.currentTimeMillis(),
@@ -130,6 +132,7 @@ fun ScreenMainErrors(
     error: RunnerError,
     provider: String,
     errorAtMs: Long = System.currentTimeMillis(),
+    actionLabel: String? = null,
     onAction: (MainErrorAction) -> Unit,
 ) {
     val p = mainError(error, nowMs = errorAtMs)
@@ -172,5 +175,5 @@ fun ScreenMainErrors(
                 )
             MainErrorAction.Network -> stringResource(R.string.err_openSettings)
         }
-    Banner(title, body, action, { onAction(p.action) }, warning = p.warning)
+    Banner(title, body, actionLabel ?: action, { onAction(p.action) }, warning = p.warning)
 }

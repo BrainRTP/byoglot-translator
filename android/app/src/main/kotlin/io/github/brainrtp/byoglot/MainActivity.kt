@@ -144,6 +144,14 @@ class MainActivity : ComponentActivity() {
                     onImport = {
                         import.launch(arrayOf("application/json", "application/octet-stream"))
                     },
+                    interfaceLanguage =
+                        getSystemService(android.app.LocaleManager::class.java)
+                            .applicationLocales
+                            .toLanguageTags(),
+                    onInterfaceLanguage = { tag ->
+                        getSystemService(android.app.LocaleManager::class.java).applicationLocales =
+                            android.os.LocaleList.forLanguageTags(tag)
+                    },
                     onLink = { url ->
                         try {
                             startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))

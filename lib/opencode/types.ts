@@ -15,6 +15,8 @@ export type ServerInfo = { version: string };
 
 export type Connection = OpencodeData;
 
+export type TextGeneration = { text: string; truncated?: boolean };
+
 export type BackendErrorKind =
   | "offline"
   | "unauthorized"
@@ -31,4 +33,9 @@ export interface TranslationBackend {
   listModels(signal?: AbortSignal): Promise<ModelInfo[]>;
   defaultModel(signal?: AbortSignal): Promise<ModelInfo | null>;
   generate(prompt: string, model: ModelRef, signal?: AbortSignal): Promise<string>;
+  generateWithMetadata?(
+    prompt: string,
+    model: ModelRef,
+    signal?: AbortSignal,
+  ): Promise<TextGeneration>;
 }

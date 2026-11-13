@@ -35,6 +35,21 @@ async function kindOf(promise: Promise<unknown>) {
 }
 
 describe("generate", () => {
+  it("keeps completion unknown when the server only returns text", async () => {
+    const { backend } = backendWith(async () => json({ data: { text: "Translation" } }));
+    expect(await backend.generateWithMetadata?.("hi", model)).toEqual({ text: "Translation" });
+  });
+
+  it("recognizes optional output-limit metadata without changing the string API", async () => {
+    const { backend } = backendWith(async () =>
+      json({ data: { text: "Partial", finishReason: "length" } }),
+    );
+    expect(await backend.generateWithMetadata?.("hi", model)).toEqual({
+      text: "Partial",
+      truncated: true,
+    });
+    expect(await backend.generate("hi", model)).toBe("Partial");
+  });
   it("posts prompt and model with basic auth and returns the text", async () => {
     const { backend, fetchImpl } = backendWith(async () => json({ data: { text: "Привет" } }));
     const text = await backend.generate("Hello", model);

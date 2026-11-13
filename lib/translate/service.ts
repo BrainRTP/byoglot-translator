@@ -1,9 +1,9 @@
 import { cacheKey, type TranslationCache } from "../cache/cache";
 import { BackendError, isFatal, isTimeout } from "../opencode/errors";
-import type { ModelRef, TranslationBackend } from "../opencode/types";
+import type { ModelRef, TextGeneration, TranslationBackend } from "../opencode/types";
 import type { EffectiveSettings } from "../settings/types";
 import { parsePageResponse } from "./parse";
-import { buildPagePrompt, buildSelectionPrompt } from "./prompt";
+import { buildPagePrompt, buildSelectionPrompt, buildTextPrompt } from "./prompt";
 import { createSemaphore } from "./semaphore";
 
 export type Segment = { id: string; text: string };
@@ -196,7 +196,7 @@ export function createTranslationService(deps: {
     },
     signal: AbortSignal,
   ): Promise<string> {
-    const prompt = buildSelectionPrompt({
+    const input = {
       prePrompt: i.settings.prePrompt,
       languagePrompt: i.languagePrompt,
       sourceLang: i.settings.sourceLang,
@@ -204,9 +204,50 @@ export function createTranslationService(deps: {
       text: i.text,
       context: i.context,
       hostname: i.hostname,
-    });
+    };
+    const prompt = buildSelectionPrompt(input);
     return (await generate(prompt, i.model, signal)).trim();
   }
 
-  return { translatePage, translateSelection };
+  async function translateText(
+    i: {
+      text: string;
+      settings: EffectiveSettings;
+      model: ModelRef;
+      languagePrompt: string;
+    },
+    signal: AbortSignal,
+  ): Promise<TextGeneration> {
+    const prompt = buildTextPrompt({
+      prePrompt: i.settings.prePrompt,
+      languagePrompt: i.languagePrompt,
+      sourceLang: i.settings.sourceLang,
+      targetLang: i.settings.targetLang,
+      text: i.text,
+      context: "",
+      appName: "ByoGlot Translator",
+    });
+    try {
+      return await semaphore.run(async () => {
+        const backend = await deps.getBackend();
+        signal.throwIfAborted();
+        const limited = AbortSignal.any([signal, AbortSignal.timeout(GENERATE_TIMEOUT_MS)]);
+        try {
+          const result = backend.generateWithMetadata
+            ? await backend.generateWithMetadata(prompt, i.model, limited)
+            : { text: await backend.generate(prompt, i.model, limited) };
+          return { ...result, text: result.text.trim() };
+        } catch (error) {
+          if (isTimeout(limited.reason) || isTimeout(error)) {
+            throw new BackendError("offline", { detail: "timeout", cause: error });
+          }
+          throw error;
+        }
+      }, signal);
+    } catch (error) {
+      throw toBackendError(error, signal);
+    }
+  }
+
+  return { translatePage, translateSelection, translateText };
 }

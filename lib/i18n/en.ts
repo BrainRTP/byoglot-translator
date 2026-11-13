@@ -1,4 +1,22 @@
 export const en = {
+  "translator.title": "Text translator",
+  "translator.open": "Translate text",
+  "translator.input": "Text to translate",
+  "translator.placeholder": "Paste or type text here",
+  "translator.source": "Source language",
+  "translator.target": "Target language",
+  "translator.translate": "Translate",
+  "translator.result": "Translation",
+  "translator.limit": "Text is too long ({count} / {limit}). Shorten it to translate.",
+  "translator.count": "{count} / {limit}",
+  "translator.privacy":
+    "ByoGlot does not save your text or translation. Text is sent to your connected provider or opencode server.",
+  "translator.truncated": "The translation was cut off because the model reached its output limit.",
+  "translator.unverified": "This connection does not report whether the translation was cut off.",
+  "translator.ready": "Translation ready",
+  "translator.timeout.title": "Translation timed out",
+  "translator.timeout":
+    "The request took too long. Try again or choose a faster model in Settings.",
   "template.builtin": "Plain translation",
   "unit.h": "h",
   "unit.min": "min",

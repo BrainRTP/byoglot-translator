@@ -12,6 +12,7 @@
   import type { ModelInfo } from "../../lib/opencode/types";
   import { toTemplateSettings } from "../../lib/settings/effective";
   import type { EffectiveSettings, SelectionMode, Template } from "../../lib/settings/types";
+  import { openTranslator } from "../../lib/translator/open";
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
   import { languageOptions } from "../../lib/ui/languages";
   import ModelPicker from "../../lib/ui/ModelPicker.svelte";
@@ -362,6 +363,11 @@
       .finally(() => window.close());
   }
 
+  async function translateText() {
+    await openTranslator();
+    window.close();
+  }
+
   function focusPicker() {
     picker?.focus();
   }
@@ -429,6 +435,8 @@
         </svg>
       </button>
     </div>
+
+    <button class="btn big" type="button" onclick={translateText}>{tr("translator.open")}</button>
 
     {#if status?.state === "disconnected"}
       <button class="btn pri big" type="button" onclick={openOnboarding}>

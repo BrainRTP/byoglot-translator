@@ -92,6 +92,24 @@ export function createOpencodeBackend(
     return parsed.data;
   }
 
+  async function generateWithMetadata(prompt: string, model: ModelRef, signal?: AbortSignal) {
+    const { data } = await call("/api/experimental/generate/text", generateSchema, signal, {
+      prompt,
+      model: {
+        providerID: model.providerID,
+        id: model.id,
+        ...(model.variant !== undefined && { variant: model.variant }),
+      },
+    });
+    const reason = data.finishReason ?? data.finish_reason;
+    return {
+      text: data.text,
+      ...(typeof reason === "string" && {
+        truncated: reason === "length" || reason === "max_tokens",
+      }),
+    };
+  }
+
   return {
     async info(signal) {
       const { version } = await call("/api/info", infoSchema, signal);
@@ -105,16 +123,8 @@ export function createOpencodeBackend(
       const { data } = await call("/api/model/default", defaultModelSchema, signal);
       return data ? toModelInfo(data) : null;
     },
-    async generate(prompt, model: ModelRef, signal) {
-      const { data } = await call("/api/experimental/generate/text", generateSchema, signal, {
-        prompt,
-        model: {
-          providerID: model.providerID,
-          id: model.id,
-          ...(model.variant !== undefined && { variant: model.variant }),
-        },
-      });
-      return data.text;
-    },
+    generate: async (prompt, model, signal) =>
+      (await generateWithMetadata(prompt, model, signal)).text,
+    generateWithMetadata,
   };
 }

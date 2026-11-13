@@ -30,6 +30,7 @@ function deps(): BackgroundDeps {
     service: {
       translatePage: async () => {},
       translateSelection: async () => "x",
+      translateText: async () => ({ text: "x", truncated: false }),
     },
   };
 }

@@ -76,13 +76,17 @@ import type {
 } from "../settings/types";
 import { BUILTIN_PROFILES, PROFILE_IDS } from "../translate/profiles";
 import type { createTranslationService, PageJob, Segment } from "../translate/service";
+import { textProblem } from "../translator/input";
 
 export interface HandlerDeps {
   getBackend(): Promise<TranslationBackend>;
   createBackend(rec: ConnectionRecord): TranslationBackend;
   pair(link: string): Promise<Connection>;
   removeOrigin(origin: string): Promise<void>;
-  service: Pick<ReturnType<typeof createTranslationService>, "translateSelection">;
+  service: Pick<
+    ReturnType<typeof createTranslationService>,
+    "translateSelection" | "translateText"
+  >;
   cache: TranslationCache;
 }
 
@@ -157,7 +161,10 @@ const BADGE_ERROR_COLOR = "#d93025";
 
 export function createHandlers(deps: HandlerDeps) {
   let modelsCache: { at: number; models: ModelInfo[] } | null = null;
-  const selectionJobs = new Map<string, { controller: AbortController; tabId?: number }>();
+  const selectionJobs = new Map<
+    string,
+    { controller: AbortController; tabId?: number; editor?: boolean }
+  >();
 
   let pending: Promise<ModelInfo[]> | null = null;
   let modelsEpoch = 0;
@@ -752,43 +759,54 @@ export function createHandlers(deps: HandlerDeps) {
       i: Parameters<ProtocolMap["translateSelection"]>[0],
       sender: Sender,
     ): Promise<SelectionResult> {
-      const kind = await activeKind();
+      const editor = i.editor;
+      if (editor) {
+        if (sender.url !== browser.runtime.getURL("/translator.html")) {
+          throw new Error("Editor translation requires the translator page");
+        }
+        if (textProblem(i.text)) throw new Error("Invalid translator input");
+      }
+      let kind = editor ? undefined : await activeKind();
       const controller = new AbortController();
-      if (i.requestId) selectionJobs.set(i.requestId, { controller, tabId: sender.tab?.id });
+      if (i.requestId)
+        selectionJobs.set(i.requestId, { controller, tabId: sender.tab?.id, editor: !!editor });
+      if (editor) kind = await activeKind();
       let used: ModelRef | undefined;
       try {
-        const hostname = hostnameOf(sender.tab?.url) || i.hostname;
+        const hostname = editor ? "" : hostnameOf(sender.tab?.url) || i.hostname;
         const required = await requireModel(
-          sender.tab?.id,
+          editor ? undefined : sender.tab?.id,
           hostname,
           "selectionModel",
           i.templateId,
         );
         const view = required.view;
         let model = required.model;
-        if (i.window === "pinned") {
+        if (!editor && i.window === "pinned") {
           const info = (await loadModels())?.find(
             (m) => m.providerID === model.providerID && m.id === model.id,
           );
           model = pinnedModel(model, info, (await globalsItem.getValue()).pinnedEffort);
         }
         used = model;
-        const text = await deps.service.translateSelection(
-          {
-            text: i.text,
-            context: i.context,
-            settings: view.settings,
-            model,
-            hostname: i.hostname || hostname,
-            languagePrompt: await languagePromptFor(view.settings.targetLang),
-          },
-          controller.signal,
-        );
-        return {
-          text,
-          sourceLang: view.settings.sourceLang,
-          targetLang: view.settings.targetLang,
+        const settings = editor ? { ...view.settings, ...editor } : view.settings;
+        const input = {
+          text: i.text,
+          context: i.context,
+          settings,
           model,
+          hostname: i.hostname || hostname,
+          languagePrompt: await languagePromptFor(settings.targetLang),
+        };
+        const result = editor
+          ? await deps.service.translateText(input, controller.signal)
+          : { text: await deps.service.translateSelection(input, controller.signal) };
+        return {
+          text: result.text,
+          sourceLang: settings.sourceLang,
+          targetLang: settings.targetLang,
+          model,
+          ...(editor && { truncated: "truncated" in result ? result.truncated : undefined }),
         };
       } catch (error) {
         const e = toBackendError(error);
@@ -797,6 +815,7 @@ export function createHandlers(deps: HandlerDeps) {
           error: e.kind,
           retryAfterMs: e.retryAfterMs,
           backend: kind,
+          ...(editor && e.detail === "timeout" && { timeout: true }),
           ...(source !== undefined && { source }),
         };
       } finally {
@@ -844,6 +863,12 @@ export function createHandlers(deps: HandlerDeps) {
     },
 
     async tabRemoved(tabId: number): Promise<void> {
+      for (const [id, job] of selectionJobs) {
+        if (job.editor && job.tabId === tabId) {
+          job.controller.abort();
+          selectionJobs.delete(id);
+        }
+      }
       await Promise.all([tabSettings(tabId).removeValue(), tabHostItem(tabId).removeValue()]);
     },
 

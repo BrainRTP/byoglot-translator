@@ -16,6 +16,7 @@
   import { DEFAULT_GLOBALS } from "../../lib/settings/defaults";
   import { pinnedModel } from "../../lib/settings/effective";
   import type { GlobalSettings, SelectionMode, SiteRule, Template, ThemeChoice } from "../../lib/settings/types";
+  import { openTranslator } from "../../lib/translator/open";
   import AnimationSection from "../../lib/ui/AnimationSection.svelte";
   import ConnectionList from "../../lib/ui/ConnectionList.svelte";
   import { changeUiLang, tr } from "../../lib/ui/i18n.svelte";
@@ -509,6 +510,7 @@
     {:else}
       <div class="layout">
         <nav aria-label={tr("opt.sections")}>
+          <a class="btn translator-link" href="/translator.html" onclick={(event) => { event.preventDefault(); void openTranslator(); }}>{tr("translator.open")}</a>
           {#each SECTIONS.filter((id) => !android || id !== "hotkeys") as id (id)}
             <a href={`#${id}`} class:on={active === id} onclick={() => (active = id)}>
               {tr(NAV_KEYS[id])}
@@ -782,6 +784,11 @@
     color: var(--tx);
     background: var(--sf);
     font-weight: 600;
+  }
+  nav .translator-link {
+    min-height: 44px;
+    margin-bottom: 12px;
+    color: var(--tx);
   }
   nav a:focus-visible {
     outline: 2px solid var(--ac);

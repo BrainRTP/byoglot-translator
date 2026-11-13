@@ -1,3 +1,5 @@
+%global debug_package %{nil}
+
 %{!?byoglot_version:%global byoglot_version 0.3.11}
 
 Name:           byoglot

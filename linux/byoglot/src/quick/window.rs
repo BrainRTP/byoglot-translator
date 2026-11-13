@@ -123,6 +123,11 @@ impl QuickWindow {
         });
         let weak = Rc::downgrade(driver);
         self.paste.connect_clicked(move |button| {
+            let Some(driver) = weak.upgrade() else {
+                return;
+            };
+            driver.dispatch(QuickEvent::Pasted(String::new()));
+            let generation = driver.generation();
             let weak = weak.clone();
             let clipboard = button.clipboard();
             glib::spawn_future_local(async move {
@@ -134,7 +139,9 @@ impl QuickWindow {
                 .ok()
                 .and_then(Result::ok)
                 .flatten();
-                if let Some(driver) = weak.upgrade() {
+                if let Some(driver) = weak.upgrade()
+                    && driver.accepts(generation)
+                {
                     driver.dispatch(QuickEvent::Pasted(
                         text.map(|s| s.to_string()).unwrap_or_default(),
                     ));

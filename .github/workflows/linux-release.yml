@@ -31,7 +31,7 @@ jobs:
           set -euo pipefail
           version=$(python3 linux/build-aux/check-version.py)
           mkdir -p /tmp/byoglot-rpm/SOURCES /tmp/byoglot-source
-          git archive HEAD --prefix="byoglot-$version/" | tar -x -C /tmp/byoglot-source
+          git -c safe.directory="$GITHUB_WORKSPACE" archive HEAD --prefix="byoglot-$version/" | tar -x -C /tmp/byoglot-source
           cd "/tmp/byoglot-source/byoglot-$version"
           mkdir .cargo
           /usr/bin/cargo vendor --locked --manifest-path linux/Cargo.toml vendor > .cargo/config.toml

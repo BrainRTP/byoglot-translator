@@ -30,7 +30,7 @@ install -Dm755 target/release/byoglot ~/.local/bin/byoglot
 install -Dm644 data/io.github.brainrtp.ByoGlot.desktop ~/.local/share/applications/io.github.brainrtp.ByoGlot.desktop
 ```
 
-Run `byoglot` for the main window, `byoglot --translate-selection` for selection capture, `byoglot --text "Hello"` for explicit text, or `echo Hello | byoglot --text -`. Commands go to the existing instance through GApplication. The app stays in the background after windows close; Quit waits for settings/key transactions and exits. Preferences can change the portal shortcut or copy the fallback command for desktop keyboard settings. The preferred shortcut is Ctrl+Alt+T, which a desktop may already reserve. The optional GUI dependency futures-util 0.3.34 consumes portal event streams with its std feature and no default features.
+Run `byoglot` for the main window, `byoglot --translate-selection` for selection capture, `byoglot --text "Hello"` for explicit text, or `echo Hello | byoglot --text -`. Commands go to the existing instance through GApplication. The app stays in the background after windows close; Quit waits for settings/key transactions and exits. Preferences can change the portal shortcut or copy the fallback command for desktop keyboard settings. In Flatpak, Copy uses the host command `flatpak run io.github.brainrtp.ByoGlot --translate-selection`. The preferred shortcut is Ctrl+Alt+T, which a desktop may already reserve. The optional GUI dependency futures-util 0.3.34 consumes portal event streams with its std feature and no default features.
 
 ## Package artifacts
 

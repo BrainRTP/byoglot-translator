@@ -19,6 +19,14 @@ pub fn parse(args: &[String]) -> Command {
     }
 }
 
+pub fn selection_command(sandboxed: bool) -> &'static str {
+    if sandboxed {
+        "flatpak run io.github.brainrtp.ByoGlot --translate-selection"
+    } else {
+        "byoglot --translate-selection"
+    }
+}
+
 impl std::fmt::Debug for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
@@ -37,6 +45,14 @@ mod tests {
     use super::*;
     fn command(args: &[&str]) -> Command {
         parse(&args.iter().map(|a| (*a).into()).collect::<Vec<_>>())
+    }
+    #[test]
+    fn selection_binding_runs_on_the_host_for_both_packages() {
+        assert_eq!(selection_command(false), "byoglot --translate-selection");
+        assert_eq!(
+            selection_command(true),
+            "flatpak run io.github.brainrtp.ByoGlot --translate-selection"
+        );
     }
     #[test]
     fn no_arguments_activate() {

@@ -80,7 +80,7 @@ messages! {
     QuickHint => ("Select text and press the shortcut again, or paste it here.", "Выделите текст и нажмите сочетание еще раз или вставьте его здесь."),
     OpenMain => ("Open in ByoGlot", "Открыть в ByoGlot"),
     ShortcutDescription => ("Translate the selected text", "Перевести выделенный текст"),
-    ShortcutFallback => ("Bind this command to a key in your desktop's keyboard settings: byoglot --translate-selection", "Назначьте этой команде сочетание клавиш в настройках рабочего стола: byoglot --translate-selection"),
+    ShortcutFallback => ("Bind this command to a key in your desktop's keyboard settings: {}", "Назначьте этой команде сочетание клавиш в настройках рабочего стола: {}"),
     ShortcutBinding => ("Requesting a shortcut from the desktop...", "Запрос сочетания клавиш у рабочего стола..."),
     ShortcutChange => ("Change...", "Изменить..."),
     CliHelp => ("Usage: byoglot [--translate-selection | --text TEXT | --text - | --help | --version]\nWith no options, open the main window. Use --text - to read standard input.", "Использование: byoglot [--translate-selection | --text TEXT | --text - | --help | --version]\nБез параметров открывается главное окно. Параметр --text - читает стандартный ввод."),

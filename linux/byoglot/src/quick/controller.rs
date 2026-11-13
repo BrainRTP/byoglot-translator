@@ -121,6 +121,12 @@ pub mod gui {
                 self.dispatch(QuickEvent::Pasted(source));
             }
         }
+        pub fn generation(&self) -> u64 {
+            self.controller.borrow().generation()
+        }
+        pub fn accepts(&self, generation: u64) -> bool {
+            self.controller.borrow().accept(generation)
+        }
         pub fn source(&self) -> Option<String> {
             self.controller.borrow().source().map(str::to_owned)
         }

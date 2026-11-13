@@ -1,6 +1,6 @@
 use crate::{
     APP_ID,
-    i18n::{Msg, tr},
+    i18n::{Msg, tr, tr_with},
 };
 use adw::prelude::*;
 use ashpd::desktop::{
@@ -16,7 +16,12 @@ use std::{
 };
 
 const SHORTCUT_ID: &str = "translate-selection";
-pub const FALLBACK_COMMAND: &str = "byoglot --translate-selection";
+fn fallback_command() -> &'static str {
+    crate::cli::selection_command(ashpd::is_sandboxed())
+}
+fn fallback_hint() -> String {
+    tr_with(Msg::ShortcutFallback, fallback_command())
+}
 
 #[derive(Debug)]
 pub struct ShortcutError;
@@ -118,8 +123,9 @@ pub async fn bind(app: &adw::Application) -> Result<ShortcutStatus, ShortcutErro
                         .shortcuts()
                         .iter()
                         .find(|s| s.id() == SHORTCUT_ID)
-                        .map(|s| s.trigger_description())
-                        .unwrap_or(tr(Msg::ShortcutFallback)),
+                        .map(|s| s.trigger_description().to_owned())
+                        .unwrap_or_else(fallback_hint)
+                        .as_str(),
                 );
             }
         }
@@ -134,7 +140,7 @@ pub async fn bind(app: &adw::Application) -> Result<ShortcutStatus, ShortcutErro
         if closed.next().await.is_some()
             && let Some(status) = status.upgrade()
         {
-            status.set_label(tr(Msg::ShortcutFallback));
+            status.set_label(&fallback_hint());
         }
     });
     Ok(ShortcutStatus {
@@ -155,7 +161,7 @@ impl Default for Registration {
         Self {
             current: RefCell::new(None),
             busy: Cell::new(false),
-            description: gtk::Label::new(Some(tr(Msg::ShortcutFallback))),
+            description: gtk::Label::new(Some(&fallback_hint())),
         }
     }
 }
@@ -180,9 +186,7 @@ impl Registration {
                     });
                     *registration.current.borrow_mut() = Some(status);
                 } else {
-                    registration
-                        .description
-                        .set_label(tr(Msg::ShortcutFallback));
+                    registration.description.set_label(&fallback_hint());
                 }
                 registration.busy.set(false);
             }
@@ -211,7 +215,7 @@ impl Registration {
         let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         let change = gtk::Button::with_label(tr(Msg::ShortcutChange));
         let copy = gtk::Button::with_label(tr(Msg::Copy));
-        copy.connect_clicked(|button| button.clipboard().set_text(FALLBACK_COMMAND));
+        copy.connect_clicked(|button| button.clipboard().set_text(fallback_command()));
         buttons.append(&change);
         buttons.append(&copy);
         group.add(&buttons);
@@ -242,9 +246,7 @@ impl Registration {
                         .await
                         .is_err()
                     {
-                        registration
-                            .description
-                            .set_label(tr(Msg::ShortcutFallback));
+                        registration.description.set_label(&fallback_hint());
                     }
                     *registration.current.borrow_mut() = Some(status);
                     registration.busy.set(false);

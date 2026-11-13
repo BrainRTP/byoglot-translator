@@ -43,6 +43,11 @@ updates:
       interval: weekly
     labels: ["dependencies", "area:android"]
 
+  - package-ecosystem: swift
+    directory: /apple/ByoGlotKit
+    schedule:
+      interval: weekly
+    labels: ["dependencies", "area:apple"]
   - package-ecosystem: cargo
     directory: /linux
     schedule:

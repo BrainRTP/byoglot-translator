@@ -173,6 +173,24 @@
         "params": {},
         "needsKey": true
       }
+    },
+    {
+      "name": "custom LAN HTTP still needs a key",
+      "input": {
+        "preset": "custom",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "http://192.168.1.5:11434/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": true
+      }
     }
   ]
 }

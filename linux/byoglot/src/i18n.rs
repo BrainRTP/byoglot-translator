@@ -59,7 +59,7 @@ messages! {
     FixConnection => ("Open Connections", "Открыть подключения"),
     Input => ("Text to translate", "Текст для перевода"),
     Result => ("Translation", "Перевод"),
-    InputLimit => ("Up to 20000 UTF-16 units", "До 20000 единиц UTF-16"),
+    InputLimit => ("Up to {} UTF-16 units", "До {} единиц UTF-16"),
     NoConnections => ("Add a provider to start translating.", "Добавьте провайдера для перевода."),
     DeleteTemplate => ("Delete this template?", "Удалить этот шаблон?"),
     DeleteConnection => ("Delete this connection?", "Удалить это подключение?"),

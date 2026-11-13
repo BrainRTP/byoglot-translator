@@ -16,7 +16,7 @@ public static class CoreJson
 }
 
 public sealed record ModelRef([property: JsonPropertyName("providerID")] string ProviderID, string Id, string? Variant = null, string? ConnectionId = null);
-public sealed record ModelInfo([property: JsonPropertyName("providerID")] string ProviderID, string Id, string Name, IReadOnlyList<string> Variants, int ContextLimit, int OutputLimit);
+public sealed record ModelInfo([property: JsonPropertyName("providerID")] string ProviderID, string Id, string Name, IReadOnlyList<string> Variants, double ContextLimit, double OutputLimit);
 [JsonConverter(typeof(JsonStringEnumConverter<ProviderPreset>))]
 public enum ProviderPreset
 {
@@ -44,11 +44,11 @@ public sealed record ProfileOverride(string Text, string Base, double SavedAt)
 }
 public sealed record PortableGlobals(string SourceLang, string TargetLang, bool LanguagePromptEnabled, string LanguageProfile, string DefaultTemplateId);
 public sealed record PresetInfo(string BaseUrl, bool NeedsKey);
-public sealed record Limits(int MaxBlocks, int MaxChars, int Concurrency, int GenerateTimeoutMs, int MaxProfileText);
+public sealed record Limits(int MaxBlocks, int MaxChars, int Concurrency, int GenerateTimeoutMs, int MaxProfileText, int MaxEditorText);
 public sealed record SiteRule(string Id, string Pattern, string TemplateId);
 public sealed record ExportConnection(string Id, ProviderPreset Preset, string Name, string BaseUrl);
 public static class InputLimits
 {
     public const int Quick = 5000;
-    public const int Editor = 20000;
+    public static int Editor => Contracts.Limits.MaxEditorText;
 }

@@ -273,10 +273,10 @@ async fn numeric_model_metadata_preserves_typescript_number_values() {
     );
 }
 #[tokio::test]
-async fn retry_after_preserves_large_finite_delays_and_rejects_infinity() {
+async fn retry_after_caps_large_finite_and_overflowing_delays() {
     for (seconds, expected) in [
-        ("99999999999999999999".into(), Some(1e23)),
-        ("9".repeat(400), None),
+        ("99999999999999999999".into(), Some(86_400_000.0)),
+        ("9".repeat(400), Some(86_400_000.0)),
     ] {
         let mut transport = RecordingTransport::new(429, json!({}));
         transport

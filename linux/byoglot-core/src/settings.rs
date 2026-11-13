@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub const QUICK_INPUT_LIMIT: usize = 5000;
-pub const EDITOR_INPUT_LIMIT: usize = 20000;
+pub fn editor_input_limit() -> usize {
+    contracts::limits().max_editor_text
+}
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {

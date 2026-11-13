@@ -27,6 +27,19 @@ internal fun backendShape(error: BackendException): JsonObject = buildJsonObject
 internal fun JsonObject.string(key: String): String = getValue(key).jsonPrimitive.content
 
 class ProviderContractTest {
+    private fun normalizeNumbers(value: JsonElement): JsonElement = when (value) {
+        is JsonObject -> JsonObject(value.mapValues { normalizeNumbers(it.value) })
+        is JsonArray -> JsonArray(value.map(::normalizeNumbers))
+        is JsonPrimitive -> if (value.isString) value else value.doubleOrNull?.let { JsonPrimitive(it) } ?: value
+    }
+
+    @Test fun `numeric normalization keeps exact object keys and primitive types`() {
+        fun normalized(raw: String) = normalizeNumbers(coreJson.parseToJsonElement(raw))
+        assertEquals(normalized("""[{"limit":1e3}]"""), normalized("""[{"limit":1000.0}]"""))
+        assertNotEquals(normalized("""[{"limit":1,"effort":"high"}]"""), normalized("""[{"limit":1.0}]"""))
+        assertNotEquals(normalized("""[{"limit":"1"}]"""), normalized("""[{"limit":1}]"""))
+    }
+
     private fun client(i: JsonObject): Pair<ProviderClient, RecordingTransport> {
         val p = i.getValue("provider").jsonObject
         val r = i.getValue("response").jsonObject
@@ -50,8 +63,8 @@ class ProviderContractTest {
     @TestFactory fun models() = ContractsFolder.fixture<JsonObject, JsonObject>("provider-models", version = 1).map { c ->
         dynamicTest(c.name) { runBlocking {
             val (client, transport) = client(c.input)
-            assertEquals(c.expected["models"], coreJson.encodeToJsonElement(client.listModels()))
-            assertEquals(c.expected["defaultModel"], coreJson.encodeToJsonElement(client.defaultModel()))
+            assertEquals(normalizeNumbers(c.expected.getValue("models")), normalizeNumbers(coreJson.encodeToJsonElement(client.listModels())))
+            assertEquals(normalizeNumbers(c.expected.getValue("defaultModel")), normalizeNumbers(coreJson.encodeToJsonElement(client.defaultModel())))
             transport.requests.forEach { request(c.expected.getValue("request").jsonObject, it) }
             assertEquals(listOf(30000L, 30000L), transport.timeouts)
         } }
@@ -136,13 +149,13 @@ class ProviderContractTest {
         assertFalse(error.stackTraceToString().contains("fixture-key"))
     }
 
-    @Test fun `model metadata accepts finite JSON numbers and bounds them to Int`() = runBlocking<Unit> {
+    @Test fun `model metadata preserves finite JSON numbers`() = runBlocking<Unit> {
         val body = """{"data":[{"id":"float","context_length":131072.0,"max_output_tokens":4096.0},{"id":"large","context_window":2147483648,"max_output_tokens":1e100},{"id":"negative","context_window":-1e100}]}"""
         val transport = RecordingTransport(HttpResponse(200, emptyMap(), body.toByteArray()))
         val connection = Connection("c", ProviderPreset.ollama, "Local", "http://localhost/v1")
         val models = ProviderClient(connection, null, transport).listModels()
-        assertEquals(listOf(131072, Int.MAX_VALUE, Int.MIN_VALUE), models.map { it.contextLimit })
-        assertEquals(listOf(4096, Int.MAX_VALUE, 0), models.map { it.outputLimit })
+        assertEquals(listOf(131072.0, 2147483648.0, -1e100), models.map { it.contextLimit })
+        assertEquals(listOf(4096.0, 1e100, 0.0), models.map { it.outputLimit })
         val invalid = RecordingTransport(HttpResponse(200, emptyMap(), """{"data":[{"id":"infinite","context_window":1e309}]}""".toByteArray()))
         val error = runCatching { ProviderClient(connection, null, invalid).listModels() }.exceptionOrNull() as BackendException
         assertEquals(ErrorKind.Incompatible, error.kind)

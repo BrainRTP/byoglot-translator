@@ -52,7 +52,7 @@ data class RunnerOutput(
 }
 
 const val EXTERNAL_INPUT_LIMIT = 5000
-const val EDITOR_INPUT_LIMIT = 20000
+val EDITOR_INPUT_LIMIT: Int get() = Contracts.limits.maxEditorText
 
 class TranslationRunner(
     private val settings: SettingsRepository,

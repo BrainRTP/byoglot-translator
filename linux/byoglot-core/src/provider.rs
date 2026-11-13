@@ -91,8 +91,8 @@ impl<T: HttpTransport> ProviderClient<T> {
             }
             return Err(error);
         }
-        let value: Value = serde_json::from_slice(&response.body)
-            .map_err(|_| incompatible("response is not JSON"))?;
+        let value =
+            response_json(&response.body).map_err(|_| incompatible("response is not JSON"))?;
         serde_json::from_value(value).map_err(|_| incompatible("unexpected response shape"))
     }
     pub async fn list_models(&self) -> Result<Vec<ModelInfo>, BackendError> {
@@ -186,8 +186,11 @@ struct Choice {
 struct Message {
     content: Option<String>,
 }
+fn response_json(body: &[u8]) -> Result<Value, serde_json::Error> {
+    serde_json::from_slice(body.strip_prefix(b"\xef\xbb\xbf").unwrap_or(body))
+}
 fn failure(response: HttpResponse, now: SystemTime) -> BackendError {
-    let message = serde_json::from_slice::<Value>(&response.body)
+    let message = response_json(&response.body)
         .ok()
         .and_then(|v| v.get("error")?.get("message")?.as_str().map(str::to_owned));
     let status = response.status;
@@ -225,7 +228,7 @@ fn retry_after(value: &str, now: SystemTime) -> Option<f64> {
         && pieces.next().is_none()
     {
         let milliseconds = (value.parse::<f64>().ok()? * 1000.0).round();
-        return milliseconds.is_finite().then_some(milliseconds);
+        return Some(milliseconds.min(86_400_000.0));
     }
     if value.len() != 29
         || value.get(3..5)? != ", "
@@ -261,7 +264,7 @@ fn retry_after(value: &str, now: SystemTime) -> Option<f64> {
         Ok(d) => d.as_millis() as i128,
         Err(e) => -(e.duration().as_millis() as i128),
     };
-    Some((i128::from(timestamp) - now).max(0) as f64)
+    Some((i128::from(timestamp) - now).clamp(0, 86_400_000) as f64)
 }
 pub(crate) fn digits(value: &str) -> Option<u32> {
     if value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {

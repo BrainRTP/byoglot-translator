@@ -30,7 +30,11 @@ pub fn language_prompt_text(
     };
     let builtin = builtins.get(id).map(String::as_str).unwrap_or("");
     match overrides.get(id) {
-        Some(value) if value.text.trim() != builtin.trim() => value.text.clone(),
+        Some(value) if js_trim(&value.text) != js_trim(builtin) => value.text.clone(),
         _ => builtin.into(),
     }
+}
+
+fn js_trim(value: &str) -> &str {
+    value.trim_matches(|c| matches!(c, '\u{0009}'..='\u{000d}' | '\u{0020}' | '\u{00a0}' | '\u{1680}' | '\u{2000}'..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{202f}' | '\u{205f}' | '\u{3000}' | '\u{feff}'))
 }

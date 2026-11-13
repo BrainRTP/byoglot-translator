@@ -25,10 +25,10 @@ public struct ModelInfo: Codable, Hashable, Sendable {
     public var id: String
     public var name: String
     public var variants: [String]
-    public var contextLimit: Int
-    public var outputLimit: Int
+    public var contextLimit: Double
+    public var outputLimit: Double
 
-    public init(providerID: String, id: String, name: String, variants: [String], contextLimit: Int, outputLimit: Int) {
+    public init(providerID: String, id: String, name: String, variants: [String], contextLimit: Double, outputLimit: Double) {
         self.providerID = providerID
         self.id = id
         self.name = name

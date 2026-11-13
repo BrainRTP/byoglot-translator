@@ -11,6 +11,7 @@ public struct Limits: Codable, Hashable, Sendable {
     public let concurrency: Int
     public let generateTimeoutMs: Int
     public let maxProfileText: Int
+    public let maxEditorText: Int
 }
 
 public enum Contracts: Sendable {

@@ -21,6 +21,7 @@
     <keyword>AI</keyword>
     <keyword xml:lang="ru">перевод</keyword>
     <keyword xml:lang="ru">переводчик</keyword>
+    <keyword xml:lang="ru">ИИ</keyword>
   </keywords>
   <supports><control>keyboard</control><control>pointing</control></supports>
   <launchable type="desktop-id">io.github.brainrtp.ByoGlot.desktop</launchable>

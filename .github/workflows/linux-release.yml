@@ -34,6 +34,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check version and tag
         run: python3 linux/build-aux/check-version.py
+      - name: Require an explicit RPM version
+        run: |
+          if rpmspec --parse linux/build-aux/byoglot.spec > /dev/null 2>&1; then
+            exit 1
+          fi
       - name: Test the workspace
         working-directory: linux
         run: /usr/bin/cargo test --workspace --locked

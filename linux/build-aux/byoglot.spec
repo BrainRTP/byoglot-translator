@@ -1,6 +1,6 @@
 %global debug_package %{nil}
 
-%{!?byoglot_version:%global byoglot_version 0.3.11}
+%{!?byoglot_version:%{error:Define byoglot_version from linux/Cargo.toml}}
 
 Name:           byoglot
 Version:        %{byoglot_version}

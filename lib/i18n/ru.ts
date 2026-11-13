@@ -235,6 +235,7 @@ export const ru = {
   "models.thinkingTitle": "Thinking замедляет перевод в 5-7 раз.",
   "models.thinkingHint":
     "Effort выше none включает thinking. Для перевода обычно достаточно none: качество почти не меняется, а скорость максимальна.",
+  "models.choose": "Выберите модель",
   "models.page": "Перевод страницы",
   "models.selection": "Перевод выделения",
   "models.noneNote": "Самый быстрый вариант, рекомендуется для больших страниц.",

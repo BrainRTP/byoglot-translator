@@ -569,16 +569,7 @@
             "outputLimit": 0
           }
         ],
-        "defaultModel": {
-          "providerID": "openai",
-          "id": "model-id-0",
-          "name": "model-id-0",
-          "variants": [
-            "none"
-          ],
-          "contextLimit": 0,
-          "outputLimit": 0
-        }
+        "defaultModel": null
       }
     },
     {
@@ -651,6 +642,195 @@
           "contextLimit": 0,
           "outputLimit": 0
         }
+      }
+    },
+    {
+      "name": "null model name falls back to id",
+      "input": {
+        "provider": {
+          "preset": "custom",
+          "name": "custom",
+          "baseUrl": "https://models.example.com/v1",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "object": "list",
+            "data": [
+              {
+                "id": "nullable-name",
+                "name": null
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "GET",
+          "url": "https://models.example.com/v1/models",
+          "headers": {
+            "authorization": "Bearer fixture-key"
+          }
+        },
+        "models": [
+          {
+            "providerID": "custom",
+            "id": "nullable-name",
+            "name": "nullable-name",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 0,
+            "outputLimit": 0
+          }
+        ],
+        "defaultModel": {
+          "providerID": "custom",
+          "id": "nullable-name",
+          "name": "nullable-name",
+          "variants": [
+            "none"
+          ],
+          "contextLimit": 0,
+          "outputLimit": 0
+        }
+      }
+    },
+    {
+      "name": "mistral skips non-chat models for default",
+      "input": {
+        "provider": {
+          "preset": "mistral",
+          "name": "mistral",
+          "baseUrl": "https://api.mistral.ai/v1",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "object": "list",
+            "data": [
+              {
+                "id": "mistral-embed",
+                "capabilities": {
+                  "completion_chat": false
+                }
+              },
+              {
+                "id": "chat-without-capabilities"
+              },
+              {
+                "id": "mistral-large-latest",
+                "capabilities": {
+                  "completion_chat": true
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "GET",
+          "url": "https://api.mistral.ai/v1/models",
+          "headers": {
+            "authorization": "Bearer fixture-key"
+          }
+        },
+        "models": [
+          {
+            "providerID": "mistral",
+            "id": "mistral-embed",
+            "name": "mistral-embed",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 0,
+            "outputLimit": 0
+          },
+          {
+            "providerID": "mistral",
+            "id": "chat-without-capabilities",
+            "name": "chat-without-capabilities",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 0,
+            "outputLimit": 0
+          },
+          {
+            "providerID": "mistral",
+            "id": "mistral-large-latest",
+            "name": "mistral-large-latest",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 0,
+            "outputLimit": 0
+          }
+        ],
+        "defaultModel": {
+          "providerID": "mistral",
+          "id": "chat-without-capabilities",
+          "name": "chat-without-capabilities",
+          "variants": [
+            "none"
+          ],
+          "contextLimit": 0,
+          "outputLimit": 0
+        }
+      }
+    },
+    {
+      "name": "mistral without chat models has no default",
+      "input": {
+        "provider": {
+          "preset": "mistral",
+          "name": "mistral",
+          "baseUrl": "https://api.mistral.ai/v1",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "object": "list",
+            "data": [
+              {
+                "id": "mistral-embed",
+                "capabilities": {
+                  "completion_chat": false
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "GET",
+          "url": "https://api.mistral.ai/v1/models",
+          "headers": {
+            "authorization": "Bearer fixture-key"
+          }
+        },
+        "models": [
+          {
+            "providerID": "mistral",
+            "id": "mistral-embed",
+            "name": "mistral-embed",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 0,
+            "outputLimit": 0
+          }
+        ],
+        "defaultModel": null
       }
     }
   ]

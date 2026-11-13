@@ -720,6 +720,151 @@
           "content": "Привет"
         }
       }
+    },
+    {
+      "name": "chunk content keeps only text in order",
+      "input": {
+        "provider": {
+          "preset": "mistral",
+          "name": "Mistral",
+          "baseUrl": "https://api.mistral.ai/v1",
+          "apiKey": "fixture-key"
+        },
+        "model": {
+          "providerID": "mistral",
+          "id": "mistral-large-latest"
+        },
+        "prompt": "Translate hello to Russian.",
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "choices": [
+              {
+                "message": {
+                  "content": [
+                    {
+                      "type": "thinking",
+                      "thinking": [
+                        {
+                          "type": "text",
+                          "text": "private reasoning"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "text": "При"
+                    },
+                    {
+                      "type": "image_url",
+                      "image_url": "https://example.com/image.png"
+                    },
+                    {
+                      "type": "text",
+                      "text": "вет"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "POST",
+          "url": "https://api.mistral.ai/v1/chat/completions",
+          "headers": {
+            "authorization": "Bearer fixture-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "mistral-large-latest",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Translate hello to Russian."
+              }
+            ],
+            "stream": false
+          }
+        },
+        "result": {
+          "content": "Привет"
+        }
+      }
+    },
+    {
+      "name": "chunk content without text is empty",
+      "input": {
+        "provider": {
+          "preset": "mistral",
+          "name": "Mistral",
+          "baseUrl": "https://api.mistral.ai/v1",
+          "apiKey": "fixture-key"
+        },
+        "model": {
+          "providerID": "mistral",
+          "id": "mistral-large-latest"
+        },
+        "prompt": "Translate hello to Russian.",
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "choices": [
+              {
+                "message": {
+                  "content": [
+                    {
+                      "type": "thinking",
+                      "thinking": [
+                        {
+                          "type": "text",
+                          "text": "private reasoning"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "reference",
+                      "reference_ids": [
+                        "ref"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "POST",
+          "url": "https://api.mistral.ai/v1/chat/completions",
+          "headers": {
+            "authorization": "Bearer fixture-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "mistral-large-latest",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Translate hello to Russian."
+              }
+            ],
+            "stream": false
+          }
+        },
+        "result": {
+          "error": {
+            "kind": "bad_response",
+            "detail": "empty completion"
+          }
+        }
+      }
     }
   ]
 }

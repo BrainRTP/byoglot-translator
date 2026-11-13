@@ -22,6 +22,8 @@ pub struct Services {
     pub editor: Editor,
     pub runtime: Handle,
     mutation: Mutex<()>,
+    #[cfg(feature = "gui")]
+    startup_path: PathBuf,
 }
 
 fn failed() -> RunnerError {
@@ -34,6 +36,8 @@ impl Services {
         language: Option<String>,
         runtime: Handle,
     ) -> Result<Arc<Self>, RunnerError> {
+        #[cfg(feature = "gui")]
+        let startup_path = path.with_file_name("startup.json");
         let settings = Arc::new(FileSettingsRepository::new(path, language));
         let secrets = Arc::new(FallbackSecretStore::open().await);
         let transport = ReqwestTransport::new(runtime.clone()).map_err(|_| failed())?;
@@ -45,7 +49,82 @@ impl Services {
             transport,
             runtime,
             mutation: Mutex::new(()),
+            #[cfg(feature = "gui")]
+            startup_path,
         }))
+    }
+
+    pub async fn translate(
+        self: &Arc<Self>,
+        input: byoglot_core::RunnerInput,
+    ) -> Result<byoglot_core::RunnerOutput, RunnerError> {
+        let services = self.clone();
+        let mut task = crate::net::AbortOnDrop(
+            self.runtime
+                .spawn(async move { services.runner.translate(input).await }),
+        );
+        (&mut task.0).await.map_err(|_| failed())?
+    }
+
+    pub async fn models(
+        self: &Arc<Self>,
+        id: String,
+    ) -> Result<Vec<byoglot_core::ModelInfo>, RunnerError> {
+        let services = self.clone();
+        let mut task = crate::net::AbortOnDrop(
+            self.runtime
+                .spawn(async move { services.editor.models(&id).await }),
+        );
+        (&mut task.0).await.map_err(|_| failed())?
+    }
+
+    pub async fn key_state(self: &Arc<Self>, id: String) -> Result<bool, RunnerError> {
+        let services = self.clone();
+        self.runtime
+            .spawn(async move { services.editor.key_state(&id).await })
+            .await
+            .map_err(|_| failed())?
+    }
+
+    #[cfg(feature = "gui")]
+    pub fn startup_enabled(&self) -> bool {
+        std::fs::read(&self.startup_path)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .unwrap_or(false)
+    }
+
+    #[cfg(feature = "gui")]
+    pub async fn set_startup(
+        self: &Arc<Self>,
+        enabled: bool,
+        reason: &'static str,
+    ) -> Result<bool, ()> {
+        let services = self.clone();
+        self.runtime
+            .spawn(async move {
+                let response = ashpd::desktop::background::Background::request()
+                    .reason(reason)
+                    .auto_start(enabled)
+                    .command(["byoglot", "--background"])
+                    .dbus_activatable(false)
+                    .send()
+                    .await
+                    .map_err(|_| ())?
+                    .response()
+                    .map_err(|_| ())?;
+                let actual = response.auto_start();
+                if let Some(parent) = services.startup_path.parent() {
+                    std::fs::create_dir_all(parent).map_err(|_| ())?;
+                }
+                let temporary = services.startup_path.with_extension("json.tmp");
+                std::fs::write(&temporary, if actual { "true" } else { "false" })
+                    .map_err(|_| ())?;
+                std::fs::rename(temporary, &services.startup_path).map_err(|_| ())?;
+                Ok(actual)
+            })
+            .await
+            .map_err(|_| ())?
     }
 
     pub async fn save_connection(
@@ -174,6 +253,8 @@ mod tests {
 
     fn services(path: PathBuf) -> Arc<Services> {
         let runtime = Handle::current();
+        #[cfg(feature = "gui")]
+        let startup_path = path.with_file_name("startup.json");
         let settings = Arc::new(FileSettingsRepository::new(path, None));
         let secrets = Arc::new(FallbackSecretStore::memory());
         let transport = ReqwestTransport::new(runtime.clone()).unwrap();
@@ -185,6 +266,8 @@ mod tests {
             transport,
             runtime,
             mutation: Mutex::new(()),
+            #[cfg(feature = "gui")]
+            startup_path,
         })
     }
 

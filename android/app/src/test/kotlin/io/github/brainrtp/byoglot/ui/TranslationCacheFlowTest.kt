@@ -16,17 +16,22 @@ class TranslationCacheFlowTest {
         withTimeout(5000) {
             val fixture = Fixture()
             val main = fixture.main(this)
+            main.setResultVisible(true)
             main.settings.filterNotNull().first()
             main.setText("hello")
             main.translate()
             assertEquals("answer 1", main.translation.first { it.complete }.output?.text)
+            assertNotNull(main.translation.value.animation, "whole JSON answer")
             fixture.cache.writes.first { it == 1 }
             fixture.online = false
             main.setText(" hello ")
             main.translate()
             assertEquals("answer 1", main.translation.first { it.complete }.output?.text)
+            assertNotNull(main.translation.value.animation, "main cache hit")
             val quick = QuickTranslateViewModel(fixture.runner, QuickRequest("hello", false, true), fixture.settings, this, online = { fixture.online })
+            quick.setResultVisible(true)
             assertEquals("answer 1", quick.state.first { it.complete }.output?.text)
+            assertNotNull(quick.state.value.animation, "external sheet cache hit")
             assertEquals(1, fixture.calls.get())
             fixture.online = true
             quick.retry()

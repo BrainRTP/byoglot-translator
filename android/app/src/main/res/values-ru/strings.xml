@@ -188,4 +188,20 @@
     <string name="cache_size">Размер</string>
     <string name="cache_megabytes">%1$s МБ</string>
     <string name="cache_clear">Очистить кэш</string>
+    <string name="animation_title">Анимация</string>
+    <string name="animation_group">Эффект появления перевода</string>
+    <string name="animation_none">Без анимации</string>
+    <string name="animation_fade">Плавное появление</string>
+    <string name="animation_scramble">Шифр</string>
+    <string name="animation_flap">Табло</string>
+    <string name="animation_typewriter">Печатная машинка</string>
+    <string name="animation_pen">Перо</string>
+    <string name="animation_wave">Волна</string>
+    <string name="animation_instant">Текст меняется сразу</string>
+    <string name="animation_duration">%1$d мс</string>
+    <string name="animation_preview">Превью</string>
+    <string name="animation_sample">Краткое руководство объясняет, как подключить ключ.</string>
+    <string name="animation_replay">Повторить</string>
+    <string name="animation_tap_hint">Нажмите на карточку, чтобы проиграть эффект.</string>
+    <string name="animation_reduced_motion">В разделе «Спец. возможности» включен переключатель «Удалить анимацию». Эффекты не играют, перевод появляется сразу.</string>
 </resources>

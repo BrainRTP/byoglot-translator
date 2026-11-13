@@ -21,6 +21,7 @@ data class TranslationState(
     val complete: Boolean = false,
     val incomplete: Boolean = false,
     val errorAtMs: Long? = null,
+    val animation: ResultAnimationPlayback? = null,
 )
 
 data class MainParameters(
@@ -78,6 +79,13 @@ class MainViewModel(
     val settings = mutableSettings.asStateFlow()
     private val mutableTranslation = MutableStateFlow(TranslationState())
     val translation = mutableTranslation.asStateFlow()
+    private var resultVisible = false
+
+    fun setResultVisible(visible: Boolean) {
+        resultVisible = visible
+        if (!visible) mutableTranslation.value = translation.value.copy(animation = null)
+    }
+
     private val mutableText = MutableStateFlow("")
     val text = mutableText.asStateFlow()
     private val mutableKeys = MutableStateFlow<Map<String, Boolean>>(emptyMap())
@@ -322,10 +330,14 @@ class MainViewModel(
             try {
                 PhoneProviderPolicy.check(input, repository.read())
                 var latest: RunnerStreamOutput? = null
+                var streamed = false
                 streamRunner(input)
                     .map { chunk ->
-                        latest = chunk
-                        Result.success(chunk)
+                        streamed = streamed || chunk.streamed || !chunk.complete
+                        chunk.copy(streamed = streamed).let {
+                            latest = it
+                            Result.success(it)
+                        }
                     }
                     .catch { error ->
                         if (error is CancellationException) throw error
@@ -348,6 +360,7 @@ class MainViewModel(
                             working = false,
                             error = e.error,
                             complete = false,
+                            animation = null,
                             errorAtMs = nowMs(),
                         )
             } catch (_: Exception) {
@@ -357,6 +370,7 @@ class MainViewModel(
                             working = false,
                             error = RunnerError.Backend(BackendException(ErrorKind.ProviderError)),
                             complete = false,
+                            animation = null,
                             errorAtMs = nowMs(),
                         )
             }
@@ -371,6 +385,7 @@ class MainViewModel(
                 output = chunk.output,
                 complete = chunk.complete,
                 incomplete = chunk.incomplete,
+                animation = resultAnimation(chunk, settings.value?.animation ?: AnimationChoice.fade, resultVisible),
             )
         if (chunk.complete && input.sourceLang == "auto") {
             detectionJob = workScope.launch {
@@ -422,7 +437,7 @@ class MainViewModel(
         autoJob?.cancel()
         job?.cancel()
         detectionJob?.cancel()
-        mutableTranslation.value = mutableTranslation.value.copy(working = false)
+        mutableTranslation.value = mutableTranslation.value.copy(working = false, animation = null)
     }
 
     suspend fun update(change: (AppSettings) -> AppSettings) {

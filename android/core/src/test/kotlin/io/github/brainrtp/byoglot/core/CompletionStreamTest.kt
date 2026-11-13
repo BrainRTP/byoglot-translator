@@ -106,6 +106,7 @@ class CompletionStreamTest {
         assertEquals("Привет 🌍", chunks.last().text)
         assertTrue(chunks.last().complete)
         assertTrue(chunks.last().incomplete)
+        assertTrue(chunks.last().streamed)
         val json =
             RecordingTransport(
                 HttpResponse(
@@ -116,9 +117,10 @@ class CompletionStreamTest {
                 ),
             )
         val complete =
-            Translator({ ProviderClient(connection, "key", json) }).stream(request).last()
+            Translator({ ProviderClient(connection, "key", json) }).stream(request).toList().single()
         assertEquals("complete", complete.text)
         assertFalse(complete.incomplete)
+        assertFalse(complete.streamed)
     }
 
     @Test

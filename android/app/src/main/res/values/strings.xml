@@ -186,4 +186,20 @@
     <string name="cache_size">Size</string>
     <string name="cache_megabytes">%1$s MB</string>
     <string name="cache_clear">Clear cache</string>
+    <string name="animation_title">Animation</string>
+    <string name="animation_group">Animation effect</string>
+    <string name="animation_none">None</string>
+    <string name="animation_fade">Fade</string>
+    <string name="animation_scramble">Scramble</string>
+    <string name="animation_flap">Flip board</string>
+    <string name="animation_typewriter">Typewriter</string>
+    <string name="animation_pen">Pen</string>
+    <string name="animation_wave">Wave</string>
+    <string name="animation_instant">Text changes instantly</string>
+    <string name="animation_duration">%1$d ms</string>
+    <string name="animation_preview">Preview</string>
+    <string name="animation_sample">The quick guide explains how to connect an API key.</string>
+    <string name="animation_replay">Replay</string>
+    <string name="animation_tap_hint">Tap a card to play the effect.</string>
+    <string name="animation_reduced_motion">Remove animations is on in Accessibility. Effects are off and translations appear immediately.</string>
 </resources>

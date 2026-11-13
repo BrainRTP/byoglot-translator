@@ -1,6 +1,5 @@
 package io.github.brainrtp.byoglot.ui
 
-import android.provider.Settings
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,17 +12,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import io.github.brainrtp.byoglot.R
 import io.github.brainrtp.byoglot.core.EDITOR_INPUT_LIMIT
@@ -108,16 +103,10 @@ fun TranslatorBlock(
     }
     val counter = InputCounter.editor(fieldValue.text)
     val keyboard = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-    val context = LocalContext.current
     val sourceDescription = stringResource(R.string.source_language)
     val resultDescription = stringResource(R.string.translation)
     val limitDescription = stringResource(R.string.error_too_long, EDITOR_INPUT_LIMIT)
-    val reducedMotion =
-        Settings.Global.getFloat(
-            context.contentResolver,
-            Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f,
-        ) == 0f
+    val reducedMotion = rememberReducedMotion()
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         LangBar(
             if (parameters.sourceLang == "auto")
@@ -219,19 +208,15 @@ fun TranslatorBlock(
                 val result = state.output?.text.orEmpty()
                 if (result.isNotEmpty())
                     SelectionContainer {
-                        Text(
-                            buildAnnotatedString {
-                                append(result)
-                                if (state.working && !reducedMotion)
-                                    withStyle(SpanStyle(color = c.ac)) { append(" ▏") }
+                        ResultText(
+                            result,
+                            state.working,
+                            state.animation,
+                            c.sf,
+                            Modifier.clearAndSetSemantics {
+                                contentDescription = if (state.working) resultDescription else result
                             },
-                            modifier =
-                                Modifier.clearAndSetSemantics {
-                                    contentDescription =
-                                        if (state.working) resultDescription else result
-                                },
-                            style = ByoType.text,
-                            color = c.tx,
+                            reducedMotion = reducedMotion,
                         )
                     }
                 else if (state.error == null)

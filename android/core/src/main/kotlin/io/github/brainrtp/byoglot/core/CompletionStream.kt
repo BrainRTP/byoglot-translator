@@ -11,6 +11,7 @@ data class CompletionDelta(
     val text: String = "",
     val finishReason: String? = null,
     val usage: TokenUsage? = null,
+    val streamed: Boolean = true,
 ) {
     override fun toString() =
         "CompletionDelta(textLength=${text.length}, finished=${finishReason != null})"

@@ -26,6 +26,7 @@ fun ScreenMain(
     onLanguage: (Boolean) -> Unit,
     onFix: (String) -> Unit,
 ) {
+    ObserveResultVisibility(vm::setResultVisible)
     val text by vm.text.collectAsState()
     val state by vm.translation.collectAsState()
     val parameters by vm.parameters.collectAsState()

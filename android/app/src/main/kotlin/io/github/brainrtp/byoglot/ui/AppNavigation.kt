@@ -96,6 +96,7 @@ fun AppNavigation(
                             "templates",
                             "template" -> R.string.templates
                             "cache" -> R.string.cache_title
+                            "animation" -> R.string.animation_title
                             "about" -> R.string.about
                             else -> R.string.main_title
                         }
@@ -206,6 +207,7 @@ fun AppNavigation(
                                 )
                             }
                         "cache" -> ScreenCacheSettings(vm)
+                        "animation" -> ScreenAnimationSettings(vm, state)
                         "about" -> ScreenAbout(version, onExport, onImport, onLink)
                     }
                 }

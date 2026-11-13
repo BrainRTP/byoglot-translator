@@ -2,7 +2,7 @@ use crate::{
     i18n::{Msg, language_name, tr},
     services::Services,
     ui::main_window::{banner, combo, page_box, scroll},
-    view_state::{RequestState, editor_input, template_target},
+    view_state::{RequestState, editor_input, template_target, validate_editor_text},
 };
 use adw::prelude::*;
 use byoglot_core::{SettingsRepository, Template, contracts};
@@ -13,7 +13,11 @@ use std::{
     sync::Arc,
 };
 
-pub fn build(services: Arc<Services>, stack: &adw::ViewStack) -> gtk::ScrolledWindow {
+pub fn build(
+    services: Arc<Services>,
+    stack: &adw::ViewStack,
+    window: &adw::ApplicationWindow,
+) -> gtk::ScrolledWindow {
     let content = page_box();
     let error = banner();
     let weak_stack = stack.downgrade();
@@ -63,6 +67,27 @@ pub fn build(services: Arc<Services>, stack: &adw::ViewStack) -> gtk::ScrolledWi
         .vexpand(true)
         .tooltip_text(tr(Msg::InputLimit))
         .build();
+    let load = gtk::gio::SimpleAction::new("load-text", Some(glib::VariantTy::STRING));
+    let input_weak = input.downgrade();
+    let stack_weak = stack.downgrade();
+    let error_load = error.clone();
+    load.connect_activate(move |_, value| {
+        if let (Some(input), Some(stack), Some(text)) = (
+            input_weak.upgrade(),
+            stack_weak.upgrade(),
+            value.and_then(|v| v.str()),
+        ) {
+            stack.set_visible_child_name("translate");
+            if let Err(problem) = validate_editor_text(text) {
+                super::main_window::show_error(&error_load, &problem);
+                return;
+            }
+            error_load.set_revealed(false);
+            input.buffer().set_text(text);
+            input.grab_focus();
+        }
+    });
+    window.add_action(&load);
     let input_scroll = scroll(&input);
     input_scroll.set_min_content_height(180);
     input_scroll.add_css_class("card");

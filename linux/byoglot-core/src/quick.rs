@@ -9,7 +9,7 @@ pub enum TextSource {
     Pasted,
     CommandLine,
 }
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum QuickState {
     Hidden,
@@ -30,7 +30,7 @@ pub enum QuickState {
         limit: usize,
     },
 }
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum QuickEvent {
     Triggered,
@@ -49,7 +49,7 @@ pub enum QuickEvent {
     },
     Dismissed,
 }
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum QuickEffect {
     PresentWindow,
@@ -132,3 +132,14 @@ fn text_rule(
         (QuickState::Translating { source }, effects)
     }
 }
+
+macro_rules! redacted_debug {
+    ($($name:ident),+) => { $(
+        impl std::fmt::Debug for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.debug_struct(stringify!($name)).field("kind", &std::mem::discriminant(self)).finish_non_exhaustive()
+            }
+        }
+    )+ };
+}
+redacted_debug!(QuickState, QuickEvent, QuickEffect);

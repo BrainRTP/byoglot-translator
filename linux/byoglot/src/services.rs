@@ -118,17 +118,9 @@ impl Services {
         self.runtime
             .spawn(async move {
                 let _writes = services.writes.read().await;
-                static REGISTERED: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
-                REGISTERED
-                    .get_or_try_init(|| async {
-                        if !ashpd::is_sandboxed() {
-                            ashpd::register_host_app(crate::APP_ID.parse().map_err(|_| failed())?)
-                                .await
-                                .map_err(|_| failed())?;
-                        }
-                        Ok::<(), RunnerError>(())
-                    })
-                    .await?;
+                crate::shortcut::register_host()
+                    .await
+                    .map_err(|_| failed())?;
                 let identifier = if let Some(handle) = parent.strip_prefix("wayland:") {
                     ashpd::WindowIdentifier::from_xdg_foreign_exported(handle.into())
                 } else if let Some(handle) = parent.strip_prefix("x11:") {

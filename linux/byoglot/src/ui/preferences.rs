@@ -9,7 +9,11 @@ use byoglot_core::{ExportFile, SettingsRepository, contracts, export_settings, m
 use gtk::{gio, glib};
 use std::{cell::Cell, rc::Rc, sync::Arc};
 
-pub fn present(window: &adw::ApplicationWindow, services: Arc<Services>) {
+pub fn present(
+    window: &adw::ApplicationWindow,
+    services: Arc<Services>,
+    shortcuts: Rc<crate::shortcut::Registration>,
+) {
     let window = window.clone();
     glib::spawn_future_local(async move {
         let settings = services.settings.read().await;
@@ -191,11 +195,7 @@ pub fn present(window: &adw::ApplicationWindow, services: Arc<Services>) {
             });
         }
         page.add(&style);
-        let shortcuts = adw::PreferencesGroup::builder()
-            .title(tr(Msg::KeyboardShortcuts))
-            .description(tr(Msg::ShortcutLater))
-            .build();
-        page.add(&shortcuts);
+        page.add(&shortcuts.group(&window));
         let startup = adw::PreferencesGroup::builder()
             .title(tr(Msg::Startup))
             .build();

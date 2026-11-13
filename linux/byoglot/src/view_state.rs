@@ -131,6 +131,18 @@ pub fn delete_template(settings: &mut AppSettings, id: &str) -> bool {
 mod tests {
     use super::*;
     #[test]
+    fn opening_editor_text_accepts_its_own_limit_and_counts_utf16() {
+        assert!(validate_editor_text(&"x".repeat(byoglot_core::QUICK_INPUT_LIMIT + 1)).is_ok());
+        let text = "😀".repeat(byoglot_core::EDITOR_INPUT_LIMIT / 2);
+        assert!(validate_editor_text(&text).is_ok());
+        assert_eq!(
+            validate_editor_text(&(text + "x")),
+            Err(byoglot_core::RunnerError::TooLong {
+                limit: byoglot_core::EDITOR_INPUT_LIMIT
+            })
+        );
+    }
+    #[test]
     fn template_updates_the_picker_and_manual_target_wins_for_requests() {
         let mut template = byoglot_core::contracts::builtin_template().clone();
         template.settings.target_lang = Some("fr".into());
@@ -264,5 +276,15 @@ pub fn editor_input(
         context: String::new(),
         app_name: "ByoGlot".into(),
         limit: byoglot_core::EDITOR_INPUT_LIMIT,
+    }
+}
+
+pub fn validate_editor_text(text: &str) -> Result<(), byoglot_core::RunnerError> {
+    if text.encode_utf16().count() > byoglot_core::EDITOR_INPUT_LIMIT {
+        Err(byoglot_core::RunnerError::TooLong {
+            limit: byoglot_core::EDITOR_INPUT_LIMIT,
+        })
+    } else {
+        Ok(())
     }
 }

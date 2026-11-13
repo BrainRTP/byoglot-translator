@@ -122,6 +122,7 @@ version = "0.3.11"
 dependencies = [
  "ashpd",
  "byoglot-core",
+ "futures-util",
  "gtk4",
  "libadwaita",
  "oo7",

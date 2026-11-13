@@ -68,6 +68,12 @@ private actor CancellableTransport: HTTPTransport {
 }
 
 struct BridgeHandlerTests {
+    private func boundStore() throws -> InMemorySecretStore {
+        let store = InMemorySecretStore()
+        try store.set("", connectionId: "c1", origin: "https://api.deepseek.com")
+        return store
+    }
+
     private func message(_ fields: [String: JSONValue]) throws -> Data {
         try JSONEncoder().encode(JSONValue.object(fields.merging(["v": .number(1)]) { old, _ in old }))
     }
@@ -120,7 +126,12 @@ struct BridgeHandlerTests {
         let bridge = BridgeHandler(secrets: store, transport: transport)
         let set = try message(["type": .string("setSecret"), "connectionId": .string("c1"), "origin": .string("https://API.DEEPSEEK.com:443"), "secret": .string("fixture-key")])
         #expect(try reply(await bridge.handle(set)) == .object(["ok": .bool(true)]))
-        let result = await bridge.handle(try fetch(headers: ["Authorization": "caller", "aUtHoRiZaTiOn": "other", "content-type": "text/plain"]))
+        let result = await bridge.handle(try fetch(headers: [
+            "Authorization": "caller", "aUtHoRiZaTiOn": "other", "content-type": "text/plain",
+            "hOsT": "tenant.attacker.example", "Cookie": "session=private", "Connection": "keep-alive",
+            "Content-Length": "999", "Transfer-Encoding": "chunked", "TE": "trailers", "Upgrade": "websocket",
+            "Proxy-Authorization": "proxy", "pRoXy-Custom": "value", "Keep-Alive": "timeout=5", "Trailer": "Digest",
+        ]))
         let request = try #require(await transport.requests.first)
         #expect(request.headers == ["authorization": "Bearer fixture-key", "content-type": "text/plain"])
         #expect(request.method == "POST")
@@ -145,8 +156,19 @@ struct BridgeHandlerTests {
     @Test func fetchWithoutASecretSendsNoAuthorization() async throws {
         let transport = CannedTransport()
         let bridge = BridgeHandler(secrets: InMemorySecretStore(), transport: transport)
-        _ = await bridge.handle(try fetch(headers: ["Authorization": "caller", "authorization": "other", "Proxy-Authorization": "proxy"]))
+        let url = "http://localhost:11434/v1"
+        for unbound in [url, "http://192.168.1.1/admin/config", "https://api.deepseek.com/chat/completions"] {
+            #expect(try reply(await bridge.handle(fetch(url: unbound))) == failure("origin_mismatch"))
+        }
+        #expect(await transport.requests.isEmpty)
+        let set = try message(["type": .string("setSecret"), "connectionId": .string("c1"), "origin": .string("http://localhost:11434"), "secret": .string("")])
+        #expect(try reply(await bridge.handle(set)) == .object(["ok": .bool(true)]))
+        let result = await bridge.handle(try fetch(url: url, headers: ["Authorization": "caller", "authorization": "other", "Proxy-Authorization": "proxy"]))
+        #expect(try JSONDecoder().decode(BridgeReply.self, from: result).ok)
+        #expect(await transport.requests.count == 1)
         #expect(await transport.requests.first?.headers.isEmpty == true)
+        #expect(try reply(await bridge.handle(fetch(url: "http://localhost:11435/v1"))) == failure("origin_mismatch"))
+        #expect(await transport.requests.count == 1)
     }
 
     @Test func nonHttpUrlIsBadRequest() async throws {
@@ -158,7 +180,7 @@ struct BridgeHandlerTests {
 
     @Test func cancelAbortsTheRunningFetch() async throws {
         let transport = CancellableTransport()
-        let bridge = BridgeHandler(secrets: InMemorySecretStore(), transport: transport)
+        let bridge = BridgeHandler(secrets: try boundStore(), transport: transport)
         let otherHandler = BridgeHandler(secrets: InMemorySecretStore(), transport: CannedTransport())
         let id = UUID().uuidString
         var starts = transport.starts.stream.makeAsyncIterator()
@@ -173,7 +195,7 @@ struct BridgeHandlerTests {
     }
 
     @Test func timeoutIsReported() async throws {
-        let bridge = BridgeHandler(secrets: InMemorySecretStore(), transport: CannedTransport(error: .timedOut))
+        let bridge = BridgeHandler(secrets: try boundStore(), transport: CannedTransport(error: .timedOut))
         #expect(try reply(await bridge.handle(fetch())) == failure("timeout"))
     }
 
@@ -188,12 +210,14 @@ struct BridgeHandlerTests {
 
     @Test func refusesPublicHTTPBeforeCallingTheTransportAndAllowsLAN() async throws {
         let transport = CannedTransport()
-        let bridge = BridgeHandler(secrets: InMemorySecretStore(), transport: transport)
+        let store = InMemorySecretStore()
+        let bridge = BridgeHandler(secrets: store, transport: transport)
         for url in ["http://models.example.com/x", "http://8.8.8.8/x", "https://user:pass@api.deepseek.com/x"] {
             #expect(try reply(await bridge.handle(fetch(url: url))) == failure("bad_request"))
         }
         #expect(await transport.requests.isEmpty)
         for url in ["http://localhost:11434/v1", "http://127.0.0.1:4096/", "http://192.168.1.5/v1", "http://[::1]/"] {
+            try store.set("", connectionId: "c1", origin: #require(originOf(url)))
             _ = await bridge.handle(try fetch(url: url))
         }
         #expect(await transport.requests.count == 4)
@@ -201,7 +225,7 @@ struct BridgeHandlerTests {
 
     @Test func totalDeadlineCancelsAndLateReplyCannotCompleteAReusedID() async throws {
         let transport = SuspendedTransport()
-        let bridge = BridgeHandler(secrets: InMemorySecretStore(), transport: transport)
+        let bridge = BridgeHandler(secrets: try boundStore(), transport: transport)
         var starts = transport.starts.stream.makeAsyncIterator()
         var finishes = transport.finishes.stream.makeAsyncIterator()
         let id = UUID().uuidString
@@ -222,7 +246,7 @@ struct BridgeHandlerTests {
 
     @Test func reusedIDAbortsTheOldFetchAndCapsTheDeadline() async throws {
         let transport = SuspendedTransport()
-        let bridge = BridgeHandler(secrets: InMemorySecretStore(), transport: transport)
+        let bridge = BridgeHandler(secrets: try boundStore(), transport: transport)
         var starts = transport.starts.stream.makeAsyncIterator()
         let id = UUID().uuidString
         let data = try fetch(id: id)
@@ -236,7 +260,7 @@ struct BridgeHandlerTests {
         await transport.complete(1)
         await transport.complete(2)
         let recording = CannedTransport()
-        _ = await BridgeHandler(secrets: InMemorySecretStore(), transport: recording).handle(try fetch(timeout: 999_999))
+        _ = await BridgeHandler(secrets: try boundStore(), transport: recording).handle(try fetch(timeout: 999_999))
         #expect(try #require(await recording.timeouts.first) <= .seconds(180))
     }
 }

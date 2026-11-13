@@ -55,9 +55,17 @@ public actor BridgeHandler {
               message.headers.allSatisfy({ Self.isToken($0.key) && !$0.value.contains("\r") && !$0.value.contains("\n") }) else {
             throw BridgeError.badRequest
         }
-        let secret = try secrets.secret(connectionId: message.connectionId, origin: origin)
-        var headers = message.headers.filter { !["authorization", "proxy-authorization"].contains($0.key.lowercased()) }
-        if let secret, !secret.isEmpty { headers["authorization"] = "Bearer \(secret)" }
+        guard let secret = try secrets.secret(connectionId: message.connectionId, origin: origin) else {
+            throw BridgeError.originMismatch
+        }
+        var headers = message.headers.filter {
+            let name = $0.key.lowercased()
+            return !name.hasPrefix("proxy-") && ![
+                "authorization", "host", "cookie", "connection", "content-length", "transfer-encoding",
+                "te", "upgrade", "keep-alive", "trailer",
+            ].contains(name)
+        }
+        if !secret.isEmpty { headers["authorization"] = "Bearer \(secret)" }
         let request = HTTPRequest(method: message.method, url: url, headers: headers, body: message.body.map { Data($0.utf8) })
         let deadline = start.advanced(by: .milliseconds(min(message.timeoutMs, 180_000)))
         let transport = transport

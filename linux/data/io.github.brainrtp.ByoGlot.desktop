@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=ByoGlot
+Comment=Translate with your own AI providers
+Comment[ru]=Переводите с помощью своих ИИ-провайдеров
+Exec=byoglot
+Icon=io.github.brainrtp.ByoGlot
+Terminal=false
+Categories=Utility;Education;
+Keywords=translate;translation;AI;
+Keywords[ru]=перевод;переводчик;ИИ;
+StartupNotify=true

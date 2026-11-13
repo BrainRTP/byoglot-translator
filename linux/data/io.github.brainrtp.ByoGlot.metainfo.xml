@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.brainrtp.ByoGlot</id>
+  <name>ByoGlot</name>
+  <summary>Translate with your own AI providers</summary>
+  <summary xml:lang="ru">Переводите с помощью своих ИИ-провайдеров</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="io.github.brainrtp"><name>BrainRTP</name></developer>
+  <description>
+    <p>Translate text using your own provider connections, models and reusable instruction templates. Connect to DeepSeek, OpenRouter, Ollama, LM Studio or a compatible API.</p>
+    <p xml:lang="ru">Переводите текст со своими подключениями, моделями и шаблонами инструкций. Подключите DeepSeek, OpenRouter, Ollama, LM Studio или совместимый API.</p>
+    <p>API keys are stored in the desktop keyring when available. No translation history is saved.</p>
+    <p xml:lang="ru">API-ключи хранятся в связке ключей рабочего стола, когда она доступна. История переводов не сохраняется.</p>
+  </description>
+  <launchable type="desktop-id">io.github.brainrtp.ByoGlot.desktop</launchable>
+  <url type="homepage">https://github.com/BrainRTP/byoglot-translator</url>
+  <url type="bugtracker">https://github.com/BrainRTP/byoglot-translator/issues</url>
+  <content_rating type="oars-1.1"/>
+</component>

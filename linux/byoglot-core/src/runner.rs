@@ -24,10 +24,12 @@ pub enum RunnerError {
     TooLong { limit: usize },
     #[error("empty input")]
     Empty,
+    #[error("settings or key storage unavailable")]
+    Storage,
     #[error(transparent)]
     Backend(#[from] BackendError),
 }
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunnerInput {
     pub text: String,
@@ -36,6 +38,15 @@ pub struct RunnerInput {
     pub template_id: Option<String>,
     pub target_lang: Option<String>,
     pub limit: usize,
+}
+impl std::fmt::Debug for RunnerInput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RunnerInput")
+            .field("text", &"[redacted]")
+            .field("context", &"[redacted]")
+            .field("limit", &self.limit)
+            .finish_non_exhaustive()
+    }
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -148,11 +159,32 @@ impl<S: SettingsRepository, K: SecretStore, T: HttpTransport + Send> Translation
 pub(crate) fn secret_failure(error: SecretError) -> RunnerError {
     match error {
         SecretError::OriginMismatch => RunnerError::KeyMissing,
-        SecretError::Unavailable(_) => BackendError::new(ErrorKind::Offline).into(),
+        SecretError::Unavailable(_) => RunnerError::Storage,
     }
 }
 pub(crate) fn invalid_base_url() -> RunnerError {
     let mut error = BackendError::new(ErrorKind::Incompatible);
     error.detail = Some("invalid base URL".into());
     error.into()
+}
+
+#[cfg(test)]
+mod privacy_tests {
+    use super::*;
+    #[test]
+    fn input_debug_redacts_user_content() {
+        let input = RunnerInput {
+            text: "private-text".into(),
+            context: "private-context".into(),
+            app_name: "private-app".into(),
+            template_id: Some("private-id".into()),
+            target_lang: Some("private-target".into()),
+            limit: 20000,
+        };
+        assert!(!format!("{input:?}").contains("private-"));
+        assert_eq!(
+            secret_failure(SecretError::Unavailable("private-error".into())),
+            RunnerError::Storage
+        );
+    }
 }

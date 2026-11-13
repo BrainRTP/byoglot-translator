@@ -53,6 +53,7 @@ pub enum TransportError {
     Offline,
     Timeout,
     Cancelled,
+    BadResponse,
 }
 pub trait HttpTransport: Sync {
     fn send(

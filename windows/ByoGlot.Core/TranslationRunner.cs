@@ -14,8 +14,14 @@ public sealed class RunnerException(RunnerError error) : Exception
 {
     public RunnerError Error { get; } = error;
 }
-public sealed record RunnerInput(string Text, int Limit, string Context = "", string AppName = "", string? TemplateId = null, string? TargetLang = null);
-public sealed record RunnerOutput(string Text, string SourceLang, string TargetLang, ModelRef Model);
+public sealed record RunnerInput(string Text, int Limit, string Context = "", string AppName = "", string? TemplateId = null, string? TargetLang = null)
+{
+    public override string ToString() => "RunnerInput { [redacted] }";
+}
+public sealed record RunnerOutput(string Text, string SourceLang, string TargetLang, ModelRef Model)
+{
+    public override string ToString() => "RunnerOutput { [redacted] }";
+}
 
 public sealed class TranslationRunner(ISettingsRepository settings, ISecretStore secrets, IHttpTransport transport)
 {

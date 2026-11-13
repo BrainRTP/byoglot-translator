@@ -2,6 +2,7 @@ namespace ByoGlot.Core.Capture;
 
 public abstract record QuickState
 {
+    public sealed override string ToString() => $"{GetType().Name} {{ [redacted] }}";
     public sealed record Hidden : QuickState;
     public sealed record Message(string ResourceKey) : QuickState;
     public sealed record Translating(string Source, long RequestId) : QuickState;
@@ -10,6 +11,7 @@ public abstract record QuickState
 }
 public abstract record QuickEvent
 {
+    public sealed override string ToString() => $"{GetType().Name} {{ [redacted] }}";
     public sealed record Captured(CaptureResult Result, long RequestId) : QuickEvent;
     public sealed record Clipboard(ClipboardRead Read, long RequestId) : QuickEvent;
     public sealed record Finished(RunnerOutput Output, long RequestId) : QuickEvent;

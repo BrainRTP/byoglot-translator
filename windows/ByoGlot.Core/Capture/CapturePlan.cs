@@ -1,9 +1,13 @@
 namespace ByoGlot.Core.Capture;
 
 public enum SelectionSource { None, Automation, CopyFallback }
-public sealed record CaptureInputs(bool ForegroundIsElevated, string? AutomationText, bool CopyFallbackAllowed, Func<Task<ClipboardRead>> CopyAndRead);
+public sealed record CaptureInputs(bool ForegroundIsElevated, string? AutomationText, bool CopyFallbackAllowed, Func<Task<ClipboardRead>> CopyAndRead)
+{
+    public override string ToString() => "CaptureInputs { [redacted] }";
+}
 public abstract record CaptureResult
 {
+    public sealed override string ToString() => $"{GetType().Name} {{ [redacted] }}";
     public sealed record Text(string Value, SelectionSource Source) : CaptureResult;
     public sealed record Elevated : CaptureResult;
     public sealed record Nothing : CaptureResult;

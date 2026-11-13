@@ -6,4 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
+  <!-- SDK 11.0.100 omits 28000; declare it before the SDK normalizes Windows targets. -->
+  <ItemGroup>
+    <WindowsSdkSupportedTargetPlatformVersion Include="10.0.28000.0" WindowsSdkPackageVersion="10.0.28000.87" MinimumNETVersion="11.0" />
+  </ItemGroup>
 </Project>

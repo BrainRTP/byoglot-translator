@@ -38,7 +38,16 @@ public sealed partial class SettingsPage : Page
         var v = Package.Current.Id.Version;
         Panel.Children.Add(new TextBlock { Text = Strings.Get("Version") + $" {v.Major}.{v.Minor}.{v.Build}" });
     }
-    private void AddCaptureSettings() { }
+    private void AddCaptureSettings()
+    {
+        var app = (App)Microsoft.UI.Xaml.Application.Current;
+        Panel.Children.Add(new ByoGlot.App.Shell.HotKeyRecorder());
+        var fallback = new ToggleSwitch { Header = Strings.Get("Fallback"), IsOn = app.CaptureSettings.Fallback };
+        fallback.Toggled += (_, _) => app.CaptureSettings.Fallback = fallback.IsOn;
+        var doubleCopy = new ToggleSwitch { Header = Strings.Get("DoubleCopy"), IsOn = app.CaptureSettings.DoubleCopy };
+        doubleCopy.Toggled += (_, _) => app.SetDoubleCopy(doubleCopy.IsOn);
+        Panel.Children.Add(fallback); Panel.Children.Add(doubleCopy);
+    }
     private async Task Export()
     {
         var picker = new FileSavePicker { SuggestedFileName = "byoglot-settings" };

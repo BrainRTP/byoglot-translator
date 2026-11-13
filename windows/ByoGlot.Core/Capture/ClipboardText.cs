@@ -2,6 +2,7 @@ namespace ByoGlot.Core.Capture;
 
 public abstract record ClipboardRead
 {
+    public sealed override string ToString() => $"{GetType().Name} {{ [redacted] }}";
     public sealed record Text(string Value) : ClipboardRead;
     public sealed record Empty : ClipboardRead;
     public sealed record Concealed : ClipboardRead;

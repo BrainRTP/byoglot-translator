@@ -33,9 +33,15 @@ public enum DisplayMode
     [JsonStringEnumMemberName("replace")] Replace,
     [JsonStringEnumMemberName("bilingual")] Bilingual
 }
-public sealed record TemplateSettings(string? PrePrompt = null, string? TargetLang = null, DisplayMode? DisplayMode = null, bool? VisibleOnly = null, ModelRef? PageModel = null, ModelRef? SelectionModel = null);
+public sealed record TemplateSettings(string? PrePrompt = null, string? TargetLang = null, DisplayMode? DisplayMode = null, bool? VisibleOnly = null, ModelRef? PageModel = null, ModelRef? SelectionModel = null)
+{
+    public override string ToString() => "TemplateSettings { [redacted] }";
+}
 public sealed record Template(string Id, string Name, bool Builtin, TemplateSettings Settings);
-public sealed record ProfileOverride(string Text, string Base, double SavedAt);
+public sealed record ProfileOverride(string Text, string Base, double SavedAt)
+{
+    public override string ToString() => "ProfileOverride { [redacted] }";
+}
 public sealed record PortableGlobals(string SourceLang, string TargetLang, bool LanguagePromptEnabled, string LanguageProfile, string DefaultTemplateId);
 public sealed record PresetInfo(string BaseUrl, bool NeedsKey);
 public sealed record Limits(int MaxBlocks, int MaxChars, int Concurrency, int GenerateTimeoutMs, int MaxProfileText);

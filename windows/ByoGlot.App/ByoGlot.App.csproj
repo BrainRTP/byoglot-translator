@@ -9,6 +9,7 @@
     <RuntimeIdentifier Condition="'$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
     <RuntimeIdentifier Condition="'$(Platform)' != 'ARM64'">win-x64</RuntimeIdentifier>
     <UseWinUI>true</UseWinUI>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <EnableMsixTooling>true</EnableMsixTooling>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <WindowsPackageType>MSIX</WindowsPackageType>
@@ -17,10 +18,6 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>ByoGlot.App</RootNamespace>
   </PropertyGroup>
-  <!-- SDK 11.0.100 lacks this stable target; remove when the SDK lists 28000. -->
-  <ItemGroup>
-    <WindowsSdkSupportedTargetPlatformVersion Include="10.0.28000.0" WindowsSdkPackageVersion="$(WindowsSdkPackageVersion)" MinimumNETVersion="11.0" />
-  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../ByoGlot.Core/ByoGlot.Core.csproj" />
     <PackageReference Include="Microsoft.WindowsAppSDK" />

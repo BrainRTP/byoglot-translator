@@ -40,6 +40,7 @@ private struct WaitingTransport: HTTPTransport {
     let values: [Any] = [
         RunnerInput(text: marker, context: marker, appName: marker, limit: 100, prePrompt: marker),
         RunnerOutput(text: marker, sourceLang: "auto", targetLang: "ru", model: model),
+        CachedTranslation(text: marker, targetLang: "ru"),
         ConnectionDraft(preset: .custom, name: marker, baseUrl: "http://localhost", apiKey: marker),
         TextRequest(text: marker, context: marker, appName: marker, sourceLang: "auto", targetLang: "ru", prePrompt: marker, languagePrompt: marker, model: model),
         HTTPRequest(method: "POST", url: URL(string: "https://example.com")!, headers: ["Authorization": marker], body: Data(marker.utf8)),

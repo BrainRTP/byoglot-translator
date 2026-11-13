@@ -33,12 +33,14 @@ public final class AppModel {
     public private(set) var keyStates: [String: Bool] = [:]
     public private(set) var catalogueErrors: [String: RunnerError] = [:]
     public private(set) var recentLanguages: [String] = []
+    public private(set) var cacheStatistics = TranslationCacheStatistics()
     public var interfaceLanguage: String { AppStrings.interfaceLanguage }
     public let editor: ConnectionEditor
     @ObservationIgnored private let store: SettingsStore
     @ObservationIgnored private let stream: Stream
     @ObservationIgnored private let delay: Duration
     @ObservationIgnored private let backgroundTask: (any TranslationBackgroundTask)?
+    @ObservationIgnored private let translationCache: (any TranslationCaching)?
     @ObservationIgnored private var latestChunk: RunnerStreamOutput?
     @ObservationIgnored private var pending: Task<Void, Never>?
     @ObservationIgnored private var request: Task<Void, Never>?
@@ -56,15 +58,17 @@ public final class AppModel {
         self.delay = .milliseconds(800)
         self.online = online
         self.backgroundTask = backgroundTask
+        self.translationCache = runner.translationCache
     }
 
-    init(settings: SettingsStore, editor: ConnectionEditor, stream: @escaping Stream, online: Bool = true, delay: Duration = .milliseconds(800), backgroundTask: (any TranslationBackgroundTask)? = nil) {
+    init(settings: SettingsStore, editor: ConnectionEditor, stream: @escaping Stream, online: Bool = true, delay: Duration = .milliseconds(800), backgroundTask: (any TranslationBackgroundTask)? = nil, translationCache: (any TranslationCaching)? = nil) {
         self.store = settings
         self.editor = editor
         self.stream = stream
         self.delay = delay
         self.online = online
         self.backgroundTask = backgroundTask
+        self.translationCache = translationCache
     }
 
     public var targetLang: String { selection.targetLang }
@@ -167,6 +171,14 @@ public final class AppModel {
     public func keyboardTranslate() { if !settings.autoTranslate { translate() } }
 
     public func translate() {
+        startTranslation(reloadCache: false)
+    }
+
+    public func translateAgain() {
+        startTranslation(reloadCache: true)
+    }
+
+    private func startTranslation(reloadCache: Bool) {
         guard !composing, activity != .background else { return }
         cancelTasks()
         error = nil
@@ -176,10 +188,10 @@ public final class AppModel {
         result = ""
         guard !jsTrim(inputText).isEmpty else { return }
         guard !overLimit else { error = .tooLong(limit: editorInputLimit); errorAt = .now; return }
-        guard online else { error = .backend(BackendError(kind: .offline)); errorAt = .now; return }
+        guard online || translationCache != nil else { error = .backend(BackendError(kind: .offline)); errorAt = .now; return }
         let id = UUID()
         requestId = id
-        let input = RunnerInput(text: inputText, templateId: selection.templateId, limit: editorInputLimit, pair: .main, sourceLang: sourceLang, targetLang: targetLang, model: model, prePrompt: prePrompt, requestId: id)
+        let input = RunnerInput(text: inputText, templateId: selection.templateId, limit: editorInputLimit, pair: .main, sourceLang: sourceLang, targetLang: targetLang, model: model, prePrompt: prePrompt, requestId: id, reloadCache: reloadCache, networkAvailable: online)
         running = true
         request = Task { [weak self, stream] in
             var latest: RunnerStreamOutput?
@@ -472,6 +484,7 @@ public final class AppModel {
         let before = inputs
         do {
             settings = try await store.update { state in state = SettingsLogic.merge(file, into: state) }
+            await clearTranslationCache()
             sourceLang = settings.globals.sourceLang
             selection = LanguageSelection(targetLang: settings.globals.targetLang)
             _ = selection.selectTemplate(settings.templates.first { $0.id == settings.globals.defaultTemplateId } ?? Contracts.builtinTemplate)
@@ -539,6 +552,16 @@ public final class AppModel {
         models[id] = nil
         keyStates[id] = nil
         await refresh()
+        await refreshCacheStatistics()
+    }
+
+    public func refreshCacheStatistics() async {
+        cacheStatistics = await translationCache?.statistics() ?? TranslationCacheStatistics()
+    }
+
+    public func clearTranslationCache() async {
+        await translationCache?.clear()
+        await refreshCacheStatistics()
     }
 
     deinit { pending?.cancel(); request?.cancel() }

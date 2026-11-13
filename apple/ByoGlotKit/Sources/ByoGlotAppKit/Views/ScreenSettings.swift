@@ -2,7 +2,7 @@ import ByoGlotCore
 import SwiftUI
 
 public enum SettingsDestination: String, Hashable, Codable {
-    case providers, language, prompt, models, templates, about
+    case providers, language, prompt, models, templates, cache, about
 }
 
 public struct ScreenSettings: View {
@@ -16,6 +16,7 @@ public struct ScreenSettings: View {
                 destination(.prompt, title: "settings.prompt", subtitle: AppStrings.profile(model.settings.globals.languageProfile))
                 destination(.models, title: "settings.models", subtitle: SettingsLogic.defaultModel(settings: model.settings, main: true)?.id)
                 destination(.templates, title: "settings.templates", subtitle: templateLabel(model.template))
+                destination(.cache, title: "cache.title")
                 destination(.about, title: "settings.about")
             }
         }
@@ -29,12 +30,41 @@ public struct ScreenSettings: View {
             case .prompt: ScreenLanguagePrompt(model: model)
             case .models: ScreenModelSettings(model: model)
             case .templates: ScreenTemplateSettings(model: model)
+            case .cache: ScreenCacheSettings(model: model)
             case .about: ScreenAbout(model: model)
             }
         }
     }
     private func destination(_ value: SettingsDestination, title: String, subtitle: String? = nil) -> some View {
         NavigationLink(value: value) { SettingsLinkLabel(title: title, subtitle: subtitle) }.buttonStyle(.plain)
+    }
+}
+
+public struct ScreenCacheSettings: View {
+    @Bindable var model: AppModel
+    @Environment(\.dynamicTypeSize) private var typeSize
+    public init(model: AppModel) { self.model = model }
+    public var body: some View {
+        SettingsPage(title: "cache.title") {
+            ByoGroup {
+                statistic("cache.entries", value: model.cacheStatistics.count.formatted(.number.locale(AppStrings.locale)))
+                statistic("cache.size", value: ByteCountFormatStyle(style: .file).locale(AppStrings.locale).format(Int64(model.cacheStatistics.byteSize)))
+            }
+            Note(text: AppStrings.text("cache.help"))
+            ByoButton("cache.clear", kind: .danger) { Task { await model.clearTranslationCache() } }
+        }.task { await model.refreshCacheStatistics() }
+    }
+    private func statistic(_ title: String, value: String) -> some View {
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 4) { Text(AppStrings.text(title)); Text(value).monospacedDigit() }
+            } else {
+                HStack { Text(AppStrings.text(title)); Spacer(); Text(value).monospacedDigit() }
+            }
+        }.modifier(ByoTypography()).frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .overlay(alignment: .bottom) { ByoColor.border.frame(height: 0.5) }
+            .accessibilityElement(children: .combine)
     }
 }
 

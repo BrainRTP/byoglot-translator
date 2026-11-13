@@ -12,19 +12,19 @@ import io.github.brainrtp.byoglot.core.*
 @Composable
 fun TemplatesScreen(vm: MainViewModel, settings: AppSettings, onEdit: (String?) -> Unit) {
     var removing by remember { mutableStateOf<Template?>(null) }
-    val copySuffix = stringResource(R.string.copy_suffix)
     ScreenColumn {
         Text(stringResource(R.string.templates), style = MaterialTheme.typography.headlineMedium)
         Button(onClick = { onEdit(null) }) { Text(stringResource(R.string.add_template)) }
         settings.templates.forEach { template ->
             val label = templateLabel(template)
+            val copyName = stringResource(R.string.template_copy_name, label)
             OutlinedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(label, style = MaterialTheme.typography.titleMedium)
                     if (template.builtin) Text(stringResource(R.string.builtin_readonly))
                     Row {
                         if (!template.builtin) TextButton(onClick = { onEdit(template.id) }) { Text(stringResource(R.string.edit)) }
-                        TextButton(onClick = { vm.action { vm.duplicate(template, "$label $copySuffix") } }) { Text(stringResource(R.string.duplicate)) }
+                        TextButton(onClick = { vm.action { vm.duplicate(template, copyName) } }) { Text(stringResource(R.string.duplicate)) }
                         if (!template.builtin) TextButton(onClick = { removing = template }) { Text(stringResource(R.string.delete)) }
                     }
                 }

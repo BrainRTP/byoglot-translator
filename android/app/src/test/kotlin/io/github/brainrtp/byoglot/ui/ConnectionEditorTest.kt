@@ -33,7 +33,9 @@ class ConnectionEditorTest {
         assertEquals(DraftProblem.ApiKey, editor.validate(draft("http://192.168.1.2", ""), false))
     }
     @Test fun save_checks_models_stores_the_key_and_activates() = runTest {
-        val c = editor.save(draft(), true)
+        val saved = editor.save(draft(), true)
+        val c = saved.connection
+        assertEquals(listOf("m"), saved.models.map { it.id })
         assertEquals(1, calls); assertEquals("key", secrets.secret(c.id, "https://a.test")); assertEquals(c.id, settings.read().activeConnectionId); assertEquals("m", c.selectionModel?.id)
     }
     @Test fun save_without_consent_for_a_remote_origin_fails() = runTest {
@@ -41,19 +43,19 @@ class ConnectionEditorTest {
         assertEquals(0, calls); assertEquals(initial, settings.read())
     }
     @Test fun a_401_leaves_settings_and_secrets_unchanged() = runTest {
-        val c = editor.save(draft(), true); val before = settings.read(); status = 401
+        val c = editor.save(draft(), true).connection; val before = settings.read(); status = 401
         try { editor.save(draft(key = "new", id = c.id), true); fail() } catch (_: RunnerException) {}
         assertEquals(before, settings.read()); assertEquals("key", secrets.secret(c.id, "https://a.test"))
     }
     @Test fun editing_to_another_origin_drops_the_old_key() = runTest {
-        val c = editor.save(draft(), true)
+        val c = editor.save(draft(), true).connection
         try { editor.save(draft("https://b.test", "", c.id), true); fail() } catch (e: RunnerException) { assertEquals(RunnerError.KeyMissing, e.error) }
         editor.save(draft("https://b.test", "new", c.id), true)
         assertEquals("new", secrets.secret(c.id, "https://b.test"))
         assertThrows(OriginMismatchException::class.java) { runBlocking { secrets.secret(c.id, "https://a.test") } }
     }
     @Test fun remove_deletes_secret_and_clears_active() = runTest {
-        val c = editor.save(draft(), true); editor.remove(c.id)
+        val c = editor.save(draft(), true).connection; editor.remove(c.id)
         assertFalse(secrets.has(c.id)); assertNull(settings.read().activeConnectionId); assertTrue(settings.read().connections.isEmpty())
     }
     @Test fun imported_connection_reports_key_missing() = runTest {
@@ -63,7 +65,7 @@ class ConnectionEditorTest {
         assertFalse(editor.keyState(settings.read().connections.first().id))
     }
     @Test fun cancellation_during_commit_does_not_split_key_and_settings() = runTest {
-        val c = editor.save(draft(), true)
+        val c = editor.save(draft(), true).connection
         val entered = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>()
         val delayedSettings = object : SettingsRepository {
             override suspend fun read() = settings.read()
@@ -74,13 +76,13 @@ class ConnectionEditorTest {
         assertEquals("https://b.test", settings.read().connections.single().baseUrl); assertEquals("new", secrets.secret(c.id, "https://b.test"))
     }
     @Test fun a_failed_key_write_preserves_the_old_key_and_settings() = runTest {
-        val c = editor.save(draft(), true); val before = settings.read()
+        val c = editor.save(draft(), true).connection; val before = settings.read()
         val failingSecrets = object : SecretStore by secrets { override suspend fun set(secret: String, connectionId: String, origin: String) { throw java.io.IOException() } }
         try { ConnectionEditor(settings, failingSecrets, transport).save(draft(key = "new", id = c.id), true); fail() } catch (_: java.io.IOException) {}
         assertEquals(before, settings.read()); assertEquals("key", secrets.secret(c.id, "https://a.test"))
     }
     @Test fun a_failed_settings_write_restores_the_old_key() = runTest {
-        val c = editor.save(draft(), true)
+        val c = editor.save(draft(), true).connection
         val failingSettings = object : SettingsRepository by settings { override suspend fun update(change: (AppSettings) -> AppSettings): AppSettings = throw java.io.IOException() }
         try { ConnectionEditor(failingSettings, secrets, transport).save(draft(key = "new", id = c.id), true); fail() } catch (_: java.io.IOException) {}
         assertEquals("key", secrets.secret(c.id, "https://a.test"))

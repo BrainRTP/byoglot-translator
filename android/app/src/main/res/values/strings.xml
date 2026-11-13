@@ -69,7 +69,7 @@
     <string name="use_global_language">Use app language setting</string>
     <string name="builtin_readonly">Built-in template. Duplicate it to make changes.</string>
     <string name="duplicate">Duplicate</string>
-    <string name="copy_suffix">copy</string>
+    <string name="template_copy_name">%1$s (copy)</string>
     <string name="language_style">Language style instructions</string>
     <string name="language_profile">Language profile</string>
     <string name="automatic_profile">Automatic</string>

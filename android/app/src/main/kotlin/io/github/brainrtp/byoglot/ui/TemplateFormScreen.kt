@@ -3,6 +3,7 @@ package io.github.brainrtp.byoglot.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -11,9 +12,9 @@ import io.github.brainrtp.byoglot.core.*
 
 @Composable
 fun TemplateFormScreen(vm: MainViewModel, template: Template?, onBack: () -> Unit) {
-    var name by remember { mutableStateOf(template?.name.orEmpty()) }
-    var instructions by remember { mutableStateOf(template?.settings?.prePrompt.orEmpty()) }
-    var target by remember { mutableStateOf(template?.settings?.targetLang.orEmpty()) }
+    var name by rememberSaveable { mutableStateOf(template?.name.orEmpty()) }
+    var instructions by rememberSaveable { mutableStateOf(template?.settings?.prePrompt.orEmpty()) }
+    var target by rememberSaveable { mutableStateOf(template?.settings?.targetLang.orEmpty()) }
     val busy by vm.busy.collectAsState()
     val readOnly = template?.builtin == true
     ScreenColumn {

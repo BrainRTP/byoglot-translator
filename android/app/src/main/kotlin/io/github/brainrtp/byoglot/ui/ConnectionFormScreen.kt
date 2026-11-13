@@ -5,16 +5,19 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
 import io.github.brainrtp.byoglot.R
 import io.github.brainrtp.byoglot.core.*
 import java.net.URI
@@ -32,17 +35,17 @@ fun ConnectionFormScreen(vm: MainViewModel, settings: AppSettings, initial: Conn
     val context = LocalContext.current
     val busy by vm.busy.collectAsState()
     val keys by vm.keys.collectAsState()
-    var id by remember(initial?.id) { mutableStateOf(initial?.id) }
-    var preset by remember { mutableStateOf(initial?.preset ?: ProviderPreset.deepseek) }
-    var name by remember { mutableStateOf(initial?.name.orEmpty()) }
-    var url by remember { mutableStateOf(initial?.baseUrl ?: Contracts.presets.getValue(preset).baseUrl) }
+    var id by rememberSaveable(initial?.id) { mutableStateOf(initial?.id) }
+    var preset by rememberSaveable { mutableStateOf(initial?.preset ?: ProviderPreset.deepseek) }
+    var name by rememberSaveable { mutableStateOf(initial?.name.orEmpty()) }
+    var url by rememberSaveable { mutableStateOf(initial?.baseUrl ?: Contracts.presets.getValue(preset).baseUrl) }
     var key by remember { mutableStateOf("") }
     var models by remember { mutableStateOf<List<ModelInfo>>(emptyList()) }
     var checked by remember { mutableStateOf(false) }
     var permissionDenied by remember { mutableStateOf(false) }
     val origin = originOf(url)
     val local = origin?.let { isLocalHost(URI(it).host) } == true
-    var consent by remember(origin) { mutableStateOf(origin in settings.consentedOrigins) }
+    var consent by rememberSaveable(origin) { mutableStateOf(origin in settings.consentedOrigins) }
     val sameOrigin = origin == settings.connections.find { it.id == id }?.let { originOf(it.baseUrl) }
     val draft = ConnectionDraft(id, preset, name.ifBlank { presetLabel(preset) }, url, key)
     val problem = vm.editor.validate(draft, sameOrigin && keys[id] == true)
@@ -51,10 +54,10 @@ fun ConnectionFormScreen(vm: MainViewModel, settings: AppSettings, initial: Conn
         checked = true
         if (problem == null) vm.action {
             val saved = vm.editor.save(draft, consent)
-            id = saved.id
+            id = saved.connection.id
             key = ""
             vm.refresh()
-            models = vm.editor.models(saved.id)
+            models = saved.models
         }
     }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -73,7 +76,10 @@ fun ConnectionFormScreen(vm: MainViewModel, settings: AppSettings, initial: Conn
         if (checked && problem != null) Text(stringResource(when (problem) { DraftProblem.BaseUrl -> R.string.invalid_url; DraftProblem.InsecureRemote -> R.string.insecure_remote; DraftProblem.ApiKey -> R.string.error_key_missing }), color = MaterialTheme.colorScheme.error)
         if (origin != null && !local) {
             val consentText = stringResource(R.string.origin_consent, origin)
-            Row { Checkbox(consent, { consent = it }, modifier = Modifier.semantics { contentDescription = consentText }, enabled = !busy); Text(consentText, Modifier.weight(1f)) }
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(consent, enabled = !busy, role = Role.Checkbox, onValueChange = { consent = it }), verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(consent, onCheckedChange = null, enabled = !busy)
+                Text(consentText, Modifier.weight(1f))
+            }
         }
         if (permissionDenied) {
             Text(stringResource(R.string.error_local_network), color = MaterialTheme.colorScheme.error)

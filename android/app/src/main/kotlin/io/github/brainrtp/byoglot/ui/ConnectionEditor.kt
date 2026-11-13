@@ -11,6 +11,7 @@ data class ConnectionDraft(val id: String?, val preset: ProviderPreset, val name
     override fun toString() = "ConnectionDraft(id=$id, preset=$preset)"
 }
 enum class DraftProblem { BaseUrl, ApiKey, InsecureRemote }
+data class SavedConnection(val connection: Connection, val models: List<ModelInfo>)
 class ConnectionEditor(private val settings: SettingsRepository, private val secrets: SecretStore, private val transport: HttpTransport) {
     fun validate(draft: ConnectionDraft, hasStoredKey: Boolean): DraftProblem? {
         val origin = originOf(draft.baseUrl) ?: return DraftProblem.BaseUrl
@@ -18,7 +19,7 @@ class ConnectionEditor(private val settings: SettingsRepository, private val sec
         if (ProviderEffort.needsKey(draft.preset, draft.baseUrl) && draft.apiKey.isBlank() && !hasStoredKey) return DraftProblem.ApiKey
         return null
     }
-    suspend fun save(draft: ConnectionDraft, consent: Boolean): Connection = lock.withLock {
+    suspend fun save(draft: ConnectionDraft, consent: Boolean): SavedConnection = lock.withLock {
         val state = settings.read()
         val origin = originOf(draft.baseUrl) ?: throw RunnerException(RunnerError.Backend(BackendException(ErrorKind.Offline)))
         val old = state.connections.find { it.id == draft.id }
@@ -54,7 +55,7 @@ class ConnectionEditor(private val settings: SettingsRepository, private val sec
                 throw e
             }
         }
-        saved
+        SavedConnection(saved, models)
     }
     suspend fun remove(id: String) = lock.withLock {
         val connection = settings.read().connections.find { it.id == id }

@@ -69,7 +69,7 @@
     <string name="use_global_language">Использовать язык из настроек</string>
     <string name="builtin_readonly">Встроенный шаблон. Создайте копию, чтобы внести изменения.</string>
     <string name="duplicate">Создать копию</string>
-    <string name="copy_suffix">копия</string>
+    <string name="template_copy_name">%1$s (копия)</string>
     <string name="language_style">Инструкции по стилю языка</string>
     <string name="language_profile">Языковой профиль</string>
     <string name="automatic_profile">Автоматически</string>

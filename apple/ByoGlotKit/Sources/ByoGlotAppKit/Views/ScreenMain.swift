@@ -110,6 +110,8 @@ public struct TranslatorBlock: View {
     let openModels: () -> Void
     let openLanguage: (Bool) -> Void
     @State private var editing = false
+    @State private var playback: ResultAnimationPlayback?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
     public init(model: AppModel, text: Binding<String>, openProviders: @escaping () -> Void, openModels: @escaping () -> Void, openLanguage: @escaping (Bool) -> Void) {
         self.model = model; _text = text; self.openProviders = openProviders; self.openModels = openModels; self.openLanguage = openLanguage
@@ -137,6 +139,9 @@ public struct TranslatorBlock: View {
             }
         }.padding(.horizontal, 16).padding(.bottom, 12)
             .onChange(of: model.inputText) { _, value in if value != text { text = value } }
+            .onChange(of: model.resultAnimation) { _, value in playback = reduceMotion ? nil : value }
+            .onChange(of: reduceMotion) { _, value in if value { playback = nil } }
+            .onDisappear { playback = nil }
             .onChange(of: model.completionID) { _, id in
                 guard id != nil else { return }
                 #if canImport(UIKit)
@@ -214,7 +219,7 @@ public struct TranslatorBlock: View {
             if model.result.isEmpty && model.error == nil && !model.running {
                 Text(AppStrings.text("main.resultPlaceholder")).foregroundStyle(ByoColor.muted)
             } else if !model.result.isEmpty || model.running {
-                StreamingResult(text: model.result, running: model.running)
+                ResultText(text: model.result, running: model.running, playback: playback)
             }
             if let error = model.error { ScreenMainErrors(error: error, errorAt: model.errorAt, provider: model.providerName, retry: model.translate, providers: openProviders, models: openModels, clear: { text = ""; model.edit("") }) }
             else if model.incomplete {
@@ -249,27 +254,5 @@ public struct ScreenMainErrors: View {
         Banner(title: presentation.title, message: presentation.message, warning: presentation.warning, actionTitle: presentation.actionTitle) {
             switch presentation.action { case .retry: retry(); case .providers: providers(); case .model: models(); case .edit: clear() }
         }
-    }
-}
-
-private struct StreamingResult: View {
-    let text: String
-    let running: Bool
-    var body: some View {
-        Text(text.isEmpty ? " " : text).textSelection(.enabled).lineSpacing(5)
-            .overlay(alignment: .bottomTrailing) {
-                if running { StreamingCaret().offset(x: 4) }
-            }
-    }
-}
-
-private struct StreamingCaret: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ScaledMetric private var height: CGFloat = 20
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 0.5, paused: reduceMotion)) { context in
-            let visible = reduceMotion || context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1) < 0.5
-            Rectangle().fill(ByoColor.accent).frame(width: 2, height: height).opacity(visible ? 1 : 0)
-        }.accessibilityHidden(true)
     }
 }

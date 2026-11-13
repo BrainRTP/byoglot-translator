@@ -26,6 +26,7 @@ public final class AppModel {
     public private(set) var sourceLang = "auto"
     public private(set) var selection = LanguageSelection(targetLang: "en")
     public private(set) var detectedSourceLang: String?
+    public private(set) var resultAnimation: ResultAnimationPlayback?
     public private(set) var completionID: UUID?
     public private(set) var online = false
     public private(set) var activity = AppActivity.active
@@ -230,7 +231,12 @@ public final class AppModel {
         if chunk.complete { backgroundTask?.end() }
         if chunk.complete && !chunk.incomplete {
             detectedSourceLang = chunk.output.detectedSourceLang
-            if completionID != chunk.requestId { completionID = chunk.requestId }
+            if completionID != chunk.requestId {
+                completionID = chunk.requestId
+                if ResultAnimationPolicy.shouldPlay(effect: settings.resultAnimation, delivery: chunk.delivery, complete: chunk.complete, incomplete: chunk.incomplete, hasText: !result.isEmpty, reduceMotion: false, isNewResult: true), activity == .active {
+                    resultAnimation = ResultAnimationPlayback(id: chunk.requestId, effect: settings.resultAnimation)
+                }
+            }
         }
     }
 
@@ -242,6 +248,7 @@ public final class AppModel {
     }
 
     private func cancelTasks() {
+        resultAnimation = nil
         requestId = nil
         latestChunk = nil
         pending?.cancel()
@@ -262,6 +269,7 @@ public final class AppModel {
     public func sceneChanged(_ value: AppActivity) {
         guard value != activity else { return }
         activity = value
+        if value != .active { resultAnimation = nil }
         switch value {
         case .inactive: break
         case .active:

@@ -2,7 +2,7 @@ import ByoGlotCore
 import SwiftUI
 
 public enum SettingsDestination: String, Hashable, Codable {
-    case providers, language, prompt, models, templates, cache, about
+    case providers, language, prompt, models, templates, animation, cache, about
 }
 
 public struct ScreenSettings: View {
@@ -16,6 +16,7 @@ public struct ScreenSettings: View {
                 destination(.prompt, title: "settings.prompt", subtitle: AppStrings.profile(model.settings.globals.languageProfile))
                 destination(.models, title: "settings.models", subtitle: SettingsLogic.defaultModel(settings: model.settings, main: true)?.id)
                 destination(.templates, title: "settings.templates", subtitle: templateLabel(model.template))
+                destination(.animation, title: "anim.title", subtitle: AppStrings.text("anim." + model.settings.resultAnimation.rawValue))
                 destination(.cache, title: "cache.title")
                 destination(.about, title: "settings.about")
             }
@@ -30,6 +31,7 @@ public struct ScreenSettings: View {
             case .prompt: ScreenLanguagePrompt(model: model)
             case .models: ScreenModelSettings(model: model)
             case .templates: ScreenTemplateSettings(model: model)
+            case .animation: ScreenAnimationSettings(model: model)
             case .cache: ScreenCacheSettings(model: model)
             case .about: ScreenAbout(model: model)
             }

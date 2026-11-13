@@ -2,6 +2,10 @@ import Foundation
 
 public enum ThemeChoice: String, Codable, Hashable, Sendable { case system, light, dark }
 
+public enum ResultAnimation: String, CaseIterable, Codable, Hashable, Sendable {
+    case none, fade, scramble, flap, typewriter, pen, wave
+}
+
 public struct AppSettings: Codable, Hashable, Sendable {
     public var schemaVersion: Int
     public var revision: Int
@@ -13,12 +17,13 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var activeConnectionId: String?
     public var consentedOrigins: [String]
     public var theme: ThemeChoice
+    public var resultAnimation: ResultAnimation
     public var autoTranslate: Bool
     public var mainModel: ModelRef?
     public var externalModel: ModelRef?
     public var fallbackModel: ModelRef?
 
-    public init(schemaVersion: Int = 1, revision: Int = 0, globals: PortableGlobals, templates: [Template], profileOverrides: [String: ProfileOverride] = [:], siteRules: [SiteRule] = [], connections: [Connection] = [], activeConnectionId: String? = nil, consentedOrigins: [String] = [], theme: ThemeChoice = .system, autoTranslate: Bool = true, mainModel: ModelRef? = nil, externalModel: ModelRef? = nil, fallbackModel: ModelRef? = nil) {
+    public init(schemaVersion: Int = 1, revision: Int = 0, globals: PortableGlobals, templates: [Template], profileOverrides: [String: ProfileOverride] = [:], siteRules: [SiteRule] = [], connections: [Connection] = [], activeConnectionId: String? = nil, consentedOrigins: [String] = [], theme: ThemeChoice = .system, resultAnimation: ResultAnimation = .fade, autoTranslate: Bool = true, mainModel: ModelRef? = nil, externalModel: ModelRef? = nil, fallbackModel: ModelRef? = nil) {
         self.schemaVersion = schemaVersion
         self.revision = revision
         self.globals = globals
@@ -29,6 +34,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
         self.activeConnectionId = activeConnectionId
         self.consentedOrigins = consentedOrigins
         self.theme = theme
+        self.resultAnimation = resultAnimation
         self.autoTranslate = autoTranslate
         self.mainModel = mainModel
         self.externalModel = externalModel
@@ -42,7 +48,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
     }
 
     private enum CodingKeys: CodingKey {
-        case schemaVersion, revision, globals, templates, profileOverrides, siteRules, connections, activeConnectionId, consentedOrigins, theme, autoTranslate, mainModel, externalModel, fallbackModel
+        case schemaVersion, revision, globals, templates, profileOverrides, siteRules, connections, activeConnectionId, consentedOrigins, theme, resultAnimation, autoTranslate, mainModel, externalModel, fallbackModel
     }
 
     public init(from decoder: any Decoder) throws {
@@ -57,6 +63,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
         activeConnectionId = try c.decodeIfPresent(String.self, forKey: .activeConnectionId)
         consentedOrigins = try c.decodeIfPresent([String].self, forKey: .consentedOrigins) ?? []
         theme = try c.decodeIfPresent(ThemeChoice.self, forKey: .theme) ?? .system
+        resultAnimation = ResultAnimation(rawValue: try c.decodeIfPresent(String.self, forKey: .resultAnimation) ?? "fade") ?? .fade
         autoTranslate = try c.decodeIfPresent(Bool.self, forKey: .autoTranslate) ?? true
         mainModel = try c.decodeIfPresent(ModelRef.self, forKey: .mainModel)
         externalModel = try c.decodeIfPresent(ModelRef.self, forKey: .externalModel)

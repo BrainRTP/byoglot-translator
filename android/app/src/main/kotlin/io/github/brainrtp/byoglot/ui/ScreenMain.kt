@@ -71,7 +71,7 @@ fun ScreenMain(
                 contentAlignment = Alignment.CenterEnd,
             ) {
                 Text(
-                    model?.let { "${it.id} · ${it.variant ?: "none"}" }
+                    model?.let { "${it.id} · ${effortLabel(it.variant ?: "none")}" }
                         ?: stringResource(R.string.choose_model),
                     style = ByoType.mono,
                     color = c.mu,

@@ -386,6 +386,7 @@ fun ListRow(
             .heightIn(min = 56.dp)
             .background(if (selected) c.sf else c.bg)
             .clickable(role = Role.Button, onClick = onClick)
+            .semantics { this.selected = selected }
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),

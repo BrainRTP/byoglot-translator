@@ -72,3 +72,7 @@ internal fun languageLabel(code: String): String =
 @Composable
 internal fun templateLabel(template: Template): String =
     if (template.builtin) stringResource(R.string.builtin_template) else template.name
+
+@Composable
+internal fun effortLabel(value: String): String =
+    if (value == "none") stringResource(R.string.effort_none) else value

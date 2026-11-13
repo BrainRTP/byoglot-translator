@@ -127,4 +127,8 @@
         <item quantity="many">%1$s · %2$d моделей доступны</item>
         <item quantity="other">%1$s · %2$d модели доступны</item>
     </plurals>
+    <string name="effort_label">Усилие</string>
+    <string name="effort_none">Нет</string>
+    <string name="auto_detected">Авто: %1$s</string>
+    <string name="delete_connection_confirm">Удалить %1$s с этого устройства? Шаблоны с моделями этого провайдера перейдут на запасную модель.</string>
 </resources>

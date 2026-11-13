@@ -18,8 +18,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -100,7 +102,11 @@ fun TranslatorBlock(
     errorContent: @Composable () -> Unit = {},
 ) {
     val c = ByoTheme.colors
-    val counter = InputCounter.editor(text)
+    var fieldValue by remember { mutableStateOf(TextFieldValue(text, TextRange(text.length))) }
+    LaunchedEffect(text) {
+        if (fieldValue.text != text) fieldValue = TextFieldValue(text, TextRange(text.length))
+    }
+    val counter = InputCounter.editor(fieldValue.text)
     val keyboard = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val context = LocalContext.current
     val sourceDescription = stringResource(R.string.source_language)
@@ -114,7 +120,10 @@ fun TranslatorBlock(
         ) == 0f
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         LangBar(
-            if (parameters.sourceLang == "auto") stringResource(R.string.auto_short)
+            if (parameters.sourceLang == "auto")
+                parameters.detectedSourceLang?.let {
+                    stringResource(R.string.auto_detected, languageLabel(it))
+                } ?: stringResource(R.string.auto_short)
             else languageLabel(parameters.sourceLang),
             languageLabel(parameters.targetLang),
             onSource,
@@ -129,8 +138,11 @@ fun TranslatorBlock(
                 .border(1.dp, c.bd, RoundedCornerShape(ByoRadius.panel)),
         ) {
             BasicTextField(
-                text,
-                onText,
+                fieldValue,
+                { value ->
+                    fieldValue = value
+                    onText(value.text)
+                },
                 Modifier.weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 14.dp, vertical = 6.dp)
@@ -144,7 +156,7 @@ fun TranslatorBlock(
                 keyboardActions = KeyboardActions(onSend = { onKeyboardTranslate() }),
                 decorationBox = { input ->
                     Box {
-                        if (text.isEmpty())
+                        if (fieldValue.text.isEmpty())
                             Text(
                                 stringResource(R.string.main_placeholder),
                                 style = ByoType.text,
@@ -166,13 +178,16 @@ fun TranslatorBlock(
                     style = ByoType.label,
                     color = if (counter.overLimit) c.er else c.mu,
                 )
-                if (text.isEmpty())
+                if (fieldValue.text.isEmpty())
                     ByoButton(stringResource(R.string.paste), onPaste, style = ButtonStyle.Text)
                 else
                     ByoIconButton(
                         ByoIcon.Close,
                         stringResource(R.string.main_clear),
-                        { onText("") },
+                        {
+                            fieldValue = TextFieldValue("")
+                            onText("")
+                        },
                     )
             }
         }
@@ -195,7 +210,7 @@ fun TranslatorBlock(
                     .focusable()
                     .semantics {
                         contentDescription = resultDescription
-                        liveRegion = LiveRegionMode.Polite
+                        if (state.complete) liveRegion = LiveRegionMode.Polite
                     }
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 14.dp, vertical = 6.dp),
@@ -210,7 +225,11 @@ fun TranslatorBlock(
                                 if (state.working && !reducedMotion)
                                     withStyle(SpanStyle(color = c.ac)) { append(" ▏") }
                             },
-                            modifier = Modifier.semantics { contentDescription = result },
+                            modifier =
+                                Modifier.clearAndSetSemantics {
+                                    contentDescription =
+                                        if (state.working) resultDescription else result
+                                },
                             style = ByoType.text,
                             color = c.tx,
                         )

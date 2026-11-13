@@ -55,21 +55,25 @@ fun ScreenProviders(
             Text(stringResource(R.string.providers_firstTitle), style = ByoType.title)
             Text(stringResource(R.string.providers_firstBody), style = ByoType.body, color = c.mu)
         }
-        settings.connections
-            .filter { it.preset in phonePresets() || it.preset == ProviderPreset.custom }
-            .forEach { connection ->
+        settings.connections.forEach { connection ->
+            key(connection.id) {
                 ListRow(
                     connection.name,
                     { onEdit(connection.id, connection.preset) },
                     subtitle =
                         if (keys[connection.id] == true) stringResource(R.string.key_ok)
-                        else stringResource(R.string.key_missing),
+                        else if (ProviderEffort.needsKey(connection.preset, connection.baseUrl))
+                            stringResource(R.string.key_missing)
+                        else connection.baseUrl,
                     value =
                         if (connection.id == settings.activeConnectionId)
                             stringResource(R.string.active_connection)
                         else null,
+                    selected = connection.id == settings.activeConnectionId,
                 )
+                if (legacyLocalConnection(connection)) ConnectionDelete(vm, connection) {}
             }
+        }
         Column(Modifier.border(1.dp, c.bd, RoundedCornerShape(8.dp))) {
             phonePresets().forEach { preset ->
                 ListRow(
@@ -97,6 +101,23 @@ fun ProviderKeyScreen(
     onPaste: () -> String?,
     onDone: () -> Unit,
 ) {
+    if (initial != null && legacyLocalConnection(initial)) {
+        ScreenColumn {
+            Text(initial.baseUrl, style = ByoType.mono)
+            ByoButton(
+                stringResource(R.string.use_connection),
+                {
+                    vm.action {
+                        vm.activate(initial.id)
+                        onDone()
+                    }
+                },
+                enabled = initial.id != settings.activeConnectionId,
+            )
+            ConnectionDelete(vm, initial, onDone)
+        }
+        return
+    }
     val c = ByoTheme.colors
     val scope = rememberCoroutineScope()
     val keys by vm.keys.collectAsState()
@@ -116,17 +137,6 @@ fun ProviderKeyScreen(
     var saving by remember { mutableStateOf(false) }
     var checked by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<RunnerError?>(null) }
-    var removing by remember { mutableStateOf(false) }
-    val confirmFocus = remember { FocusRequester() }
-    val deleteFocus = remember { FocusRequester() }
-    var returnDeleteFocus by remember { mutableStateOf(false) }
-    LaunchedEffect(removing) {
-        if (removing) confirmFocus.requestFocus()
-        else if (returnDeleteFocus) {
-            deleteFocus.requestFocus()
-            returnDeleteFocus = false
-        }
-    }
     val origin = originOf(url)
     var consent by remember(origin) { mutableStateOf(origin in settings.consentedOrigins) }
     val stored =
@@ -328,9 +338,9 @@ fun ProviderKeyScreen(
                 val selected = models.find { it.id == saved?.pageModel?.id }
                 if (!selected?.variants.isNullOrEmpty())
                     ChoiceMenu(
-                        "Effort",
-                        saved?.pageModel?.variant ?: "none",
-                        selected!!.variants.map { it to it },
+                        stringResource(R.string.effort_label),
+                        effortLabel(saved?.pageModel?.variant ?: "none"),
+                        selected!!.variants.map { it to effortLabel(it) },
                         mono = true,
                     ) { effort ->
                         vm.action {
@@ -364,51 +374,76 @@ fun ProviderKeyScreen(
             style = ByoType.label,
             color = c.mu,
         )
-        if (stored) {
-            if (removing)
-                Column(
-                    Modifier.fillMaxWidth()
-                        .border(1.dp, c.bd2, RoundedCornerShape(6.dp))
-                        .semantics {
-                            paneTitle = displayName
-                            dialog()
-                            liveRegion = LiveRegionMode.Assertive
-                        }
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(
-                        stringResource(R.string.key_deleteConfirm, displayName),
-                        style = ByoType.original,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ByoButton(
-                            stringResource(R.string.key_delete),
-                            {
-                                vm.action {
-                                    vm.editor.remove(id!!)
-                                    onDone()
-                                }
-                            },
-                            modifier = Modifier.focusRequester(confirmFocus),
-                            style = ButtonStyle.Danger,
-                        )
-                        ByoButton(
-                            stringResource(R.string.cancel),
-                            {
-                                removing = false
-                                returnDeleteFocus = true
-                            },
-                        )
-                    }
-                }
-            else
-                ByoButton(
-                    stringResource(R.string.key_delete),
-                    { removing = true },
-                    modifier = Modifier.focusRequester(deleteFocus),
-                    style = ButtonStyle.Danger,
-                )
+        settings.connections.find { it.id == id }?.let { ConnectionDelete(vm, it, onDone) }
+    }
+}
+
+internal fun legacyLocalConnection(connection: Connection): Boolean =
+    connection.preset == ProviderPreset.ollama ||
+        connection.preset == ProviderPreset.lmstudio ||
+        originOf(connection.baseUrl)?.startsWith("http://") == true
+
+@Composable
+private fun ConnectionDelete(vm: MainViewModel, connection: Connection, onDone: () -> Unit) {
+    val c = ByoTheme.colors
+    var removing by remember { mutableStateOf(false) }
+    val confirmFocus = remember { FocusRequester() }
+    val deleteFocus = remember { FocusRequester() }
+    var returnDeleteFocus by remember { mutableStateOf(false) }
+    val displayName = connection.name
+    val local = legacyLocalConnection(connection)
+    LaunchedEffect(removing) {
+        if (removing) confirmFocus.requestFocus()
+        else if (returnDeleteFocus) {
+            deleteFocus.requestFocus()
+            returnDeleteFocus = false
         }
     }
+    if (removing)
+        Column(
+            Modifier.fillMaxWidth()
+                .border(1.dp, c.bd2, RoundedCornerShape(6.dp))
+                .semantics {
+                    paneTitle = displayName
+                    dialog()
+                    liveRegion = LiveRegionMode.Assertive
+                }
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                stringResource(
+                    if (local) R.string.delete_connection_confirm else R.string.key_deleteConfirm,
+                    displayName,
+                ),
+                style = ByoType.original,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ByoButton(
+                    stringResource(if (local) R.string.delete else R.string.key_delete),
+                    {
+                        vm.action {
+                            vm.editor.remove(connection.id)
+                            onDone()
+                        }
+                    },
+                    modifier = Modifier.focusRequester(confirmFocus),
+                    style = ButtonStyle.Danger,
+                )
+                ByoButton(
+                    stringResource(R.string.cancel),
+                    {
+                        removing = false
+                        returnDeleteFocus = true
+                    },
+                )
+            }
+        }
+    else
+        ByoButton(
+            stringResource(if (local) R.string.delete else R.string.key_delete),
+            { removing = true },
+            modifier = Modifier.focusRequester(deleteFocus),
+            style = ButtonStyle.Danger,
+        )
 }

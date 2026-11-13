@@ -125,4 +125,8 @@
         <item quantity="one">%1$s · %2$d model available</item>
         <item quantity="other">%1$s · %2$d models available</item>
     </plurals>
+    <string name="effort_label">Effort</string>
+    <string name="effort_none">None</string>
+    <string name="auto_detected">Auto: %1$s</string>
+    <string name="delete_connection_confirm">Delete %1$s from this device? Templates using this provider will switch to the fallback model.</string>
 </resources>

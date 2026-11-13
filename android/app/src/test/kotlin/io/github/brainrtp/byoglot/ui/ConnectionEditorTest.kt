@@ -52,6 +52,28 @@ class ConnectionEditorTest {
     }
 
     @Test
+    fun provider_defaults_do_not_select_nonchat_or_openai_models() = runTest {
+        val models =
+            object : HttpTransport {
+                override suspend fun send(request: HttpRequest, timeoutMs: Long) =
+                    HttpResponse(
+                        200,
+                        emptyMap(),
+                        """{"data":[{"id":"embed","capabilities":{"completion_chat":false}},{"id":"chat","capabilities":{"completion_chat":true}}]}""".toByteArray(),
+                    )
+            }
+        val editor = ConnectionEditor(settings, secrets, models)
+        for (preset in listOf(ProviderPreset.openai, ProviderPreset.mistral)) {
+            val saved = editor.save(draft().copy(preset = preset), true)
+            val expected = if (preset == ProviderPreset.openai) null else "chat"
+            assertEquals(expected, saved.connection.pageModel?.id)
+            assertEquals(expected, saved.connection.selectionModel?.id)
+            assertEquals(listOf("embed", "chat"), saved.models.map { it.id })
+            assertEquals(saved.connection.id, settings.read().activeConnectionId)
+        }
+    }
+
+    @Test
     fun save_without_consent_for_a_remote_origin_fails() = runTest {
         try {
             editor.save(draft(), false)
@@ -134,7 +156,10 @@ class ConnectionEditorTest {
 
     @Test
     fun phone_list_comes_from_nonlocal_contract_presets() {
-        assertEquals(listOf(ProviderPreset.deepseek, ProviderPreset.openrouter), phonePresets())
+        assertEquals(
+            listOf(ProviderPreset.deepseek, ProviderPreset.openrouter, ProviderPreset.openai, ProviderPreset.mistral),
+            phonePresets(),
+        )
     }
 
     @Test

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ModelInfo } from "../opencode/types";
+  import { tr } from "./i18n.svelte";
   import { groupByProvider, type ModelId, modelKey } from "./options-logic";
 
   let {
@@ -39,6 +40,8 @@
 >
   {#if inheritLabel !== undefined}
     <option value="">{inheritLabel}</option>
+  {:else if !value}
+    <option value="" disabled>{tr("models.choose")}</option>
   {/if}
   {#if value && !known}
     <option value={modelKey(value)}>{value.id}</option>

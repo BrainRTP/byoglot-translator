@@ -90,6 +90,8 @@
   <data name="OpenEditor" xml:space="preserve"><value>Открыть в ByoGlot</value></data>
   <data name="Preset_Deepseek" xml:space="preserve"><value>DeepSeek</value></data>
   <data name="Preset_Openrouter" xml:space="preserve"><value>OpenRouter</value></data>
+  <data name="Preset_Openai" xml:space="preserve"><value>OpenAI</value></data>
+  <data name="Preset_Mistral" xml:space="preserve"><value>Mistral</value></data>
   <data name="Preset_Ollama" xml:space="preserve"><value>Ollama</value></data>
   <data name="Preset_Lmstudio" xml:space="preserve"><value>LM Studio</value></data>
   <data name="Preset_Custom" xml:space="preserve"><value>Другой</value></data>

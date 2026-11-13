@@ -62,6 +62,15 @@ it("round-trips through parseExport", () => {
 });
 
 it.each([
+  ["openai", "OpenAI", "https://api.openai.com/v1"],
+  ["mistral", "Mistral", "https://api.mistral.ai/v1"],
+])("imports a %s connection in export-v1", (preset, name, baseUrl) => {
+  const connection = { id: "new-provider", preset, name, baseUrl };
+  const file = { ...buildExport(state, new Date(0)), connections: [connection] };
+  expect(parseExport(file).connections).toEqual([connection]);
+});
+
+it.each([
   ["a wrong format", { format: "other" }],
   ["a newer version", { version: 2 }],
   ["a template without an id", { templates: [{ name: "x", builtin: false, settings: {} }] }],

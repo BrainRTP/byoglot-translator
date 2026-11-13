@@ -38,6 +38,28 @@ class CompletionStreamTest {
     }
 
     @Test
+    fun `chunk arrays join text and discard thinking in SSE and JSON fallback`() {
+        val content =
+            """[{"type":"thinking","thinking":[{"type":"text","text":"private"}]},{"type":"text","text":"При"},{"type":"image_url","image_url":"ignored"},{"type":"text","text":"вет"}]"""
+        val parser = CompletionStreamParser()
+        val payload =
+            "data: {\"choices\":[{\"delta\":{\"content\":$content},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+        val deltas = parser.accept(payload.toByteArray()).toList() + parser.end().toList()
+        assertEquals("Привет", deltas.joinToString("") { it.text })
+        assertEquals(
+            "Привет",
+            parseCompletion("""{"choices":[{"message":{"content":$content}}]}""", true).text,
+        )
+        assertEquals(
+            "",
+            parseCompletion(
+                """{"choices":[{"delta":{"content":[{"type":"thinking","thinking":[]}]}}]}""",
+                false,
+            ).text,
+        )
+    }
+
+    @Test
     fun `middle errors preserve earlier deltas from the same network read`() {
         val parser = CompletionStreamParser()
         val seen = mutableListOf<String>()

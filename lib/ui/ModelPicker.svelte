@@ -61,6 +61,9 @@
       value={value ? key(value) : ""}
       onchange={pickModel}
     >
+      {#if !value}
+        <option value="" disabled>{tr("models.choose")}</option>
+      {/if}
       {#if value && !current}
         <option value={key(value)}>{value.id}</option>
       {/if}

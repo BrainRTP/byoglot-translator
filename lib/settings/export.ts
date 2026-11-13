@@ -48,7 +48,15 @@ export const exportSchema = z.strictObject({
   connections: z.array(
     z.strictObject({
       id: z.string(),
-      preset: z.enum(["deepseek", "openrouter", "ollama", "lmstudio", "custom"]),
+      preset: z.enum([
+        "deepseek",
+        "openrouter",
+        "openai",
+        "mistral",
+        "ollama",
+        "lmstudio",
+        "custom",
+      ]),
       name: z.string(),
       baseUrl: z.string(),
     }),

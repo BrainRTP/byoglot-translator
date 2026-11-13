@@ -8,7 +8,7 @@
   import { tr } from "./i18n.svelte";
   import { statusFailure } from "./popup-logic";
 
-  const PRESETS: ProviderPreset[] = ["deepseek", "openrouter", "ollama", "lmstudio", "custom"];
+  const PRESETS: ProviderPreset[] = ["deepseek", "openrouter", "openai", "mistral", "ollama", "lmstudio", "custom"];
 
   let {
     existing,

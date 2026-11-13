@@ -104,9 +104,13 @@ export function createProviderBackend(
     return parsed.data;
   }
 
+  async function rawModels(signal?: AbortSignal): Promise<RawModel[]> {
+    const { data } = await call("/models", modelListSchema, signal);
+    return data;
+  }
+
   async function listModels(signal?: AbortSignal): Promise<ModelInfo[]> {
-    const { data: models } = await call("/models", modelListSchema, signal);
-    return models.map(toModelInfo);
+    return (await rawModels(signal)).map(toModelInfo);
   }
 
   async function generateWithMetadata(prompt: string, model: ModelRef, signal?: AbortSignal) {
@@ -134,10 +138,15 @@ export function createProviderBackend(
     },
     listModels,
     async defaultModel(signal) {
-      const models = await listModels(signal);
-      if (provider.preset === "deepseek")
-        return models.find((m) => m.id === "deepseek-flash") ?? null;
-      return models[0] ?? null;
+      const models = await rawModels(signal);
+      if (provider.preset === "openai") return null;
+      const model =
+        provider.preset === "deepseek"
+          ? models.find((m) => m.id === "deepseek-flash")
+          : provider.preset === "mistral"
+            ? models.find((m) => m.capabilities?.completion_chat !== false)
+            : models[0];
+      return model ? toModelInfo(model) : null;
     },
     generate: async (prompt, model, signal) =>
       (await generateWithMetadata(prompt, model, signal)).text,

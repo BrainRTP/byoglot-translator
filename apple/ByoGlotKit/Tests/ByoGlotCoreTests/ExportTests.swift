@@ -18,6 +18,16 @@ struct ExportTests {
         #expect(SettingsLogic.export(state, now: try #require(formatter.date(from: file.exportedAt))) == file)
     }
 
+    @Test(arguments: [ProviderPreset.openai, .mistral])
+    func importsNewProviderPresets(preset: ProviderPreset) throws {
+        var file = try sample()
+        file.connections = [ExportConnection(id: "new-provider", preset: preset, name: preset.rawValue, baseUrl: Contracts.presets[preset]!.baseUrl)]
+        let decoded = try ExportFile.decode(JSONEncoder().encode(file))
+        let state = SettingsLogic.merge(decoded, into: .initial(preferredLanguage: "en"))
+        #expect(state.connections.first?.preset == preset)
+        #expect(state.connections.first?.baseUrl == file.connections.first?.baseUrl)
+    }
+
     @Test func rejectsAnotherFormatAndVersion() throws {
         var file = try sample()
         file.format = "other"

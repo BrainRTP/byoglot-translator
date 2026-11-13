@@ -31,6 +31,35 @@ fn editor(
     )
 }
 #[tokio::test]
+async fn save_uses_provider_defaults_and_keeps_model_choices() {
+    for (preset, expected) in [
+        (ProviderPreset::Openai, None),
+        (ProviderPreset::Mistral, Some("chat")),
+    ] {
+        let transport = RecordingTransport::new(
+            200,
+            serde_json::json!({"data": [
+                {"id": "embed", "capabilities": {"completion_chat": false}},
+                {"id": "chat", "capabilities": {"completion_chat": true}}
+            ]}),
+        );
+        let (editor, repository, _) = editor(AppSettings::initial(None), transport);
+        let mut draft = draft();
+        draft.preset = preset;
+        let saved = editor.save(draft, true).await.unwrap();
+        assert_eq!(saved.page_model.as_ref().map(|m| m.id.as_str()), expected);
+        assert_eq!(
+            saved.selection_model.as_ref().map(|m| m.id.as_str()),
+            expected
+        );
+        assert_eq!(
+            repository.read().await.active_connection_id.as_ref(),
+            Some(&saved.id)
+        );
+        assert_eq!(editor.models(&saved.id).await.unwrap().len(), 2);
+    }
+}
+#[tokio::test]
 async fn unparsable_url_is_rejected() {
     let (editor, _, _) = editor(AppSettings::initial(None), RecordingTransport::models());
     let mut d = draft();

@@ -20,6 +20,49 @@ class MainFlowTest {
         RunnerOutput("translated", input.sourceLang ?: "auto", input.targetLang ?: "en", model)
 
     @Test
+    fun `no default keeps the main picker usable and selecting a model permits translation`() = runTest {
+        val connection =
+            Connection("openai", ProviderPreset.openai, "OpenAI", "https://api.openai.com/v1")
+        val repository =
+            InMemorySettingsRepository(
+                AppSettings.initial("en").copy(
+                    connections = listOf(connection),
+                    activeConnectionId = connection.id,
+                    consentedOrigins = listOf("https://api.openai.com"),
+                    autoTranslate = false,
+                ),
+            )
+        val secrets = InMemorySecretStore().apply { set("key", connection.id, "https://api.openai.com") }
+        val transport =
+            object : HttpTransport {
+                override suspend fun send(request: HttpRequest, timeoutMs: Long) =
+                    HttpResponse(200, emptyMap(), """{"data":[{"id":"chat"}]}""".toByteArray())
+            }
+        val vm =
+            MainViewModel(repository, secrets, transport, backgroundScope, { input ->
+                val selected = input.model ?: throw RunnerException(RunnerError.NoModel)
+                RunnerOutput("translated", "auto", "en", selected)
+            })
+        runCurrent()
+        vm.refreshModels()
+        assertNull(vm.parameters.value.model)
+        assertEquals(
+            listOf("chat"),
+            vm.catalogue.groups.value.getValue(connection.id).models.map { it.id },
+        )
+        vm.translate("source")
+        runCurrent()
+        assertEquals(RunnerError.NoModel, vm.translation.value.error)
+        assertFalse(vm.translation.value.working)
+        val selected = ModelRef("openai", "chat", "none", connection.id)
+        vm.chooseModel(selected)
+        vm.translate("source")
+        runCurrent()
+        assertEquals(selected, vm.parameters.value.model)
+        assertEquals("translated", vm.translation.value.output?.text)
+    }
+
+    @Test
     fun `editing debounces for 800 ms and paste translates immediately`() = runTest {
         val calls = mutableListOf<RunnerInput>()
         val vm =

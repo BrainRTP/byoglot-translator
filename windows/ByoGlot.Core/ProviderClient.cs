@@ -12,15 +12,23 @@ public interface ITextGenerator
 
 public sealed class ProviderClient(Connection connection, string? secret, IHttpTransport transport, Func<DateTimeOffset>? now = null) : ITextGenerator
 {
-    public async Task<IReadOnlyList<ModelInfo>> ListModelsAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<ModelInfo>> ListModelsAsync(CancellationToken ct) => (await ModelsWithDefaultAsync(ct)).Models;
+
+    public async Task<(IReadOnlyList<ModelInfo> Models, ModelInfo? Default)> ModelsWithDefaultAsync(CancellationToken ct)
     {
         var root = await CallAsync("/models", null, TimeSpan.FromSeconds(30), ct);
         if (root.ValueKind != JsonValueKind.Object || Field(root, "data").ValueKind != JsonValueKind.Array) throw Shape();
         var models = new List<ModelInfo>();
+        ModelInfo? defaultModel = null;
         foreach (var raw in Field(root, "data").EnumerateArray())
         {
             if (raw.ValueKind != JsonValueKind.Object || !IsString(Field(raw, "id"))) throw Shape();
-            ValidateOptional(raw, "name", IsString);
+            ValidateOptional(raw, "name", node => node.ValueKind == JsonValueKind.Null || IsString(node));
+            if (raw.TryGetProperty("capabilities", out var capabilities))
+            {
+                if (capabilities.ValueKind != JsonValueKind.Object) throw Shape();
+                ValidateOptional(capabilities, "completion_chat", node => node.ValueKind is JsonValueKind.True or JsonValueKind.False);
+            }
             foreach (var field in new[] { "context_window", "context_length", "max_output_tokens" }) ValidateOptional(raw, field, IsNumber);
             ValidateOptional(raw, "supported_parameters", IsStringArray);
             if (raw.TryGetProperty("effort", out var effort))
@@ -30,18 +38,22 @@ public sealed class ProviderClient(Connection connection, string? secret, IHttpT
             }
             var context = raw.TryGetProperty("context_window", out var window) ? window : Field(raw, "context_length");
             models.Add(new(connection.Preset.ToString().ToLowerInvariant(), Field(raw, "id").GetString()!,
-                raw.TryGetProperty("name", out var name) ? name.GetString()! : Field(raw, "id").GetString()!,
+                Field(raw, "name").ValueKind == JsonValueKind.String ? Field(raw, "name").GetString()! : Field(raw, "id").GetString()!,
                 ProviderEffort.Variants(connection.Preset, Strings(Field(effort, "supported_levels")), Strings(Field(raw, "supported_parameters"))),
                 Number(context), Number(Field(raw, "max_output_tokens"))));
+            var eligible = connection.Preset switch
+            {
+                ProviderPreset.Openai => false,
+                ProviderPreset.Mistral => Field(Field(raw, "capabilities"), "completion_chat").ValueKind != JsonValueKind.False,
+                ProviderPreset.Deepseek => models[^1].Id == "deepseek-flash",
+                _ => true
+            };
+            if (defaultModel is null && eligible) defaultModel = models[^1];
         }
-        return models;
+        return (models, defaultModel);
     }
 
-    public async Task<ModelInfo?> DefaultModelAsync(CancellationToken ct)
-    {
-        var models = await ListModelsAsync(ct);
-        return connection.Preset == ProviderPreset.Deepseek ? models.FirstOrDefault(m => m.Id == "deepseek-flash") : models.FirstOrDefault();
-    }
+    public async Task<ModelInfo?> DefaultModelAsync(CancellationToken ct) => (await ModelsWithDefaultAsync(ct)).Default;
 
     public async Task<string> GenerateAsync(string prompt, ModelRef model, CancellationToken ct)
     {
@@ -56,11 +68,27 @@ public sealed class ProviderClient(Connection connection, string? secret, IHttpT
         {
             if (choice.ValueKind != JsonValueKind.Object || Field(choice, "message").ValueKind != JsonValueKind.Object) throw Shape();
             var content = Field(Field(choice, "message"), "content");
-            if (content.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null) && !IsString(content)) throw Shape();
+            _ = ContentText(content);
         }
         var first = choices.GetArrayLength() > 0 ? Field(Field(choices[0], "message"), "content") : default;
-        var text = first.ValueKind == JsonValueKind.String ? first.GetString() : null;
+        var text = ContentText(first);
         return string.IsNullOrEmpty(text) ? throw new BackendException(ErrorKind.BadResponse, detail: "empty completion") : text;
+    }
+
+    private static string? ContentText(JsonElement content)
+    {
+        if (content.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null) return null;
+        if (IsString(content)) return content.GetString();
+        if (content.ValueKind != JsonValueKind.Array) throw Shape();
+        var text = new System.Text.StringBuilder();
+        foreach (var chunk in content.EnumerateArray())
+        {
+            if (!IsString(Field(chunk, "type"))) throw Shape();
+            if (Field(chunk, "type").GetString() != "text") continue;
+            if (!IsString(Field(chunk, "text"))) throw Shape();
+            text.Append(Field(chunk, "text").GetString());
+        }
+        return text.ToString();
     }
 
     private async Task<JsonElement> CallAsync(string path, JsonObject? body, TimeSpan timeout, CancellationToken ct)

@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 pub enum ProviderPreset {
     Deepseek,
     Openrouter,
+    Openai,
+    Mistral,
     Ollama,
     Lmstudio,
     Custom,
@@ -15,6 +17,8 @@ impl ProviderPreset {
         match self {
             Self::Deepseek => "deepseek",
             Self::Openrouter => "openrouter",
+            Self::Openai => "openai",
+            Self::Mistral => "mistral",
             Self::Ollama => "ollama",
             Self::Lmstudio => "lmstudio",
             Self::Custom => "custom",

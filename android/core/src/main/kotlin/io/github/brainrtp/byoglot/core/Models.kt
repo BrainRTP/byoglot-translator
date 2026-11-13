@@ -7,7 +7,7 @@ data class ModelRef(val providerID: String, val id: String, val variant: String?
 @Serializable
 data class ModelInfo(val providerID: String, val id: String, val name: String, val variants: List<String>, val contextLimit: Double, val outputLimit: Double)
 @Serializable
-enum class ProviderPreset { deepseek, openrouter, ollama, lmstudio, custom }
+enum class ProviderPreset { deepseek, openrouter, openai, mistral, ollama, lmstudio, custom }
 @Serializable
 data class Connection(val id: String, val preset: ProviderPreset, val name: String, val baseUrl: String, val pageModel: ModelRef? = null, val selectionModel: ModelRef? = null)
 @Serializable

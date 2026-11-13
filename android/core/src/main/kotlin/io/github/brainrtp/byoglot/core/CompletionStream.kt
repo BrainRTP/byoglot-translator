@@ -130,9 +130,7 @@ internal fun parseCompletion(
         }
         val choice = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
         val content = choice?.get(if (plain) "message" else "delta")?.jsonObject?.get("content")
-        require(
-            content == null || content == JsonNull || content is JsonPrimitive && content.isString,
-        )
+        val text = completionText(content)
         val finish =
             choice?.get("finish_reason")?.takeUnless { it == JsonNull }?.jsonPrimitive?.content
         val usage =
@@ -148,7 +146,7 @@ internal fun parseCompletion(
                 }
         require(choice != null || usage != null)
         CompletionDelta(
-            content?.takeUnless { it == JsonNull }?.jsonPrimitive?.content.orEmpty(),
+            text.orEmpty(),
             finish,
             usage,
         )
@@ -157,3 +155,22 @@ internal fun parseCompletion(
     } catch (_: IllegalArgumentException) {
         throw BackendException(ErrorKind.Incompatible)
     }
+
+internal fun completionText(content: JsonElement?): String? = when (content) {
+    null, JsonNull -> null
+    is JsonArray -> content.joinToString("") { value ->
+        val chunk = value.jsonObject
+        val type = chunk["type"] as? JsonPrimitive
+        require(type?.isString == true)
+        if (type.content != "text") ""
+        else {
+            val text = chunk["text"] as? JsonPrimitive
+            require(text?.isString == true)
+            text.content
+        }
+    }
+    else -> {
+        require(content is JsonPrimitive && content.isString)
+        content.content
+    }
+}

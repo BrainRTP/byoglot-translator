@@ -96,8 +96,24 @@ impl<T: HttpTransport> ProviderClient<T> {
         serde_json::from_value(value).map_err(|_| incompatible("unexpected response shape"))
     }
     pub async fn list_models(&self) -> Result<Vec<ModelInfo>, BackendError> {
+        Ok(self.models_with_default().await?.0)
+    }
+    pub async fn models_with_default(
+        &self,
+    ) -> Result<(Vec<ModelInfo>, Option<ModelInfo>), BackendError> {
         let raw: ModelList = self.call("/models", None, Duration::from_secs(30)).await?;
-        Ok(raw
+        let default_index = raw
+            .data
+            .iter()
+            .position(|model| match self.connection.preset {
+                crate::ProviderPreset::Openai => false,
+                crate::ProviderPreset::Mistral => {
+                    model.capabilities.as_ref().and_then(|c| c.completion_chat) != Some(false)
+                }
+                crate::ProviderPreset::Deepseek => model.id == "deepseek-flash",
+                _ => true,
+            });
+        let models: Vec<ModelInfo> = raw
             .data
             .into_iter()
             .map(|raw| ModelInfo {
@@ -114,15 +130,12 @@ impl<T: HttpTransport> ProviderClient<T> {
                 context_limit: raw.context_window.or(raw.context_length).unwrap_or(0.0),
                 output_limit: raw.max_output_tokens.unwrap_or(0.0),
             })
-            .collect())
+            .collect();
+        let default = default_index.map(|index| models[index].clone());
+        Ok((models, default))
     }
     pub async fn default_model(&self) -> Result<Option<ModelInfo>, BackendError> {
-        let models = self.list_models().await?;
-        if self.connection.preset == crate::ProviderPreset::Deepseek {
-            Ok(models.into_iter().find(|m| m.id == "deepseek-flash"))
-        } else {
-            Ok(models.into_iter().next())
-        }
+        Ok(self.models_with_default().await?.1)
     }
 }
 impl<T: HttpTransport> TextGenerator for ProviderClient<T> {
@@ -142,7 +155,7 @@ impl<T: HttpTransport> TextGenerator for ProviderClient<T> {
         raw.choices
             .into_iter()
             .next()
-            .and_then(|choice| choice.message.content)
+            .and_then(|choice| choice.message.content.map(Content::text))
             .filter(|content| !content.is_empty())
             .ok_or_else(|| {
                 let mut e = BackendError::new(ErrorKind::BadResponse);
@@ -164,11 +177,16 @@ struct ModelList {
 struct RawModel {
     id: String,
     name: Option<String>,
+    capabilities: Option<Capabilities>,
     context_window: Option<f64>,
     context_length: Option<f64>,
     max_output_tokens: Option<f64>,
     effort: Option<Effort>,
     supported_parameters: Option<Vec<String>>,
+}
+#[derive(Deserialize)]
+struct Capabilities {
+    completion_chat: Option<bool>,
 }
 #[derive(Deserialize)]
 struct Effort {
@@ -184,7 +202,36 @@ struct Choice {
 }
 #[derive(Deserialize)]
 struct Message {
-    content: Option<String>,
+    content: Option<Content>,
+}
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Content {
+    Text(String),
+    Chunks(Vec<ContentChunk>),
+}
+impl Content {
+    fn text(self) -> String {
+        match self {
+            Self::Text(text) => text,
+            Self::Chunks(chunks) => chunks.into_iter().map(|c| c.0).collect(),
+        }
+    }
+}
+struct ContentChunk(String);
+impl<'de> Deserialize<'de> for ContentChunk {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = Value::deserialize(deserializer)?;
+        let text = match raw.get("type").and_then(Value::as_str) {
+            Some("text") => raw
+                .get("text")
+                .and_then(Value::as_str)
+                .ok_or_else(|| serde::de::Error::custom("invalid text chunk"))?,
+            Some(_) => "",
+            None => return Err(serde::de::Error::custom("invalid chunk type")),
+        };
+        Ok(Self(text.into()))
+    }
 }
 fn response_json(body: &[u8]) -> Result<Value, serde_json::Error> {
     serde_json::from_slice(body.strip_prefix(b"\xef\xbb\xbf").unwrap_or(body))

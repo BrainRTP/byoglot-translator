@@ -122,15 +122,10 @@ impl<S: SettingsRepository, K: SecretStore, T: HttpTransport + Send> ConnectionE
             self.transport.clone(),
             SystemTime::now,
         );
-        let models = client.list_models().await?;
-        let default = if connection.preset == ProviderPreset::Deepseek {
-            models.iter().find(|m| m.id == "deepseek-flash")
-        } else {
-            models.first()
-        };
+        let (models, default) = client.models_with_default().await?;
         if previous.is_none() || origin_changed {
             (connection.page_model, connection.selection_model) =
-                pick_initial_models(&models, default, &connection.id);
+                pick_initial_models(&models, default.as_ref(), &connection.id);
         }
         let saved = connection.clone();
         let consent_origin = origin.clone();

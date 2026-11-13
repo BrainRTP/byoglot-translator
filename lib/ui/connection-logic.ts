@@ -16,6 +16,8 @@ export type FormValidation =
 const PRESETS: Record<ProviderPreset, { baseUrl: string; name: string; needsKey: boolean }> = {
   deepseek: { baseUrl: "https://api.deepseek.com", name: "DeepSeek", needsKey: true },
   openrouter: { baseUrl: "https://openrouter.ai/api/v1", name: "OpenRouter", needsKey: true },
+  openai: { baseUrl: "https://api.openai.com/v1", name: "OpenAI", needsKey: true },
+  mistral: { baseUrl: "https://api.mistral.ai/v1", name: "Mistral", needsKey: true },
   ollama: { baseUrl: "http://localhost:11434/v1", name: "Ollama", needsKey: false },
   lmstudio: { baseUrl: "http://localhost:1234/v1", name: "LM Studio", needsKey: false },
   custom: { baseUrl: "", name: "Custom", needsKey: true },

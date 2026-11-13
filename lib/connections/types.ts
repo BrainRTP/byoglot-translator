@@ -1,6 +1,13 @@
 import type { ModelRef } from "../opencode/types";
 
-export type ProviderPreset = "deepseek" | "openrouter" | "ollama" | "lmstudio" | "custom";
+export type ProviderPreset =
+  | "deepseek"
+  | "openrouter"
+  | "openai"
+  | "mistral"
+  | "ollama"
+  | "lmstudio"
+  | "custom";
 
 export type OpencodeData = { url: string; username: string; password: string };
 

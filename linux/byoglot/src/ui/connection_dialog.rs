@@ -9,9 +9,11 @@ use byoglot_core::{Connection, ConnectionDraft, ProviderPreset, SettingsReposito
 use gtk::glib;
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
-const PRESETS: [ProviderPreset; 5] = [
+const PRESETS: [ProviderPreset; 7] = [
     ProviderPreset::Deepseek,
     ProviderPreset::Openrouter,
+    ProviderPreset::Openai,
+    ProviderPreset::Mistral,
     ProviderPreset::Ollama,
     ProviderPreset::Lmstudio,
     ProviderPreset::Custom,
@@ -46,6 +48,8 @@ pub fn present(
         &[
             "DeepSeek".into(),
             "OpenRouter".into(),
+            "OpenAI".into(),
+            "Mistral".into(),
             "Ollama".into(),
             "LM Studio".into(),
             tr(Msg::Custom).into(),
@@ -91,6 +95,8 @@ pub fn present(
                 name.set_text(match preset {
                     ProviderPreset::Deepseek => "DeepSeek",
                     ProviderPreset::Openrouter => "OpenRouter",
+                    ProviderPreset::Openai => "OpenAI",
+                    ProviderPreset::Mistral => "Mistral",
                     ProviderPreset::Ollama => "Ollama",
                     ProviderPreset::Lmstudio => "LM Studio",
                     ProviderPreset::Custom => tr(Msg::Custom),

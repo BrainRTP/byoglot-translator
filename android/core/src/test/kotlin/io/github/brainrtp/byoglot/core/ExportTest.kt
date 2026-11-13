@@ -18,6 +18,15 @@ class ExportTest {
         val state = SettingsLogic.merge(file, initial)
         assertEquals(file, SettingsLogic.export(state, file.exportedAt))
     }
+    @Test fun `imports new provider presets in export-v1`() {
+        for (preset in listOf(ProviderPreset.openai, ProviderPreset.mistral)) {
+            val file = ExportFile.decode(sample()).copy(connections = listOf(ExportConnection("new-provider", preset, preset.name, Contracts.presets.getValue(preset).baseUrl)))
+            val decoded = ExportFile.decode(json.encodeToString(file))
+            val state = SettingsLogic.merge(decoded, AppSettings.initial("en"))
+            assertEquals(preset, state.connections.single().preset)
+            assertEquals(file.connections.single().baseUrl, state.connections.single().baseUrl)
+        }
+    }
     @Test fun `rejects other formats versions and nonportable secrets`() {
         assertThrows(IllegalArgumentException::class.java) { ExportFile.decode(sample().replace("byoglot-export", "other")) }
         assertThrows(IllegalArgumentException::class.java) { ExportFile.decode(sample().replace("\"version\": 1", "\"version\": 2")) }

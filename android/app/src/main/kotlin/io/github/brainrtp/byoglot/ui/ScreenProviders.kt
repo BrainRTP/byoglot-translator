@@ -32,13 +32,15 @@ fun phonePresets(): List<ProviderPreset> =
                 originOf(info.baseUrl)?.let { !isLocalHost(URI(it).host) } == true
         }
         .keys
-        .sortedBy { it.name }
+        .sortedBy { it.ordinal }
 
 @Composable
 fun presetLabel(preset: ProviderPreset): String =
     when (preset) {
         ProviderPreset.deepseek -> stringResource(R.string.preset_deepseek)
         ProviderPreset.openrouter -> stringResource(R.string.preset_openrouter)
+        ProviderPreset.openai -> stringResource(R.string.preset_openai)
+        ProviderPreset.mistral -> stringResource(R.string.preset_mistral)
         else -> stringResource(R.string.providers_custom)
     }
 

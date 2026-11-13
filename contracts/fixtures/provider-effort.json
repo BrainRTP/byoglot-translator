@@ -191,6 +191,64 @@
         "params": {},
         "needsKey": true
       }
+    },
+    {
+      "name": "openai ignores requested effort",
+      "input": {
+        "preset": "openai",
+        "rawModel": {
+          "id": "model-id-0",
+          "object": "model",
+          "created": 1686935002,
+          "owned_by": "organization-owner",
+          "shutdown_date": null
+        },
+        "variant": "high",
+        "baseUrl": "https://api.openai.com/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": true
+      }
+    },
+    {
+      "name": "mistral ignores requested effort",
+      "input": {
+        "preset": "mistral",
+        "rawModel": {
+          "id": "mistral-large-latest",
+          "object": "model",
+          "created": 1756746619,
+          "owned_by": "mistralai",
+          "capabilities": {
+            "completion_chat": true,
+            "completion_fim": false,
+            "function_calling": true,
+            "fine_tuning": false,
+            "vision": true,
+            "classification": false
+          },
+          "name": "mistral-large-latest",
+          "description": "Mistral Large",
+          "max_context_length": 131072,
+          "aliases": [],
+          "deprecation": null,
+          "default_model_temperature": 0.3,
+          "type": "base"
+        },
+        "variant": "high",
+        "baseUrl": "https://api.mistral.ai/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": true
+      }
     }
   ]
 }

@@ -522,6 +522,316 @@
           "outputLimit": 1000000
         }
       }
+    },
+    {
+      "name": "openai",
+      "input": {
+        "provider": {
+          "preset": "openai",
+          "name": "OpenAI",
+          "baseUrl": "https://api.openai.com/v1",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "object": "list",
+            "data": [
+              {
+                "id": "model-id-0",
+                "object": "model",
+                "created": 1686935002,
+                "owned_by": "organization-owner",
+                "shutdown_date": null
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "GET",
+          "url": "https://api.openai.com/v1/models",
+          "headers": {
+            "authorization": "Bearer fixture-key"
+          }
+        },
+        "models": [
+          {
+            "providerID": "openai",
+            "id": "model-id-0",
+            "name": "model-id-0",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 0,
+            "outputLimit": 0
+          }
+        ],
+        "defaultModel": null
+      }
+    },
+    {
+      "name": "mistral",
+      "input": {
+        "provider": {
+          "preset": "mistral",
+          "name": "Mistral",
+          "baseUrl": "https://api.mistral.ai/v1",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "object": "list",
+            "data": [
+              {
+                "id": "mistral-large-latest",
+                "object": "model",
+                "created": 1756746619,
+                "owned_by": "mistralai",
+                "capabilities": {
+                  "completion_chat": true,
+                  "completion_fim": false,
+                  "function_calling": true,
+                  "fine_tuning": false,
+                  "vision": true,
+                  "classification": false
+                },
+                "name": "mistral-large-latest",
+                "description": "Mistral Large",
+                "max_context_length": 131072,
+                "aliases": [],
+                "deprecation": null,
+                "default_model_temperature": 0.3,
+                "type": "base"
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "GET",
+          "url": "https://api.mistral.ai/v1/models",
+          "headers": {
+            "authorization": "Bearer fixture-key"
+          }
+        },
+        "models": [
+          {
+            "providerID": "mistral",
+            "id": "mistral-large-latest",
+            "name": "mistral-large-latest",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 0,
+            "outputLimit": 0
+          }
+        ],
+        "defaultModel": {
+          "providerID": "mistral",
+          "id": "mistral-large-latest",
+          "name": "mistral-large-latest",
+          "variants": [
+            "none"
+          ],
+          "contextLimit": 0,
+          "outputLimit": 0
+        }
+      }
+    },
+    {
+      "name": "null model name falls back to id",
+      "input": {
+        "provider": {
+          "preset": "custom",
+          "name": "custom",
+          "baseUrl": "https://models.example.com/v1",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "object": "list",
+            "data": [
+              {
+                "id": "nullable-name",
+                "name": null
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "GET",
+          "url": "https://models.example.com/v1/models",
+          "headers": {
+            "authorization": "Bearer fixture-key"
+          }
+        },
+        "models": [
+          {
+            "providerID": "custom",
+            "id": "nullable-name",
+            "name": "nullable-name",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 0,
+            "outputLimit": 0
+          }
+        ],
+        "defaultModel": {
+          "providerID": "custom",
+          "id": "nullable-name",
+          "name": "nullable-name",
+          "variants": [
+            "none"
+          ],
+          "contextLimit": 0,
+          "outputLimit": 0
+        }
+      }
+    },
+    {
+      "name": "mistral skips non-chat models for default",
+      "input": {
+        "provider": {
+          "preset": "mistral",
+          "name": "mistral",
+          "baseUrl": "https://api.mistral.ai/v1",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "object": "list",
+            "data": [
+              {
+                "id": "mistral-embed",
+                "capabilities": {
+                  "completion_chat": false
+                }
+              },
+              {
+                "id": "chat-without-capabilities"
+              },
+              {
+                "id": "mistral-large-latest",
+                "capabilities": {
+                  "completion_chat": true
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "GET",
+          "url": "https://api.mistral.ai/v1/models",
+          "headers": {
+            "authorization": "Bearer fixture-key"
+          }
+        },
+        "models": [
+          {
+            "providerID": "mistral",
+            "id": "mistral-embed",
+            "name": "mistral-embed",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 0,
+            "outputLimit": 0
+          },
+          {
+            "providerID": "mistral",
+            "id": "chat-without-capabilities",
+            "name": "chat-without-capabilities",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 0,
+            "outputLimit": 0
+          },
+          {
+            "providerID": "mistral",
+            "id": "mistral-large-latest",
+            "name": "mistral-large-latest",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 0,
+            "outputLimit": 0
+          }
+        ],
+        "defaultModel": {
+          "providerID": "mistral",
+          "id": "chat-without-capabilities",
+          "name": "chat-without-capabilities",
+          "variants": [
+            "none"
+          ],
+          "contextLimit": 0,
+          "outputLimit": 0
+        }
+      }
+    },
+    {
+      "name": "mistral without chat models has no default",
+      "input": {
+        "provider": {
+          "preset": "mistral",
+          "name": "mistral",
+          "baseUrl": "https://api.mistral.ai/v1",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "object": "list",
+            "data": [
+              {
+                "id": "mistral-embed",
+                "capabilities": {
+                  "completion_chat": false
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "GET",
+          "url": "https://api.mistral.ai/v1/models",
+          "headers": {
+            "authorization": "Bearer fixture-key"
+          }
+        },
+        "models": [
+          {
+            "providerID": "mistral",
+            "id": "mistral-embed",
+            "name": "mistral-embed",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 0,
+            "outputLimit": 0
+          }
+        ],
+        "defaultModel": null
+      }
     }
   ]
 }

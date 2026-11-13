@@ -8,6 +8,8 @@ export type RawModel = z.infer<typeof modelRawSchema>;
 export const PRESETS: Record<ProviderPreset, { baseUrl: string; needsKey: boolean }> = {
   deepseek: { baseUrl: "https://api.deepseek.com", needsKey: true },
   openrouter: { baseUrl: "https://openrouter.ai/api/v1", needsKey: true },
+  openai: { baseUrl: "https://api.openai.com/v1", needsKey: true },
+  mistral: { baseUrl: "https://api.mistral.ai/v1", needsKey: true },
   ollama: { baseUrl: "http://localhost:11434/v1", needsKey: false },
   lmstudio: { baseUrl: "http://localhost:1234/v1", needsKey: false },
   custom: { baseUrl: "", needsKey: true },

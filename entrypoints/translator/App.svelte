@@ -18,7 +18,7 @@
   let android = $state(false);
   let copyStatus = $state<"copied" | "copyFailed" | null>(null);
   const initial = translatorDefaults(DEFAULT_GLOBALS, [builtinTemplate()]);
-  let view = $state<TranslatorState>({ ...initial, running: false, result: "", error: null });
+  let view = $state<TranslatorState>({ ...initial, running: false, result: "", completion: null, error: null });
   const translator = createTranslator(initial, {
     translate: (input) => sendMessage("translateSelection", input),
     cancel: (id) => sendMessage("cancelSelection", id),
@@ -89,7 +89,7 @@
         </select>
       </label>
       <label><span class="lbl">{tr("selection.template")}</span>
-        <select class="fld" value={view.templateId} onchange={(e) => translator.update({ templateId: e.currentTarget.value })}>
+        <select class="fld" value={view.templateId} onchange={(e) => translator.chooseTemplate(templates.find((template) => template.id === e.currentTarget.value))}>
           {#each templates as template (template.id)}<option value={template.id}>{template.builtin ? tr("template.builtin") : template.name}</option>{/each}
         </select>
       </label>
@@ -98,7 +98,7 @@
       <label class="lbl" for="source-text">{tr("translator.input")}</label>
       <textarea id="source-text" class="fld" rows="10" value={view.text} autocomplete="off" placeholder={tr("translator.placeholder")} aria-describedby="text-count text-limit" aria-invalid={problem === "tooLong"} oninput={(e) => translator.update({ text: e.currentTarget.value })}></textarea>
       <div class="mu small count" id="text-count">{tr("translator.count", { count: view.text.length, limit: MAX_EDITOR_TEXT })}</div>
-      <div id="text-limit" role="alert" class="err">{problem === "tooLong" ? tr("translator.limit", { limit: MAX_EDITOR_TEXT }) : ""}</div>
+      <div id="text-limit" role="alert" class="err">{problem === "tooLong" ? tr("translator.limit", { count: view.text.length, limit: MAX_EDITOR_TEXT }) : ""}</div>
     </div>
     <div>
       <button class="btn pri" type="button" disabled={!view.running && problem !== null} onclick={() => view.running ? translator.cancel() : translator.translate()}>{view.running ? tr("common.cancel") : tr("translator.translate")}</button>
@@ -116,7 +116,10 @@
         <h2 id="result-title">{tr("translator.result")}</h2>
         <button class="btn" type="button" disabled={!view.result} onclick={copy}>{tr("selection.copy")}</button>
       </div>
-      <div class="result" dir="auto" aria-live="polite">{view.result}</div>
+      <div class="result" dir="auto">{view.result}</div>
+      <div role="status" class:notice={view.completion === "truncated" || view.completion === "unknown"}>
+        {view.completion === "truncated" ? tr("translator.truncated") : view.completion === "unknown" ? tr("translator.unverified") : view.completion === "complete" ? tr("translator.ready") : ""}
+      </div>
       {#if copyStatus}<div role="status" class="mu small">{tr(`selection.${copyStatus}`)}</div>{/if}
     </section>
     <p class="mu small">{tr("translator.privacy")}</p>
@@ -132,6 +135,7 @@
   .controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
   .count { text-align: right; margin-top: 6px; }
   .result { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; min-height: 80px; margin-top: 12px; }
+  .notice { margin-top: 12px; padding: 10px 12px; background: var(--wns); border: 1px solid var(--wn); border-radius: 6px; }
   .failure { display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere; }
   .failure.er { border-color: var(--er); background: var(--ers); }
   .failure.wn { border-color: var(--wn); background: var(--wns); }

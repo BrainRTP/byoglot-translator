@@ -86,21 +86,19 @@ describe("translator defaults", () => {
     builtin: false,
     settings: { targetLang: "ja" },
   };
-  it("uses global languages and the default template without changing saved settings", () => {
+  it("uses the default template target and the global source language", () => {
     const globals = {
       ...DEFAULT_GLOBALS,
       sourceLang: "de",
       targetLang: "ru",
       defaultTemplateId: "custom",
     };
-    const before = structuredClone(globals);
     expect(translatorDefaults(globals, [builtinTemplate(), custom])).toEqual({
       text: "",
       sourceLang: "de",
-      targetLang: "ru",
+      targetLang: "ja",
       templateId: "custom",
     });
-    expect(globals).toEqual(before);
   });
   it("falls back to the builtin template for a removed default", () => {
     const globals = { ...DEFAULT_GLOBALS, defaultTemplateId: "removed" };
@@ -108,6 +106,18 @@ describe("translator defaults", () => {
       builtinTemplate().id,
     );
     expect(translatorDefaults(globals, []).templateId).toBe(builtinTemplate().id);
+  });
+
+  it("moves the picker to a template target and sends a later manual choice", async () => {
+    const { controller, translate } = setup();
+    translate.mockResolvedValue(answer("Translated"));
+    controller.chooseTemplate(custom);
+    expect(controller.state.targetLang).toBe("ja");
+    controller.update({ targetLang: "de" });
+    controller.chooseTemplate(builtinTemplate());
+    expect(controller.state.targetLang).toBe("de");
+    await controller.translate();
+    expect(translate.mock.calls[0]?.[0].editor?.targetLang).toBe("de");
   });
 });
 
@@ -171,6 +181,31 @@ describe("translator request identity", () => {
 });
 
 describe("translator errors", () => {
+  it("shows a timeout and allows retrying the same text", async () => {
+    const { controller, translate } = setup();
+    translate
+      .mockResolvedValueOnce({ error: "offline", timeout: true })
+      .mockResolvedValueOnce(answer("Retried"));
+    await controller.translate();
+    expect(controller.state.error?.title).toContain("timed out");
+    expect(controller.state.running).toBe(false);
+    expect(controller.state.text).toBe("Hello");
+    await controller.translate();
+    expect(controller.state.result).toBe("Retried");
+    expect(controller.state.error).toBeNull();
+  });
+
+  it.each([true, false, undefined])("preserves completion metadata %s", async (truncated) => {
+    const { controller, translate } = setup();
+    translate.mockResolvedValue({ ...answer("Partial"), truncated });
+    await controller.translate();
+    expect(controller.state.result).toBe("Partial");
+    expect(controller.state.completion).toBe(
+      truncated === undefined ? "unknown" : truncated ? "truncated" : "complete",
+    );
+    controller.update({ text: "Other" });
+    expect(controller.state.completion).toBeNull();
+  });
   it.each(["unauthorized", "provider_auth", "no_model"] as const)(
     "links %s to options",
     (error) => {

@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { ProtocolMap, SelectionResult } from "../messaging/protocol";
 import { BUILTIN_TEMPLATE_ID, builtinTemplate } from "../settings/defaults";
 import type { GlobalSettings, Template } from "../settings/types";
@@ -14,6 +15,7 @@ export type TranslatorInput = {
 export type TranslatorState = TranslatorInput & {
   running: boolean;
   result: string;
+  completion: "complete" | "truncated" | "unknown" | null;
   error: (ErrorPresentation & { options: boolean }) | null;
 };
 
@@ -28,7 +30,7 @@ export function translatorDefaults(
   return {
     text: "",
     sourceLang: globals.sourceLang,
-    targetLang: globals.targetLang,
+    targetLang: template.settings.targetLang ?? globals.targetLang,
     templateId: template.id,
   };
 }
@@ -44,7 +46,13 @@ export function translatorError(result: Extract<SelectionResult, { error: string
       result.backend,
       result.source,
     ),
-    options: ["unauthorized", "provider_auth", "no_model"].includes(result.error),
+    ...(result.timeout && {
+      title: t("translator.timeout.title"),
+      body: t("translator.timeout"),
+      hint: undefined,
+    }),
+    options:
+      !!result.timeout || ["unauthorized", "provider_auth", "no_model"].includes(result.error),
   };
 }
 
@@ -56,7 +64,13 @@ export function createTranslator(
   },
   onChange: (state: TranslatorState) => void,
 ) {
-  let state: TranslatorState = { ...initial, running: false, result: "", error: null };
+  let state: TranslatorState = {
+    ...initial,
+    running: false,
+    result: "",
+    completion: null,
+    error: null,
+  };
   let active: string | null = null;
 
   function publish(patch: Partial<TranslatorState>) {
@@ -71,13 +85,22 @@ export function createTranslator(
     publish({ running: false });
   }
 
+  function update(patch: Partial<TranslatorInput>) {
+    cancel();
+    publish({ ...patch, result: "", completion: null, error: null });
+  }
+
   return {
     get state() {
       return state;
     },
-    update(patch: Partial<TranslatorInput>) {
-      cancel();
-      publish({ ...patch, result: "", error: null });
+    update,
+    chooseTemplate(template: Template | undefined) {
+      if (template)
+        update({
+          templateId: template.id,
+          targetLang: template.settings.targetLang ?? state.targetLang,
+        });
     },
     cancel,
     async translate() {
@@ -85,7 +108,7 @@ export function createTranslator(
       if (textProblem(state.text)) return;
       const requestId = crypto.randomUUID();
       active = requestId;
-      publish({ running: true, result: "", error: null });
+      publish({ running: true, result: "", completion: null, error: null });
       try {
         const result = await deps.translate({
           text: state.text,
@@ -96,7 +119,19 @@ export function createTranslator(
           editor: { sourceLang: state.sourceLang, targetLang: state.targetLang },
         });
         if (active !== requestId) return;
-        publish("text" in result ? { result: result.text } : { error: translatorError(result) });
+        publish(
+          "text" in result
+            ? {
+                result: result.text,
+                completion:
+                  result.truncated === undefined
+                    ? "unknown"
+                    : result.truncated
+                      ? "truncated"
+                      : "complete",
+              }
+            : { error: translatorError(result) },
+        );
       } catch {
         if (active === requestId) publish({ error: translatorError({ error: "offline" }) });
       } finally {

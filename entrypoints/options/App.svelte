@@ -510,7 +510,7 @@
     {:else}
       <div class="layout">
         <nav aria-label={tr("opt.sections")}>
-          <a href="/translator.html" onclick={(event) => { event.preventDefault(); void openTranslator(); }}>{tr("translator.open")}</a>
+          <a class="btn translator-link" href="/translator.html" onclick={(event) => { event.preventDefault(); void openTranslator(); }}>{tr("translator.open")}</a>
           {#each SECTIONS.filter((id) => !android || id !== "hotkeys") as id (id)}
             <a href={`#${id}`} class:on={active === id} onclick={() => (active = id)}>
               {tr(NAV_KEYS[id])}
@@ -784,6 +784,11 @@
     color: var(--tx);
     background: var(--sf);
     font-weight: 600;
+  }
+  nav .translator-link {
+    min-height: 44px;
+    margin-bottom: 12px;
+    color: var(--tx);
   }
   nav a:focus-visible {
     outline: 2px solid var(--ac);

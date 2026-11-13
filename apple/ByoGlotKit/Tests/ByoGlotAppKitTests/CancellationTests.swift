@@ -21,7 +21,7 @@ private struct WaitingTransport: HTTPTransport {
     let f = AppFixture()
     try await f.connect()
     let transport = WaitingTransport()
-    let runner = TranslationRunner(settings: f.settings, secrets: f.secrets, transport: transport)
+    let runner = TranslationRunner(settings: f.settings, secrets: f.secrets, transport: transport, urlPolicy: .httpsOnly)
     let received = AsyncStream<Bool>.makeStream()
     let task = Task {
         for try await _ in runner.stream(RunnerInput(text: "hello", limit: 100)) { received.continuation.yield(true) }

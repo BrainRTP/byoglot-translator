@@ -81,6 +81,7 @@ public actor TranslationRunner {
     private let transport: any HTTPTransport
     private let modelCapabilities: ModelCapabilitiesCache
     private let detector: any SourceLanguageDetecting
+    private let urlPolicy: AppProviderURLPolicy
     private var cached: ClientState?
 
     private struct ClientState: CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
@@ -92,21 +93,22 @@ public actor TranslationRunner {
         var customMirror: Mirror { Mirror(self, children: ["summary": description]) }
     }
 
-    public init(settings: SettingsStore, secrets: any SecretStore, transport: any HTTPTransport, detector: any SourceLanguageDetecting = OnDeviceLanguageDetector(), modelCapabilities: ModelCapabilitiesCache = .shared) {
+    public init(settings: SettingsStore, secrets: any SecretStore, transport: any HTTPTransport, detector: any SourceLanguageDetecting = OnDeviceLanguageDetector(), modelCapabilities: ModelCapabilitiesCache = .shared, urlPolicy: AppProviderURLPolicy) {
         self.settings = settings
         self.secrets = secrets
         self.transport = transport
         self.detector = detector
         self.modelCapabilities = modelCapabilities
+        self.urlPolicy = urlPolicy
     }
 
-    public static func shared(appGroup: String, keychainGroup: String?) throws -> TranslationRunner {
-        try shared(containerURL: FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup), keychainGroup: keychainGroup)
+    public static func shared(appGroup: String, keychainGroup: String?, urlPolicy: AppProviderURLPolicy) throws -> TranslationRunner {
+        try shared(containerURL: FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup), keychainGroup: keychainGroup, urlPolicy: urlPolicy)
     }
 
-    static func shared(containerURL: URL?, keychainGroup: String?) throws -> TranslationRunner {
+    static func shared(containerURL: URL?, keychainGroup: String?, urlPolicy: AppProviderURLPolicy) throws -> TranslationRunner {
         guard let directory = containerURL else { throw RunnerError.appGroupUnavailable }
-        return TranslationRunner(settings: SettingsStore(directory: directory), secrets: KeychainSecretStore(accessGroup: keychainGroup), transport: URLSessionTransport())
+        return TranslationRunner(settings: SettingsStore(directory: directory), secrets: KeychainSecretStore(accessGroup: keychainGroup), transport: URLSessionTransport(), urlPolicy: urlPolicy)
     }
 
     public func translate(_ input: RunnerInput) async throws(RunnerError) -> RunnerOutput {
@@ -151,7 +153,7 @@ public actor TranslationRunner {
         guard var model = input.model ?? effective.model else { throw RunnerError.noModel }
         guard let connection = SettingsLogic.modelConnection(model, settings: state) else { throw RunnerError.noModel }
         model.connectionId = connection.id
-        guard let origin = originOf(connection.baseUrl), let url = URL(string: origin), HTTPDestinationPolicy.permits(url) else { throw RunnerError.backend(BackendError(kind: .offline)) }
+        guard let origin = originOf(connection.baseUrl), let url = URL(string: origin), urlPolicy.permits(url) else { throw RunnerError.backend(BackendError(kind: .providerError)) }
         if !HTTPDestinationPolicy.isLocalOrLAN(url.host ?? ""), !state.consentedOrigins.contains(origin) { throw RunnerError.consentNeeded(origin: origin) }
         let secret: String?
         do { secret = try secrets.secret(connectionId: connection.id, origin: origin) }

@@ -38,13 +38,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>ByoGlot connects to a model server on your network when you add its address.</string>
+	<string>ByoGlot connects to a provider on your local network when you add its address.</string>
 	<key>ByoGlotKeychainGroup</key>
 	<string>$(AppIdentifierPrefix)io.github.brainrtp.byoglot.shared</string>
 	<key>CFBundleLocalizations</key>

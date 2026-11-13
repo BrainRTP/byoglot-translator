@@ -23,6 +23,18 @@ public struct ConnectionDraft: Sendable, Equatable, CustomStringConvertible, Cus
 
 public enum DraftProblem: Equatable, Sendable { case baseUrl, apiKey, insecureRemote }
 
+public enum AppProviderURLPolicy: Sendable {
+    case httpsOnly, allowLocalHTTP
+
+    var customBaseURLHelpKey: String { self == .httpsOnly ? "custom.baseUrlHelp.httpsOnly" : "custom.baseUrlHelp" }
+    var providerURLHelpKey: String { self == .httpsOnly ? "providers.httpsHelp.httpsOnly" : "providers.httpsHelp" }
+    var invalidURLKey: String { self == .httpsOnly ? "providers.badURL.httpsOnly" : "providers.badURL" }
+
+    func permits(_ url: URL) -> Bool {
+        HTTPDestinationPolicy.permits(url) && (self == .allowLocalHTTP || url.scheme?.lowercased() == "https")
+    }
+}
+
 public actor ConnectionEditor {
     private let settings: SettingsStore
     private let secrets: any SecretStore
@@ -31,12 +43,14 @@ public actor ConnectionEditor {
     var pendingMutations: Int { mutationWaiters.count }
     private let modelCapabilities: ModelCapabilitiesCache
     private let transport: any HTTPTransport
+    public nonisolated let urlPolicy: AppProviderURLPolicy
 
-    public init(settings: SettingsStore, secrets: any SecretStore, transport: any HTTPTransport, modelCapabilities: ModelCapabilitiesCache = .shared) {
+    public init(settings: SettingsStore, secrets: any SecretStore, transport: any HTTPTransport, modelCapabilities: ModelCapabilitiesCache = .shared, urlPolicy: AppProviderURLPolicy) {
         self.settings = settings
         self.secrets = secrets
         self.transport = transport
         self.modelCapabilities = modelCapabilities
+        self.urlPolicy = urlPolicy
     }
 
     public nonisolated static func presets(includeLocal: Bool = false) -> [ProviderPreset] {
@@ -49,7 +63,7 @@ public actor ConnectionEditor {
 
     public nonisolated func validate(_ draft: ConnectionDraft, hasStoredKey: Bool) -> DraftProblem? {
         guard originOf(draft.baseUrl) != nil, let url = URL(string: draft.baseUrl) else { return .baseUrl }
-        guard HTTPDestinationPolicy.permits(url) else { return .insecureRemote }
+        guard urlPolicy.permits(url) else { return .insecureRemote }
         if ProviderEffort.needsKey(preset: draft.preset, baseUrl: draft.baseUrl), jsTrim(draft.apiKey).isEmpty, !hasStoredKey { return .apiKey }
         return nil
     }
@@ -58,7 +72,7 @@ public actor ConnectionEditor {
         do {
             try await acquireMutation()
             defer { releaseMutation() }
-            guard let origin = originOf(draft.baseUrl), let url = URL(string: origin), HTTPDestinationPolicy.permits(url) else { throw RunnerError.backend(BackendError(kind: .offline)) }
+            guard let origin = originOf(draft.baseUrl), let url = URL(string: origin), urlPolicy.permits(url) else { throw RunnerError.backend(BackendError(kind: .providerError)) }
             let local = HTTPDestinationPolicy.isLocalOrLAN(url.host ?? "")
             if !local && !consent { throw RunnerError.consentNeeded(origin: origin) }
             let state = try await settings.read()
@@ -153,7 +167,8 @@ public actor ConnectionEditor {
     public func models(connectionId: String) async throws(RunnerError) -> [ModelInfo] {
         do {
             let state = try await settings.read()
-            guard let connection = state.connections.first(where: { $0.id == connectionId }), let origin = originOf(connection.baseUrl), let url = URL(string: origin) else { throw RunnerError.noConnection }
+            guard let connection = state.connections.first(where: { $0.id == connectionId }) else { throw RunnerError.noConnection }
+            guard let origin = originOf(connection.baseUrl), let url = URL(string: origin), urlPolicy.permits(url) else { throw RunnerError.backend(BackendError(kind: .providerError)) }
             if !HTTPDestinationPolicy.isLocalOrLAN(url.host ?? ""), !state.consentedOrigins.contains(origin) { throw RunnerError.consentNeeded(origin: origin) }
             let secret = try secrets.secret(connectionId: connectionId, origin: origin)
             if (secret?.isEmpty ?? true) && ProviderEffort.needsKey(preset: connection.preset, baseUrl: connection.baseUrl) { throw RunnerError.keyMissing }

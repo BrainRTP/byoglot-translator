@@ -1,6 +1,7 @@
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
+using Windows.Win32;
 
 namespace ByoGlot.App;
 
@@ -16,11 +17,16 @@ internal static class Program
             Task.Run(async () => await instance.RedirectActivationToAsync(AppInstance.GetCurrent().GetActivatedEventArgs())).GetAwaiter().GetResult();
             return;
         }
-        Application.Start(_ =>
+        var ole = PInvoke.OleInitialize();
+        if (ole.Failed) throw new System.Runtime.InteropServices.COMException("OLE initialization failed.", ole.Value);
+        try
         {
-            SynchronizationContext.SetSynchronizationContext(new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread()));
-            var app = new App();
-            instance.Activated += (_, _) => app.Main.DispatcherQueue.TryEnqueue(() => app.ShowMain());
-        });
+            Application.Start(args =>
+            {
+                SynchronizationContext.SetSynchronizationContext(new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread()));
+                _ = new App();
+            });
+        }
+        finally { PInvoke.OleUninitialize(); }
     }
 }

@@ -7,6 +7,8 @@ namespace ByoGlot.App.Shell;
 
 public static class ClipboardAccess
 {
+    public static bool IsExcluded => new[] { "ExcludeClipboardContentFromMonitorProcessing", "CanIncludeInClipboardHistory" }
+        .Any(name => PInvoke.IsClipboardFormatAvailable(PInvoke.RegisterClipboardFormat(name)));
     public static ClipboardRead ReadChanged(uint previous, uint current, int limit)
         => previous == current ? new ClipboardRead.Empty() : Read(limit, previous, current);
 

@@ -2,6 +2,7 @@ using ByoGlot.App.Services;
 using ByoGlot.App.Shell;
 using ByoGlot.Core.Capture;
 using Microsoft.UI.Xaml;
+using Microsoft.Windows.AppLifecycle;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Win32;
 
@@ -21,6 +22,7 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         Main = new MainWindow();
+        AppInstance.GetCurrent().Activated += (_, _) => Main.DispatcherQueue.TryEnqueue(() => ShowMain());
         messages = new MessageWindow();
         hotKey = new HotKeyService(messages);
         clipboard = new ClipboardListener(messages);
@@ -55,11 +57,16 @@ public partial class App : Application
     public void Copy(string text)
     {
         clipboard.BeginOwnWrites();
-        try { var data = new DataPackage(); data.SetText(text); Clipboard.SetContent(data); }
+        try
+        {
+            var data = new DataPackage(); data.SetText(text);
+            if (!Clipboard.SetContentWithOptions(data, new ClipboardContentOptions { IsAllowedInHistory = false, IsRoamable = false })) return;
+            Clipboard.Flush();
+        }
         finally { clipboard.EndOwnWrites(); }
     }
     private void Quit()
     {
-        quick.Dismiss(); tray.Dispose(); clipboard.Dispose(); hotKey.Dispose(); messages.Dispose(); AppServices.Current.Transport.Dispose(); Exit();
+        quick.Dismiss(); PInvoke.OleFlushClipboard(); Clipboard.Flush(); tray.Dispose(); clipboard.Dispose(); hotKey.Dispose(); messages.Dispose(); AppServices.Current.Transport.Dispose(); Exit();
     }
 }

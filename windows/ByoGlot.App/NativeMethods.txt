@@ -18,6 +18,17 @@ GlobalUnlock
 GlobalSize
 OleGetClipboard
 OleSetClipboard
+OleInitialize
+OleUninitialize
+OleFlushClipboard
+OleDuplicateData
+ReleaseStgMedium
+CreateStreamOnHGlobal
+GlobalAlloc
+GlobalFree
+RegisterWindowMessage
+LoadImage
+DestroyIcon
 CoInitializeEx
 CoUninitialize
 CoCreateInstance
@@ -43,7 +54,6 @@ SetWindowLongPtrW
 GetAsyncKeyState
 GetKeyState
 Shell_NotifyIcon
-LoadIcon
 CreatePopupMenu
 AppendMenu
 TrackPopupMenu
@@ -59,5 +69,4 @@ WM_NULL
 HWND_MESSAGE
 WINDOW_EX_STYLE
 HOT_KEY_MODIFIERS
-IDI_APPLICATION
 TOKEN_ELEVATION

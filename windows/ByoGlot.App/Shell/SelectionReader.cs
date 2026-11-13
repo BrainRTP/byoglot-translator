@@ -29,13 +29,13 @@ public sealed class SelectionReader(Func<bool> fallbackAllowed, ClipboardListene
         if (PInvoke.GetForegroundWindow() != foreground) return new CaptureResult.Nothing();
         if (automation.Private) return new CaptureResult.Clipboard(new ClipboardRead.Concealed());
         if (automation.Text?.Length > InputLimits.Quick) return new CaptureResult.Clipboard(new ClipboardRead.TooLong(InputLimits.Quick));
-        return await CapturePlan.RunAsync(new(false, automation.Text, fallbackAllowed(), () => CopyAndRead(foreground)));
+        return await CapturePlan.RunAsync(new(false, automation.Text, fallbackAllowed(), () => CopyAndRead(foreground), automation.Available));
     }
 
-    private static async Task<(string? Text, bool Private)> AutomationAsync()
+    private static async Task<(string? Text, bool Private, bool Available)> AutomationAsync()
     {
-        if (!AutomationGate.Wait(0)) return (null, false);
-        var completion = new TaskCompletionSource<(string?, bool)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!AutomationGate.Wait(0)) return (null, false, false);
+        var completion = new TaskCompletionSource<(string?, bool, bool)>(TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() =>
         {
             IUIAutomation? automation = null; IUIAutomationElement? element = null; IUIAutomationTextPattern? pattern = null; IUIAutomationTextRangeArray? ranges = null;
@@ -45,9 +45,9 @@ public sealed class SelectionReader(Func<bool> fallbackAllowed, ClipboardListene
             {
                 automation = (IUIAutomation)new CUIAutomation();
                 element = automation.GetFocusedElement();
-                if (element.CurrentIsPassword) { completion.TrySetResult((null, true)); return; }
+                if (element.CurrentIsPassword) { completion.TrySetResult((null, true, true)); return; }
                 pattern = element.GetCurrentPattern(UIA_PATTERN_ID.UIA_TextPatternId) as IUIAutomationTextPattern;
-                if (pattern is null) { completion.TrySetResult((null, false)); return; }
+                if (pattern is null) { completion.TrySetResult((null, false, true)); return; }
                 ranges = pattern.GetSelection();
                 var text = new StringBuilder();
                 for (var i = 0; i < ranges.Length && text.Length <= InputLimits.Quick; i++)
@@ -64,9 +64,9 @@ public sealed class SelectionReader(Func<bool> fallbackAllowed, ClipboardListene
                     }
                     finally { Marshal.ReleaseComObject(range); }
                 }
-                completion.TrySetResult((text.ToString(), false));
+                completion.TrySetResult((text.ToString(), false, true));
             }
-            catch (COMException) { completion.TrySetResult((null, false)); }
+            catch (COMException) { completion.TrySetResult((null, false, false)); }
             finally
             {
                 foreach (var value in new object?[] { ranges, pattern, element, automation }) if (value is not null) Marshal.ReleaseComObject(value);
@@ -76,56 +76,58 @@ public sealed class SelectionReader(Func<bool> fallbackAllowed, ClipboardListene
         }) { IsBackground = true, Name = "ByoGlot selection" };
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        return await Task.WhenAny(completion.Task, Task.Delay(500)) == completion.Task ? await completion.Task : (null, false);
+        return await Task.WhenAny(completion.Task, Task.Delay(500)) == completion.Task ? await completion.Task : (null, false, false);
     }
 
     private async Task<ClipboardRead> CopyAndRead(HWND foreground)
     {
         await copyGate.WaitAsync();
-        IDataObject? previous = null;
-        var copying = false;
         try
         {
             for (var i = 0; i < 30 && ModifiersDown(); i++) await Task.Delay(10);
             if (ModifiersDown() || PInvoke.GetForegroundWindow() != foreground || IsElevated(foreground)) return new ClipboardRead.Empty();
-            if (PInvoke.OleGetClipboard(out previous).Failed) return new ClipboardRead.Empty();
-            clipboard.BeginOwnWrites(); copying = true;
-            var sequence = PInvoke.GetClipboardSequenceNumber();
-            unsafe
-            {
-                INPUT Key(VIRTUAL_KEY key, bool up = false) => new() { type = INPUT_TYPE.INPUT_KEYBOARD, Anonymous = new INPUT._Anonymous_e__Union { ki = new KEYBDINPUT { wVk = key, dwFlags = up ? KEYBD_EVENT_FLAGS.KEYEVENTF_KEYUP : 0 } } };
-                ReadOnlySpan<INPUT> input = [Key(VIRTUAL_KEY.VK_CONTROL), Key(VIRTUAL_KEY.VK_C), Key(VIRTUAL_KEY.VK_C, true), Key(VIRTUAL_KEY.VK_CONTROL, true)];
-                if (PInvoke.SendInput(input, sizeof(INPUT)) != input.Length) return new ClipboardRead.Empty();
-            }
-            for (var i = 0; i < 40 && sequence == PInvoke.GetClipboardSequenceNumber(); i++) await Task.Delay(10);
-            var current = PInvoke.GetClipboardSequenceNumber();
-            clipboard.IgnoreOwnWrite();
-            return ClipboardAccess.ReadChanged(sequence, current, InputLimits.Quick);
+            clipboard.BeginOwnWrites();
+            try { return await ClipboardCopy.RunAsync(new CopyBackend(foreground)); }
+            finally { clipboard.EndOwnWrites(); }
         }
-        finally
+        finally { copyGate.Release(); }
+    }
+
+    private sealed class CopyBackend(HWND foreground) : IClipboardCopyBackend
+    {
+        public uint Sequence => PInvoke.GetClipboardSequenceNumber();
+        public bool IsExcluded => ClipboardAccess.IsExcluded;
+        public IClipboardSnapshot? Snapshot()
         {
+            var sequence = Sequence;
+            if (IsExcluded || PInvoke.OleGetClipboard(out var source).Failed) return null;
             try
             {
-                if (copying)
-                {
-                    try
-                    {
-                        var restored = false;
-                        for (var i = 0; i < 40; i++)
-                        {
-                            if (PInvoke.OleSetClipboard(previous!).Succeeded) { restored = true; break; }
-                            await Task.Delay(10);
-                        }
-                        if (!restored) throw new COMException("Clipboard restoration failed.");
-                    }
-                    finally { clipboard.EndOwnWrites(); }
-                }
+                return source is null ? null : ClipboardSnapshot.Capture(source, () => Sequence == sequence && !IsExcluded);
             }
-            finally
+            finally { if (source is not null) Marshal.ReleaseComObject(source); }
+        }
+        public unsafe bool TryCopy()
+        {
+            if (ModifiersDown() || PInvoke.GetForegroundWindow() != foreground || IsElevated(foreground)) return false;
+            INPUT Key(VIRTUAL_KEY key, bool up = false) => new() { type = INPUT_TYPE.INPUT_KEYBOARD, Anonymous = new INPUT._Anonymous_e__Union { ki = new KEYBDINPUT { wVk = key, dwFlags = up ? KEYBD_EVENT_FLAGS.KEYEVENTF_KEYUP : 0 } } };
+            ReadOnlySpan<INPUT> input = [Key(VIRTUAL_KEY.VK_CONTROL), Key(VIRTUAL_KEY.VK_C), Key(VIRTUAL_KEY.VK_C, true), Key(VIRTUAL_KEY.VK_CONTROL, true)];
+            return PInvoke.SendInput(input, sizeof(INPUT)) == input.Length;
+        }
+        public async Task WaitForChangeAsync(uint previous)
+        {
+            for (var i = 0; i < 40 && previous == Sequence; i++) await Task.Delay(10);
+        }
+        public ClipboardRead ReadChanged(uint previous, uint current) => ClipboardAccess.ReadChanged(previous, current, InputLimits.Quick);
+        public async Task RestoreAsync(IClipboardSnapshot snapshot, uint expectedSequence)
+        {
+            for (var i = 0; i < 40; i++)
             {
-                try { if (previous is not null) Marshal.ReleaseComObject(previous); }
-                finally { copyGate.Release(); }
+                if (Sequence != expectedSequence) return;
+                if (((ClipboardSnapshot)snapshot).Publish()) return;
+                await Task.Delay(10);
             }
+            throw new COMException("Clipboard restoration failed.");
         }
     }
 

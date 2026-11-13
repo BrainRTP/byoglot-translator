@@ -17,6 +17,23 @@ fn sample_decodes_and_round_trips() {
     );
 }
 #[test]
+fn imports_new_provider_presets() {
+    for preset in [ProviderPreset::Openai, ProviderPreset::Mistral] {
+        let mut value = sample();
+        value["connections"] = json!([{
+            "id": "new-provider",
+            "preset": preset,
+            "name": preset.wire(),
+            "baseUrl": contracts::presets()[&preset].base_url,
+        }]);
+        let file = ExportFile::decode(&value.to_string()).unwrap();
+        let base_url = file.connections[0].base_url.clone();
+        let state = merge_export(file, AppSettings::initial(None));
+        assert_eq!(state.connections[0].preset, preset);
+        assert_eq!(state.connections[0].base_url, base_url);
+    }
+}
+#[test]
 fn rejects_other_formats_versions_unknown_keys_and_invalid_timestamps() {
     for (field, value) in [
         ("format", json!("other")),

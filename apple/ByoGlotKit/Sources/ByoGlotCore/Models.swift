@@ -1,5 +1,5 @@
 public enum ProviderPreset: String, Codable, Hashable, CaseIterable, Sendable {
-    case deepseek, openrouter, ollama, lmstudio, custom
+    case deepseek, openrouter, openai, mistral, ollama, lmstudio, custom
 }
 
 public enum DisplayMode: String, Codable, Hashable, Sendable {

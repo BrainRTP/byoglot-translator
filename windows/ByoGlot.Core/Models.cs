@@ -22,6 +22,8 @@ public enum ProviderPreset
 {
     [JsonStringEnumMemberName("deepseek")] Deepseek,
     [JsonStringEnumMemberName("openrouter")] Openrouter,
+    [JsonStringEnumMemberName("openai")] Openai,
+    [JsonStringEnumMemberName("mistral")] Mistral,
     [JsonStringEnumMemberName("ollama")] Ollama,
     [JsonStringEnumMemberName("lmstudio")] Lmstudio,
     [JsonStringEnumMemberName("custom")] Custom

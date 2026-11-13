@@ -134,7 +134,10 @@ class ConnectionEditorTest {
 
     @Test
     fun phone_list_comes_from_nonlocal_contract_presets() {
-        assertEquals(listOf(ProviderPreset.deepseek, ProviderPreset.openrouter), phonePresets())
+        assertEquals(
+            listOf(ProviderPreset.deepseek, ProviderPreset.openrouter, ProviderPreset.openai, ProviderPreset.mistral),
+            phonePresets(),
+        )
     }
 
     @Test

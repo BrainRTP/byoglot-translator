@@ -14,7 +14,7 @@ public sealed record ExportFile(string Format, int Version, string ExportedAt, P
         if (document.RootElement.TryGetProperty("connections", out var connections) && connections.ValueKind == JsonValueKind.Array)
             foreach (var connection in connections.EnumerateArray())
                 if (connection.ValueKind == JsonValueKind.Object && connection.TryGetProperty("preset", out var preset)
-                    && (preset.ValueKind != JsonValueKind.String || preset.GetString() is not ("deepseek" or "openrouter" or "ollama" or "lmstudio" or "custom")))
+                    && (preset.ValueKind != JsonValueKind.String || preset.GetString() is not ("deepseek" or "openrouter" or "openai" or "mistral" or "ollama" or "lmstudio" or "custom")))
                     throw new JsonException("Unknown provider preset.");
         if (document.RootElement.TryGetProperty("templates", out var templates) && templates.ValueKind == JsonValueKind.Array)
             foreach (var template in templates.EnumerateArray())

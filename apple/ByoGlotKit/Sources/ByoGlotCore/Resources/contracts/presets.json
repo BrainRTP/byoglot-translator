@@ -8,6 +8,14 @@
       "baseUrl": "https://openrouter.ai/api/v1",
       "needsKey": true
     },
+    "openai": {
+      "baseUrl": "https://api.openai.com/v1",
+      "needsKey": true
+    },
+    "mistral": {
+      "baseUrl": "https://api.mistral.ai/v1",
+      "needsKey": true
+    },
     "ollama": {
       "baseUrl": "http://localhost:11434/v1",
       "needsKey": false

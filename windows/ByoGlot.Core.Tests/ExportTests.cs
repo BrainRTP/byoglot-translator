@@ -17,6 +17,19 @@ public class ExportTests
     }
 
     [Theory]
+    [InlineData(ProviderPreset.Openai)]
+    [InlineData(ProviderPreset.Mistral)]
+    public void ImportsNewProviderPresets(ProviderPreset preset)
+    {
+        var value = JsonNode.Parse(Sample)!;
+        value["connections"] = JsonSerializer.SerializeToNode(new[] { new ExportConnection("new-provider", preset, preset.ToString(), Contracts.Presets[preset].BaseUrl) }, CoreJson.Options);
+        var file = ExportFile.Decode(value.ToJsonString());
+        var state = SettingsLogic.Merge(file, AppSettings.Initial("en"));
+        Assert.Equal(preset, Assert.Single(state.Connections).Preset);
+        Assert.Equal(file.Connections[0].BaseUrl, state.Connections[0].BaseUrl);
+    }
+
+    [Theory]
     [InlineData("format", "other")]
     [InlineData("version", 2)]
     public void OtherFormatsAndVersionsAreRejected(string key, object value)

@@ -87,26 +87,38 @@ public sealed class SelectionReader(Func<bool> fallbackAllowed, ClipboardListene
             for (var i = 0; i < 30 && ModifiersDown(); i++) await Task.Delay(10);
             if (ModifiersDown() || PInvoke.GetForegroundWindow() != foreground || IsElevated(foreground)) return new ClipboardRead.Empty();
             clipboard.BeginOwnWrites();
-            try { return await ClipboardCopy.RunAsync(new CopyBackend(foreground)); }
+            try { return await ClipboardCopy.RunAsync(new CopyBackend(foreground, clipboard.Handle)); }
             finally { clipboard.EndOwnWrites(); }
         }
         finally { copyGate.Release(); }
     }
 
-    private sealed class CopyBackend(HWND foreground) : IClipboardCopyBackend
+    private sealed class CopyBackend(HWND foreground, HWND clipboardWindow) : IClipboardCopyBackend
     {
-        public uint Sequence => PInvoke.GetClipboardSequenceNumber();
+        public uint SourceProcessId { get; } = WindowProcess(foreground);
+        public ClipboardVersion Current => ClipboardAccess.Current;
         public bool IsExcluded => ClipboardAccess.IsExcluded;
-        public IClipboardSnapshot? Snapshot()
+        public Task<ClipboardBackup?> SnapshotAsync(CancellationToken cancellation) => ClipboardThread.Run<ClipboardBackup?>(() =>
         {
-            var sequence = Sequence;
+            var before = ClipboardAccess.ReadCurrent(InputLimits.Quick);
+            if (before is null || before.Read is ClipboardRead.Concealed) return null;
             if (IsExcluded || PInvoke.OleGetClipboard(out var source).Failed) return null;
             try
             {
-                return source is null ? null : ClipboardSnapshot.Capture(source, () => Sequence == sequence && !IsExcluded);
+                if (source is null) return null;
+                var snapshot = ClipboardSnapshot.Capture(source, () =>
+                {
+                    var current = ClipboardAccess.Version(false);
+                    return !cancellation.IsCancellationRequested && current.Owner == before.Identity.Owner && current.ProcessId == before.Identity.ProcessId && !IsExcluded;
+                });
+                if (snapshot is null) return null;
+                var after = ClipboardAccess.ReadCurrent(InputLimits.Quick);
+                if (cancellation.IsCancellationRequested || after is null || !ClipboardCopy.Matches(before.Identity, after.Identity)) { snapshot.Dispose(); return null; }
+                return new(snapshot, after.Identity);
             }
             finally { if (source is not null) Marshal.ReleaseComObject(source); }
-        }
+        }, null, cancellation);
+        public Task<ClipboardContent?> ReadAsync(CancellationToken cancellation) => ClipboardThread.Run(() => ClipboardAccess.ReadCurrent(InputLimits.Quick), null, cancellation);
         public unsafe bool TryCopy()
         {
             if (ModifiersDown() || PInvoke.GetForegroundWindow() != foreground || IsElevated(foreground)) return false;
@@ -114,22 +126,31 @@ public sealed class SelectionReader(Func<bool> fallbackAllowed, ClipboardListene
             ReadOnlySpan<INPUT> input = [Key(VIRTUAL_KEY.VK_CONTROL), Key(VIRTUAL_KEY.VK_C), Key(VIRTUAL_KEY.VK_C, true), Key(VIRTUAL_KEY.VK_CONTROL, true)];
             return PInvoke.SendInput(input, sizeof(INPUT)) == input.Length;
         }
-        public async Task WaitForChangeAsync(uint previous)
+        public Task DelayAsync(int milliseconds) => Task.Delay(milliseconds);
+        public async Task<ClipboardRestoreResult> RestoreAsync(IClipboardSnapshot snapshot, ClipboardIdentity expected, CancellationToken cancellation)
         {
-            for (var i = 0; i < 40 && previous == Sequence; i++) await Task.Delay(10);
-        }
-        public ClipboardRead ReadChanged(uint previous, uint current) => ClipboardAccess.ReadChanged(previous, current, InputLimits.Quick);
-        public async Task RestoreAsync(IClipboardSnapshot snapshot, uint expectedSequence)
-        {
-            for (var i = 0; i < 40; i++)
+            using var lease = ((ClipboardSnapshot)snapshot).Retain();
+            return await ClipboardThread.Run(() =>
             {
-                if (Sequence != expectedSequence) return;
-                if (((ClipboardSnapshot)snapshot).Publish()) return;
-                await Task.Delay(10);
-            }
-            throw new COMException("Clipboard restoration failed.");
+                for (var i = 0; i < 40; i++)
+                {
+                    if (cancellation.IsCancellationRequested) return ClipboardRestoreResult.Failed;
+                    var restored = ((ClipboardSnapshot)snapshot).Publish(clipboardWindow, () =>
+                    {
+                        var current = ClipboardAccess.ReadLocked(InputLimits.Quick);
+                        if (current is null) return ClipboardRestoreResult.Failed;
+                        return ClipboardCopy.Matches(expected, current.Identity) && current.Read is not ClipboardRead.Concealed
+                            ? ClipboardRestoreResult.Restored : ClipboardRestoreResult.Superseded;
+                    }, cancellation);
+                    if (restored != ClipboardRestoreResult.Failed) return restored;
+                    Thread.Sleep(10);
+                }
+                return ClipboardRestoreResult.Failed;
+            }, ClipboardRestoreResult.Failed, cancellation);
         }
     }
+
+    private static unsafe uint WindowProcess(HWND window) { uint process; PInvoke.GetWindowThreadProcessId(window, &process); return process; }
 
     private static bool ModifiersDown() => new[] { VIRTUAL_KEY.VK_CONTROL, VIRTUAL_KEY.VK_MENU, VIRTUAL_KEY.VK_SHIFT, VIRTUAL_KEY.VK_LWIN, VIRTUAL_KEY.VK_RWIN }.Any(key => PInvoke.GetAsyncKeyState((int)key) < 0);
     private static unsafe bool IsElevated(HWND foreground)

@@ -24,6 +24,7 @@
     <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
     <Compile Include="../ByoGlot.App/Services/DpapiSecretStore.cs" Link="Services/DpapiSecretStore.cs" />
     <Compile Include="../ByoGlot.App/Shell/ClipboardSnapshot.cs" Link="Shell/ClipboardSnapshot.cs" />
+    <Compile Include="../ByoGlot.App/Shell/ClipboardAccess.cs" Link="Shell/ClipboardAccess.cs" />
     <AdditionalFiles Include="../ByoGlot.App/NativeMethods.txt" />
   </ItemGroup>
   <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))"><Compile Remove="DpapiSecretStoreTests.cs;ClipboardSnapshotTests.cs" /></ItemGroup>

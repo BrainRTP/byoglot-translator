@@ -101,4 +101,5 @@
   <data name="Effort_medium" xml:space="preserve"><value>Средний</value></data>
   <data name="Effort_high" xml:space="preserve"><value>Высокий</value></data>
   <data name="ProviderFailure" xml:space="preserve"><value>неожиданный ответ</value></data>
+  <data name="Quick_ClipboardRestoreFailed" xml:space="preserve"><value>ByoGlot не смог восстановить буфер обмена. Проверьте его содержимое перед вставкой.</value></data>
 </root>

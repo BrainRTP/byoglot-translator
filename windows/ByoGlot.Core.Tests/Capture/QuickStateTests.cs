@@ -32,6 +32,7 @@ public class QuickStateTests
             (new QuickEvent.Clipboard(new ClipboardRead.Empty(), 1), "Quick_NoText"),
             (new QuickEvent.Clipboard(new ClipboardRead.Concealed(), 1), "Quick_Private"),
             (new QuickEvent.Clipboard(new ClipboardRead.TooLong(5000), 1), "Quick_TooLong"),
+            (new QuickEvent.Clipboard(new ClipboardRead.RestoreFailed(), 1), "Quick_ClipboardRestoreFailed"),
             (new QuickEvent.Captured(new CaptureResult.Clipboard(new ClipboardRead.Concealed()), 1), "Quick_Private"),
             (new QuickEvent.Captured(new CaptureResult.Clipboard(new ClipboardRead.TooLong(5000)), 1), "Quick_TooLong")
         ];

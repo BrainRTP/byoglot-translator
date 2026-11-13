@@ -70,3 +70,7 @@ HWND_MESSAGE
 WINDOW_EX_STYLE
 HOT_KEY_MODIFIERS
 TOKEN_ELEVATION
+GetClipboardOwner
+EnumClipboardFormats
+EmptyClipboard
+SetClipboardData

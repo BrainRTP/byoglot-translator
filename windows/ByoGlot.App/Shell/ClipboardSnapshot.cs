@@ -16,7 +16,19 @@ public sealed class ClipboardSnapshot : IDataObject, IClipboardSnapshot
     private const int FormatError = unchecked((int)0x80040064);
     private const int NoAdvise = unchecked((int)0x80040003);
     private readonly List<Entry> entries = [];
-    private bool published;
+    private int references = 1;
+    private int disposed;
+    internal IDisposable Retain()
+    {
+        Interlocked.Increment(ref references);
+        return new Lease(this);
+    }
+    private sealed class Lease(ClipboardSnapshot snapshot) : IDisposable
+    {
+        private ClipboardSnapshot? value = snapshot;
+        public void Dispose() => Interlocked.Exchange(ref value, null)?.ReleaseReference();
+    }
+    private void ReleaseReference() { if (Interlocked.Decrement(ref references) == 0) FreeEntries(); }
 
     private sealed class Entry(FORMATETC format, byte[]? bytes, STGMEDIUM native) : IDisposable
     {
@@ -63,12 +75,13 @@ public sealed class ClipboardSnapshot : IDataObject, IClipboardSnapshot
                 var format = next[0];
                 try
                 {
-                    if (format.ptd != IntPtr.Zero || format.lindex != -1 || format.dwAspect != DVASPECT.DVASPECT_CONTENT || canRead?.Invoke() == false) throw new COMException("Clipboard snapshot is unavailable.");
+                    if (format.ptd != IntPtr.Zero || format.lindex != -1 || format.dwAspect != DVASPECT.DVASPECT_CONTENT || unchecked((ushort)format.cfFormat) is >= 0x0200 and <= 0x02ff || canRead?.Invoke() == false) throw new COMException("Clipboard snapshot is unavailable.");
                     format.tymed &= TYMED.TYMED_HGLOBAL | TYMED.TYMED_ISTREAM | TYMED.TYMED_GDI | TYMED.TYMED_MFPICT | TYMED.TYMED_ENHMF;
                     if (format.tymed == TYMED.TYMED_NULL) throw new COMException("Clipboard format is unsupported.");
                     source.GetData(ref format, out var medium);
                     try
                     {
+                        if (canRead?.Invoke() == false) throw new COMException("Clipboard snapshot is unavailable.");
                         byte[]? bytes = medium.tymed switch
                         {
                             TYMED.TYMED_HGLOBAL => ReadGlobal(medium.unionmember),
@@ -115,14 +128,48 @@ public sealed class ClipboardSnapshot : IDataObject, IClipboardSnapshot
             foreach (var old in entries.Where(e => e.Format.cfFormat == id).ToArray()) { old.Dispose(); entries.Remove(old); }
             entries.Add(new(new() { cfFormat = id, dwAspect = DVASPECT.DVASPECT_CONTENT, lindex = -1, tymed = TYMED.TYMED_HGLOBAL }, new byte[4], default));
         }
+        var own = unchecked((short)PInvoke.RegisterClipboardFormat(ClipboardAccess.OwnFormat));
+        foreach (var old in entries.Where(e => e.Format.cfFormat == own).ToArray()) { old.Dispose(); entries.Remove(old); }
+        entries.Add(new(new() { cfFormat = own, dwAspect = DVASPECT.DVASPECT_CONTENT, lindex = -1, tymed = TYMED.TYMED_HGLOBAL }, ClipboardAccess.OwnMarker.ToArray(), default));
     }
 
-    public bool Publish()
+    public static ClipboardSnapshot Text(string text)
     {
-        if (PInvoke.OleSetClipboard(this).Failed) return false;
-        published = true;
-        if (PInvoke.OleFlushClipboard().Succeeded) published = false;
-        return true;
+        var snapshot = new ClipboardSnapshot();
+        snapshot.entries.Add(new(new() { cfFormat = 13, dwAspect = DVASPECT.DVASPECT_CONTENT, lindex = -1, tymed = TYMED.TYMED_HGLOBAL }, System.Text.Encoding.Unicode.GetBytes(text + '\0'), default));
+        snapshot.ExcludeHistory();
+        return snapshot;
+    }
+
+    internal unsafe ClipboardRestoreResult Publish(HWND owner, Func<ClipboardRestoreResult>? validate = null, CancellationToken cancellation = default)
+    {
+        var prepared = new List<(uint Format, STGMEDIUM Medium)>();
+        try
+        {
+            foreach (var entry in entries.DistinctBy(e => e.Format.cfFormat))
+                prepared.Add((unchecked((ushort)entry.Format.cfFormat), entry.Materialize(entry.Bytes is null ? entry.Format.tymed : TYMED.TYMED_HGLOBAL)));
+            if (cancellation.IsCancellationRequested || !PInvoke.OpenClipboard(owner)) return ClipboardRestoreResult.Failed;
+            try
+            {
+                var valid = validate?.Invoke() ?? ClipboardRestoreResult.Restored;
+                if (valid != ClipboardRestoreResult.Restored) return valid;
+                if (cancellation.IsCancellationRequested || !PInvoke.EmptyClipboard()) return ClipboardRestoreResult.Failed;
+                for (var i = 0; i < prepared.Count; i++)
+                {
+                    var item = prepared[i];
+                    if (PInvoke.SetClipboardData(item.Format, new HANDLE(item.Medium.unionmember)).IsNull) return ClipboardRestoreResult.Failed;
+                    prepared[i] = (item.Format, default);
+                }
+                ClipboardAccess.MarkOwn();
+                return ClipboardRestoreResult.Restored;
+            }
+            finally { PInvoke.CloseClipboard(); }
+        }
+        catch (COMException) { return ClipboardRestoreResult.Failed; }
+        finally
+        {
+            foreach (var item in prepared) { var medium = item.Medium; if (medium.tymed != TYMED.TYMED_NULL) Release(ref medium); }
+        }
     }
 
     internal static unsafe HGLOBAL Allocate(byte[] bytes)
@@ -193,7 +240,7 @@ public sealed class ClipboardSnapshot : IDataObject, IClipboardSnapshot
     public void DUnadvise(int connection) => throw new COMException("Clipboard advice is unsupported.", NoAdvise);
     public int EnumDAdvise(out IEnumSTATDATA enumerator) { enumerator = null!; return NoAdvise; }
     public override string ToString() => "ClipboardSnapshot { [redacted] }";
-    public void Dispose() { if (published) return; FreeEntries(); GC.SuppressFinalize(this); }
+    public void Dispose() { if (Interlocked.Exchange(ref disposed, 1) == 0) ReleaseReference(); GC.SuppressFinalize(this); }
     private void FreeEntries() { foreach (var entry in entries) entry.Dispose(); entries.Clear(); }
     ~ClipboardSnapshot() => FreeEntries();
 }

@@ -101,4 +101,5 @@
   <data name="Effort_medium" xml:space="preserve"><value>Medium</value></data>
   <data name="Effort_high" xml:space="preserve"><value>High</value></data>
   <data name="ProviderFailure" xml:space="preserve"><value>unexpected response</value></data>
+  <data name="Quick_ClipboardRestoreFailed" xml:space="preserve"><value>ByoGlot could not restore the clipboard. Check its contents before pasting.</value></data>
 </root>

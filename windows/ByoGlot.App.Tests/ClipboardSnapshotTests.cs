@@ -42,6 +42,23 @@ public class ClipboardSnapshotTests
     }
 
     [Fact] public void FailedEnumerationNeverPublishesAPartialSnapshot() => Assert.Null(ClipboardSnapshot.Capture(new Source(false, true)));
+    [Fact] public void APrivacyChangeDuringRenderingAbandonsTheSnapshot()
+    {
+        var checks = 0;
+        Assert.Null(ClipboardSnapshot.Capture(new Source(false), () => ++checks == 1));
+    }
+    [Fact] public void AnInFlightRestoreKeepsTheSnapshotAliveAfterCallerTimeout()
+    {
+        var source = new Source(false);
+        var snapshot = ClipboardSnapshot.Capture(source);
+        Assert.NotNull(snapshot);
+        var format = source.Format;
+        var lease = snapshot.Retain();
+        snapshot.Dispose();
+        Assert.Equal(0, snapshot.QueryGetData(ref format));
+        lease.Dispose();
+        Assert.NotEqual(0, snapshot.QueryGetData(ref format));
+    }
 
     [Theory]
     [InlineData(false)]

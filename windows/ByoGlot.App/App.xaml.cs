@@ -59,9 +59,8 @@ public partial class App : Application
         clipboard.BeginOwnWrites();
         try
         {
-            var data = new DataPackage(); data.SetText(text);
-            if (!Clipboard.SetContentWithOptions(data, new ClipboardContentOptions { IsAllowedInHistory = false, IsRoamable = false })) return;
-            Clipboard.Flush();
+            using var snapshot = ClipboardSnapshot.Text(text);
+            snapshot.Publish(clipboard.Handle);
         }
         finally { clipboard.EndOwnWrites(); }
     }

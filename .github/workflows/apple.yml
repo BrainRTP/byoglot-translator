@@ -26,7 +26,8 @@ jobs:
         with:
           fetch-depth: 0
       - run: xcodebuild -version
-      - run: brew install xcodegen
+      - run: apple/scripts/test-app-version.sh
+      - run: apple/scripts/install-xcodegen.sh
       - run: xcodegen generate
         working-directory: apple
       - run: xcodebuild -project ByoGlot.xcodeproj -scheme ByoGlotiOS -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build

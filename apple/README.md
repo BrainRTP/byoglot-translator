@@ -28,8 +28,10 @@ xcodegen generate
 xcodebuild -project ByoGlot.xcodeproj -scheme ByoGlotiOS -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
-The generated project is ignored. The app version comes from the root `package.json`, and a build phase sets the build number from the full Git history. CI fetches that history and pins Xcode 27.1 on the `xcode-27` image.
+The generated project is ignored. The app version comes from the root `package.json`, and a build phase sets the build number from the full Git history. CI fetches that history and pins Xcode 27.1 and checksum-verified XcodeGen 2.46.0 on the `xcode-27` image. Shallow clones and source archives must set an explicit positive `BUILD_NUMBER`.
 
-`ByoGlotAppKit.AppModel` owns translation timing, request identity, language selection and provider state. Shared SwiftUI components live in `DesignSystem/` and screens in `Views/`. Text and keys stay in memory; only settings use the App Group container, and keys use the shared Keychain group. The app does not read external text, URLs or user activities. It hides content when inactive and stops a running translation.
+`ByoGlotAppKit.AppModel` owns translation timing, request identity, language selection and provider state. Shared SwiftUI components live in `DesignSystem/` and screens in `Views/`. Editor text and key drafts stay in memory; settings use the App Group container, and saved keys use the shared Keychain group. The app does not read external text, URLs or user activities. A separate window hides content when inactive; an active translation continues in the background under an expiring system task assertion, and interruption keeps partial text with a Retry action.
 
 The current app includes the main translator and provider setup. The parameter, model and language sheets, settings sections and export/import controls belong to the next part; the current language and template menus and simple model list are temporary native choices. No extension targets are included.
+
+Part B can add import through `fileImporter` alone or register a single-component extension such as `.byoglot`; `.byoglot.json` cannot be registered as a filename extension. Part A registers no document types or exported UTIs.

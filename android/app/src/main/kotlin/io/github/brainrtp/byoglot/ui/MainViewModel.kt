@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.brainrtp.byoglot.core.*
 import java.time.Instant
+import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -40,6 +41,9 @@ class MainViewModel(
     stream: ((RunnerInput) -> Flow<RunnerStreamOutput>)? = null,
     private val networkOnline: () -> Boolean = { true },
     private val nowMs: () -> Long = System::currentTimeMillis,
+    private val sourceLanguageDetector: SourceLanguageDetector = SourceLanguageDetector {
+        emptyList()
+    },
 ) : ViewModel() {
     private val workScope = scope ?: viewModelScope
     private val translationRunner = TranslationRunner(repository, secrets, transport)
@@ -51,8 +55,9 @@ class MainViewModel(
     private val mutableParameters = MutableStateFlow(MainParameters())
     val parameters = mutableParameters.asStateFlow()
     private var manualTarget: String? = null
-    private var networkAvailable = true
+    private var networkAvailable = false
     private var autoJob: Job? = null
+    private var detectionJob: Job? = null
     val editor = ConnectionEditor(repository, secrets, transport)
     private val mutableSettings = MutableStateFlow<AppSettings?>(null)
     val settings = mutableSettings.asStateFlow()
@@ -121,6 +126,10 @@ class MainViewModel(
                 sourceLang = state.globals.sourceLang,
                 targetLang = target,
                 changed = target != effective.targetLang,
+                detectedSourceLang =
+                    if (state.globals.sourceLang == "auto")
+                        mutableParameters.value.detectedSourceLang
+                    else null,
             )
     }
 
@@ -128,6 +137,7 @@ class MainViewModel(
         if (text == mutableText.value) return
         cancel()
         mutableText.value = text
+        mutableParameters.value = mutableParameters.value.copy(detectedSourceLang = null)
         mutableTranslation.value = TranslationState()
         schedule()
     }
@@ -163,6 +173,8 @@ class MainViewModel(
         autoJob?.cancel()
         val id = ++identity
         job?.cancel()
+        detectionJob?.cancel()
+        mutableParameters.value = mutableParameters.value.copy(detectedSourceLang = null)
         val params = mutableParameters.value
         val input =
             RunnerInput(
@@ -177,8 +189,7 @@ class MainViewModel(
             when {
                 text.isBlank() -> RunnerError.Empty
                 InputCounter.editor(text).overLimit -> RunnerError.TooLong(EDITOR_INPUT_LIMIT)
-                !networkAvailable || !networkOnline() ->
-                    RunnerError.Backend(BackendException(ErrorKind.Offline))
+                !networkOnline() -> RunnerError.Backend(BackendException(ErrorKind.Offline))
                 else -> null
             }
         if (validation != null) {
@@ -188,16 +199,24 @@ class MainViewModel(
         mutableTranslation.value = TranslationState(working = true)
         job = workScope.launch {
             try {
-                streamRunner(input).collect { chunk ->
-                    if (id == identity)
-                        mutableTranslation.value =
-                            TranslationState(
-                                working = !chunk.complete,
-                                output = chunk.output,
-                                complete = chunk.complete,
-                                incomplete = chunk.incomplete,
-                            )
-                }
+                var latest: RunnerStreamOutput? = null
+                streamRunner(input)
+                    .map { chunk ->
+                        latest = chunk
+                        Result.success(chunk)
+                    }
+                    .catch { error ->
+                        if (error is CancellationException) throw error
+                        emit(Result.failure(error))
+                    }
+                    .conflate()
+                    .collect { event ->
+                        val chunk = event.getOrElse { error ->
+                            latest?.let { applyChunk(id, input, it) }
+                            throw error
+                        }
+                        applyChunk(id, input, chunk)
+                    }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: RunnerException) {
@@ -222,7 +241,48 @@ class MainViewModel(
         }
     }
 
-    fun isNetworkOnline() = networkAvailable && networkOnline()
+    private fun applyChunk(id: Long, input: RunnerInput, chunk: RunnerStreamOutput) {
+        if (id != identity) return
+        mutableTranslation.value =
+            TranslationState(
+                working = !chunk.complete,
+                output = chunk.output,
+                complete = chunk.complete,
+                incomplete = chunk.incomplete,
+            )
+        if (chunk.complete && input.sourceLang == "auto") {
+            detectionJob = workScope.launch {
+                val detected =
+                    try {
+                        confidentSource(sourceLanguageDetector.detect(input.text))
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: RuntimeException) {
+                        null
+                    }
+                if (
+                    id == identity &&
+                        mutableText.value == input.text &&
+                        parameters.value.sourceLang == "auto"
+                ) {
+                    mutableParameters.value =
+                        mutableParameters.value.copy(detectedSourceLang = detected)
+                }
+            }
+        }
+    }
+
+    private fun confidentSource(candidates: List<LanguageHypothesis>): String? {
+        val top =
+            candidates
+                .filter { it.confidence.isFinite() && it.confidence in 0f..1f }
+                .maxByOrNull { it.confidence } ?: return null
+        if (top.confidence < SOURCE_LANGUAGE_CONFIDENCE) return null
+        val language = Locale.forLanguageTag(top.languageTag).language.lowercase(Locale.ROOT)
+        return language.takeIf { it in Contracts.languageCodes }
+    }
+
+    fun isNetworkOnline() = networkOnline()
 
     fun setNetworkAvailable(available: Boolean) {
         val restored = !networkAvailable && available
@@ -237,6 +297,7 @@ class MainViewModel(
                 )
         } else if (
             restored &&
+                mutableSettings.value?.autoTranslate == true &&
                 (mutableTranslation.value.error as? RunnerError.Backend)?.error?.kind ==
                     ErrorKind.Offline &&
                 text.value.isNotBlank()
@@ -248,6 +309,7 @@ class MainViewModel(
         identity++
         autoJob?.cancel()
         job?.cancel()
+        detectionJob?.cancel()
         mutableTranslation.value = mutableTranslation.value.copy(working = false)
     }
 
@@ -280,6 +342,8 @@ class MainViewModel(
 
     suspend fun setSourceLanguage(code: String) {
         if (code != "auto" && code !in Contracts.languageCodes) return
+        cancel()
+        mutableParameters.value = mutableParameters.value.copy(detectedSourceLang = null)
         update { it.copy(globals = it.globals.copy(sourceLang = code)) }
         schedule()
     }
@@ -412,6 +476,7 @@ class MainViewModel(
 
     companion object {
         const val AUTO_TRANSLATE_DELAY_MS = 800L
+        const val SOURCE_LANGUAGE_CONFIDENCE = 0.8f
         private val portableJson = Json {
             explicitNulls = false
             encodeDefaults = true

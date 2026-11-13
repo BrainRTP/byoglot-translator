@@ -86,6 +86,7 @@ class MainFlowTest {
     @Test
     fun `offline never calls runner and reconnect retries latest text`() = runTest {
         val calls = mutableListOf<String>()
+        var online = true
         val vm =
             MainViewModel(
                 InMemorySettingsRepository(AppSettings.initial("en")),
@@ -96,8 +97,10 @@ class MainFlowTest {
                     calls.add(it.text)
                     output(it)
                 },
+                networkOnline = { online },
             )
         runCurrent()
+        online = false
         vm.setNetworkAvailable(false)
         vm.paste("source")
         runCurrent()
@@ -106,6 +109,7 @@ class MainFlowTest {
         vm.setText("latest")
         advanceTimeBy(801)
         runCurrent()
+        online = true
         vm.setNetworkAvailable(true)
         runCurrent()
         assertEquals(listOf("latest"), calls)
@@ -430,4 +434,182 @@ class MainFlowTest {
             runCurrent()
             assertEquals(2, calls)
         }
+
+    @Test
+    fun `a cached offline callback cannot override the request time network check`() = runTest {
+        var calls = 0
+        val vm =
+            MainViewModel(
+                InMemorySettingsRepository(AppSettings.initial("en").copy(autoTranslate = false)),
+                InMemorySecretStore(),
+                transport,
+                backgroundScope,
+                { input ->
+                    calls++
+                    output(input)
+                },
+                networkOnline = { true },
+            )
+        runCurrent()
+        vm.setNetworkAvailable(false)
+        vm.translate("source")
+        runCurrent()
+        assertEquals(1, calls)
+        assertTrue(vm.isNetworkOnline())
+    }
+
+    @Test
+    fun `manual mode never retries automatically after reconnect`() = runTest {
+        var online = false
+        var calls = 0
+        val vm =
+            MainViewModel(
+                InMemorySettingsRepository(AppSettings.initial("en").copy(autoTranslate = false)),
+                InMemorySecretStore(),
+                transport,
+                backgroundScope,
+                { input ->
+                    calls++
+                    output(input)
+                },
+                networkOnline = { online },
+            )
+        runCurrent()
+        vm.setText("source")
+        vm.setNetworkAvailable(false)
+        vm.translate()
+        runCurrent()
+        online = true
+        vm.setNetworkAvailable(true)
+        runCurrent()
+        assertEquals(0, calls)
+        vm.translate()
+        runCurrent()
+        assertEquals(1, calls)
+    }
+
+    @Test
+    fun `burst updates are coalesced while the final answer is delivered`() = runTest {
+        val vm =
+            MainViewModel(
+                InMemorySettingsRepository(AppSettings.initial("en").copy(autoTranslate = false)),
+                InMemorySecretStore(),
+                transport,
+                backgroundScope,
+                stream = { input ->
+                    flow {
+                        repeat(1000) {
+                            emit(
+                                RunnerStreamOutput(output(input).copy(text = "partial $it"), false),
+                            )
+                        }
+                        emit(RunnerStreamOutput(output(input).copy(text = "final"), true))
+                    }
+                },
+            )
+        var updates = 0
+        vm.translation.onEach { updates++ }.launchIn(backgroundScope)
+        runCurrent()
+        vm.translate("source")
+        runCurrent()
+        assertTrue(vm.translation.value.complete)
+        assertEquals("final", vm.translation.value.output?.text)
+        assertTrue(updates < 20)
+    }
+
+    @Test
+    fun `confident top platform language maps to the app list and enables Auto swap`() = runTest {
+        var detectedText = ""
+        val vm =
+            MainViewModel(
+                InMemorySettingsRepository(AppSettings.initial("ru").copy(autoTranslate = false)),
+                InMemorySecretStore(),
+                transport,
+                backgroundScope,
+                { output(it) },
+                sourceLanguageDetector =
+                    SourceLanguageDetector { text ->
+                        detectedText = text
+                        listOf(LanguageHypothesis("en-US", .95f))
+                    },
+            )
+        runCurrent()
+        vm.setText("source text")
+        vm.translate()
+        runCurrent()
+        assertEquals("source text", detectedText)
+        assertEquals("en", vm.parameters.value.detectedSourceLang)
+        assertTrue(vm.parameters.value.canSwap)
+        vm.swap()
+        assertEquals("ru", vm.parameters.value.sourceLang)
+        assertEquals("en", vm.parameters.value.targetLang)
+        assertEquals("translated", vm.text.value)
+        assertEquals("source text", vm.translation.value.output?.text)
+    }
+
+    @Test
+    fun `uncertain unsupported and absent platform languages leave Auto swap disabled`() = runTest {
+        for (hypotheses in
+            listOf(
+                emptyList(),
+                listOf(LanguageHypothesis("en", .79f)),
+                listOf(LanguageHypothesis("zz", .99f), LanguageHypothesis("en", .98f)),
+            )) {
+            val vm =
+                MainViewModel(
+                    InMemorySettingsRepository(
+                        AppSettings.initial("ru").copy(autoTranslate = false),
+                    ),
+                    InMemorySecretStore(),
+                    transport,
+                    backgroundScope,
+                    { output(it) },
+                    sourceLanguageDetector = SourceLanguageDetector { hypotheses },
+                )
+            runCurrent()
+            vm.setText("source")
+            vm.translate()
+            runCurrent()
+            assertNull(vm.parameters.value.detectedSourceLang)
+            assertFalse(vm.parameters.value.canSwap)
+        }
+    }
+
+    @Test
+    fun `late platform detection cannot attach to a newer source or request`() = runTest {
+        val vm =
+            MainViewModel(
+                InMemorySettingsRepository(AppSettings.initial("en").copy(autoTranslate = false)),
+                InMemorySecretStore(),
+                transport,
+                backgroundScope,
+                { output(it) },
+                sourceLanguageDetector =
+                    SourceLanguageDetector { text ->
+                        if (text == "old") {
+                            withContext(NonCancellable) { delay(100) }
+                            listOf(LanguageHypothesis("ru", .99f))
+                        } else
+                            listOf(
+                                LanguageHypothesis(
+                                    "zh-Hant-TW",
+                                    MainViewModel.SOURCE_LANGUAGE_CONFIDENCE,
+                                ),
+                            )
+                    },
+            )
+        runCurrent()
+        vm.setText("old")
+        vm.translate()
+        runCurrent()
+        vm.setText("new")
+        assertNull(vm.parameters.value.detectedSourceLang)
+        vm.translate()
+        runCurrent()
+        advanceTimeBy(101)
+        runCurrent()
+        assertEquals("zh", vm.parameters.value.detectedSourceLang)
+        vm.setSourceLanguage("en")
+        assertNull(vm.parameters.value.detectedSourceLang)
+    }
 }

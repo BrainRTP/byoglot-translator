@@ -21,6 +21,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.github.brainrtp.byoglot.net.NetworkMonitor
+import io.github.brainrtp.byoglot.net.PlatformSourceLanguageDetector
 import io.github.brainrtp.byoglot.ui.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -32,7 +33,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val container = (application as ByoglotApplication).container
-        val network = NetworkMonitor(this)
+        val network = NetworkMonitor(applicationContext)
         val vm =
             ViewModelProvider(
                 this,
@@ -44,6 +45,8 @@ class MainActivity : ComponentActivity() {
                             container.secrets,
                             container.transport,
                             networkOnline = network::online,
+                            sourceLanguageDetector =
+                                PlatformSourceLanguageDetector(applicationContext),
                         )
                             as T
                 },

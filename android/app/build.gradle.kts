@@ -1,18 +1,21 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlin.serialization)
 }
 android {
     namespace = "io.github.brainrtp.byoglot"
     compileSdk = 37
     buildToolsVersion = libs.versions.buildTools.get()
     defaultConfig {
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         applicationId = "io.github.brainrtp.byoglot"
         minSdk = 37
         targetSdk = 37
         versionCode = providers.gradleProperty("VERSION_CODE").get().toInt()
         versionName = providers.gradleProperty("VERSION_NAME").get()
     }
+    testOptions { unitTests.all { it.useJUnitPlatform() } }
     buildFeatures { compose = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -20,6 +23,15 @@ android {
     }
 }
 dependencies {
+    androidTestImplementation(libs.android.test.runner)
+    androidTestImplementation(libs.android.test.junit)
+    implementation(libs.coroutines.core)
+    implementation(libs.datastore)
+    implementation(libs.serialization.json)
+    implementation(libs.lifecycle.viewmodel)
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.launcher)
+    testImplementation(libs.coroutines.test)
     implementation(project(":core"))
     implementation(libs.activity.compose)
     implementation(libs.compose.ui)

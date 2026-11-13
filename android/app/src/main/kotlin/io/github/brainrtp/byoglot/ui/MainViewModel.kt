@@ -79,6 +79,13 @@ class MainViewModel(
     val settings = mutableSettings.asStateFlow()
     private val mutableTranslation = MutableStateFlow(TranslationState())
     val translation = mutableTranslation.asStateFlow()
+    private var resultVisible = false
+
+    fun setResultVisible(visible: Boolean) {
+        resultVisible = visible
+        if (!visible) mutableTranslation.value = translation.value.copy(animation = null)
+    }
+
     private val mutableText = MutableStateFlow("")
     val text = mutableText.asStateFlow()
     private val mutableKeys = MutableStateFlow<Map<String, Boolean>>(emptyMap())
@@ -378,7 +385,7 @@ class MainViewModel(
                 output = chunk.output,
                 complete = chunk.complete,
                 incomplete = chunk.incomplete,
-                animation = resultAnimation(chunk, settings.value?.animation ?: AnimationChoice.fade),
+                animation = resultAnimation(chunk, settings.value?.animation ?: AnimationChoice.fade, resultVisible),
             )
         if (chunk.complete && input.sourceLang == "auto") {
             detectionJob = workScope.launch {

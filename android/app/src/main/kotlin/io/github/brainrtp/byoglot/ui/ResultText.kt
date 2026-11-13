@@ -30,9 +30,6 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -65,7 +62,6 @@ fun rememberReducedMotion(): Boolean {
 fun ResultText(
     text: String,
     working: Boolean,
-    complete: Boolean,
     playback: ResultAnimationPlayback?,
     background: Color,
     modifier: Modifier = Modifier,
@@ -77,6 +73,8 @@ fun ResultText(
     var layout by remember(text) { mutableStateOf<TextLayoutResult?>(null) }
     var visible by remember(text) { mutableStateOf(0f to 1800f) }
     var interacted by remember(playback) { mutableStateOf(false) }
+    val choice = playback?.choice ?: AnimationChoice.none
+    var duration by remember(playback) { mutableIntStateOf(ResultAnimation.durationMs(choice, text.length, Float.MAX_VALUE)) }
     val elapsed = remember(playback) { Animatable(if (playback?.pending == true) 0f else Float.MAX_VALUE) }
     val lifecycle = LocalView.current.findViewTreeLifecycleOwner()?.lifecycle
     var foreground by remember(lifecycle) {
@@ -96,7 +94,7 @@ fun ResultText(
                 val width = (0 until measured.lineCount).sumOf {
                     (measured.getLineRight(it) - measured.getLineLeft(it)).toDouble()
                 }.toFloat()
-                val duration = ResultAnimation.durationMs(playback.choice, text.length, width / density)
+                duration = ResultAnimation.durationMs(playback.choice, text.length, width / density)
                 elapsed.snapTo(0f)
                 elapsed.animateTo(duration.toFloat(), tween(duration, easing = LinearEasing))
             }
@@ -106,14 +104,26 @@ fun ResultText(
     }
     val caret = remember { Animatable(1f) }
     LaunchedEffect(working, reducedMotion, foreground) {
+        caret.snapTo(1f)
         if (working && !reducedMotion && foreground)
             caret.animateTo(0f, infiniteRepeatable(tween(500, easing = LinearEasing), RepeatMode.Reverse))
     }
-    val choice = playback?.choice ?: AnimationChoice.none
+    val active by remember(playback, layout, reducedMotion, foreground, interacted) {
+        derivedStateOf {
+            layout != null && choice != AnimationChoice.none && !reducedMotion && foreground && !interacted && elapsed.value < duration
+        }
+    }
+    val glyphEffect = choice == AnimationChoice.scramble || choice == AnimationChoice.flap
+    val atlas = remember(active && glyphEffect, measurer) {
+        if (active && glyphEffect)
+            (FLAP_SET + FLAP_SET.lowercase() + SYMBOLS + LATIN_LOWER).toSet().associateWith {
+                measurer.measure(it.toString(), style = ByoType.text)
+            }
+        else emptyMap()
+    }
     Text(
         text,
         modifier
-            .semantics { if (complete) liveRegion = LiveRegionMode.Polite }
             .pointerInput(playback) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
@@ -127,7 +137,7 @@ fun ResultText(
             }
             .drawWithCache {
                 val measured = layout
-                val lines = measured?.let { result ->
+                val lines = measured?.takeIf { active }?.let { result ->
                     List(result.lineCount) { index ->
                         RevealLine(
                             Rect(result.getLineLeft(index), result.getLineTop(index), result.getLineRight(index), result.getLineBottom(index)),
@@ -138,9 +148,7 @@ fun ResultText(
                 }.orEmpty()
                 val widths = FloatArray(lines.size + 1)
                 lines.forEachIndexed { index, line -> widths[index + 1] = widths[index] + line.rect.width.coerceAtLeast(0f) }
-                val duration = ResultAnimation.durationMs(choice, text.length, widths.last() / density)
-                val glyphEffect = choice == AnimationChoice.scramble || choice == AnimationChoice.flap
-                val glyphs = if (glyphEffect && measured != null) {
+                val glyphs = if (active && glyphEffect && measured != null) {
                     lines.filter { it.rect.bottom >= visible.first && it.rect.top <= visible.second }.flatMap { line ->
                         (line.start until line.end).mapNotNull { index ->
                             val ch = text[index]
@@ -149,17 +157,11 @@ fun ResultText(
                         }
                     }
                 } else emptyList()
-                val atlas = if (glyphs.isNotEmpty())
-                    (FLAP_SET + FLAP_SET.lowercase() + SYMBOLS + LATIN_LOWER).toSet().associateWith {
-                        measurer.measure(it.toString(), style = ByoType.text)
-                    }
-                else emptyMap()
                 val fadePaint = androidx.compose.ui.graphics.Paint()
                 onDrawWithContent {
                     val ms = elapsed.value
-                    val active = measured != null && !reducedMotion && foreground && !interacted && ms < duration
                     val p = ResultAnimation.revealProgress(choice, ms.coerceAtMost(duration.toFloat()).toInt(), duration)
-                    if (!active || choice == AnimationChoice.none) drawContent()
+                    if (!active || measured == null) drawContent()
                     else when (choice) {
                         AnimationChoice.fade -> {
                             val alpha = 1 - (1 - p) * (1 - p)
@@ -242,7 +244,7 @@ fun ResultText(
                         }
                         AnimationChoice.none -> drawContent()
                     }
-                    if (working && !reducedMotion && foreground && measured != null) {
+                    if (working && foreground && measured != null) {
                         val rect = measured.getCursorRect(text.length)
                         drawRect(c.ac.copy(alpha = caret.value), Offset(rect.left, rect.top + 3.dp.toPx()), Size(2.dp.toPx(), (rect.height - 6.dp.toPx()).coerceAtLeast(0f)))
                     }

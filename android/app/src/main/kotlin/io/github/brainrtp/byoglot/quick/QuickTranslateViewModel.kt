@@ -60,6 +60,13 @@ internal constructor(
     private val workScope = scope ?: viewModelScope
     private val mutableState = MutableStateFlow(TranslationState())
     val state = mutableState.asStateFlow()
+    private var resultVisible = false
+
+    fun setResultVisible(visible: Boolean) {
+        resultVisible = visible
+        if (!visible) mutableState.value = state.value.copy(animation = null)
+    }
+
     private val mutableSettings = MutableStateFlow<AppSettings?>(null)
     val settings = mutableSettings.asStateFlow()
     private val mutableParameters = MutableStateFlow(MainParameters())
@@ -269,7 +276,7 @@ internal constructor(
                     output = chunk.output,
                     complete = chunk.complete,
                     incomplete = chunk.incomplete,
-                    animation = resultAnimation(chunk, settings.value?.animation ?: AnimationChoice.fade),
+                    animation = resultAnimation(chunk, settings.value?.animation ?: AnimationChoice.fade, resultVisible),
                 )
     }
 

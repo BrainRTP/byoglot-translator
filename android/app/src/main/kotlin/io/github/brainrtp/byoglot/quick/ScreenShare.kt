@@ -33,6 +33,8 @@ fun ScreenShare(
     var picker by rememberSaveable { mutableStateOf<String?>(null) }
     val current = settings
     val reducedMotion = rememberReducedMotion()
+    val resultDescription = stringResource(R.string.translation)
+    ObserveResultVisibility(vm::setResultVisible, composed = picker == null && current != null)
     when (picker) {
         "template" ->
             if (current != null)
@@ -113,7 +115,6 @@ fun ScreenShare(
                             ResultText(
                                 result,
                                 state.working,
-                                state.complete,
                                 state.animation,
                                 ByoTheme.colors.sf,
                                 Modifier.fillMaxWidth()
@@ -121,7 +122,11 @@ fun ScreenShare(
                                     .background(ByoTheme.colors.sf, RoundedCornerShape(10.dp))
                                     .border(1.dp, ByoTheme.colors.bd, RoundedCornerShape(10.dp))
                                     .padding(12.dp)
-                                    .verticalScroll(rememberScrollState()),
+                                    .verticalScroll(rememberScrollState())
+                                    .clearAndSetSemantics {
+                                        contentDescription = if (state.working) resultDescription else result
+                                        if (state.complete) liveRegion = LiveRegionMode.Polite
+                                    },
                                 reducedMotion = reducedMotion,
                             )
                         }

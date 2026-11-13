@@ -203,5 +203,5 @@
     <string name="animation_sample">Краткое руководство объясняет, как подключить ключ.</string>
     <string name="animation_replay">Повторить</string>
     <string name="animation_tap_hint">Нажмите на карточку, чтобы проиграть эффект.</string>
-    <string name="animation_reduced_motion">Включено уменьшение движения. Настройки Android → Спец. возможности → Удалить анимацию. Эффекты не играют, перевод появляется сразу.</string>
+    <string name="animation_reduced_motion">В разделе «Спец. возможности» включен переключатель «Удалить анимацию». Эффекты не играют, перевод появляется сразу.</string>
 </resources>

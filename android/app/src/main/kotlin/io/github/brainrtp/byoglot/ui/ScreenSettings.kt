@@ -156,7 +156,6 @@ fun ScreenAnimationSettings(vm: MainViewModel, settings: AppSettings) {
                     ResultText(
                         stringResource(R.string.animation_sample),
                         working = false,
-                        complete = false,
                         playback = preview,
                         background = c.bg,
                         reducedMotion = reducedMotion,

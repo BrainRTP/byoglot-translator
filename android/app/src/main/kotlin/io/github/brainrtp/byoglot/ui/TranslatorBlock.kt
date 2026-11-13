@@ -199,6 +199,7 @@ fun TranslatorBlock(
                     .focusable()
                     .semantics {
                         contentDescription = resultDescription
+                        if (state.complete) liveRegion = LiveRegionMode.Polite
                     }
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 14.dp, vertical = 6.dp),
@@ -210,9 +211,11 @@ fun TranslatorBlock(
                         ResultText(
                             result,
                             state.working,
-                            state.complete,
                             state.animation,
                             c.sf,
+                            Modifier.clearAndSetSemantics {
+                                contentDescription = if (state.working) resultDescription else result
+                            },
                             reducedMotion = reducedMotion,
                         )
                     }

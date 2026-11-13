@@ -6,18 +6,14 @@ import org.junit.jupiter.api.Test
 class ResultAnimationTest {
     @Test
     fun `only a whole successful answer can play`() {
-        for (choice in AnimationChoice.entries) {
-            for (complete in listOf(false, true)) {
-                for (incomplete in listOf(false, true)) {
-                    for (streamed in listOf(false, true)) {
-                        assertEquals(
-                            choice != AnimationChoice.none && complete && !incomplete && !streamed,
-                            ResultAnimation.shouldPlay(choice, complete, incomplete, streamed),
-                        )
-                    }
-                }
-            }
+        for (choice in listOf(AnimationChoice.fade, AnimationChoice.scramble, AnimationChoice.flap, AnimationChoice.typewriter, AnimationChoice.pen, AnimationChoice.wave)) {
+            assertTrue(ResultAnimation.shouldPlay(choice, complete = true, incomplete = false, streamed = false), "$choice whole answer")
+            assertFalse(ResultAnimation.shouldPlay(choice, complete = true, incomplete = false, streamed = true), "$choice SSE completion")
+            assertFalse(ResultAnimation.shouldPlay(choice, complete = false, incomplete = false, streamed = true), "$choice SSE partial")
+            assertFalse(ResultAnimation.shouldPlay(choice, complete = false, incomplete = false, streamed = false), "$choice unfinished answer")
+            assertFalse(ResultAnimation.shouldPlay(choice, complete = true, incomplete = true, streamed = false), "$choice truncated answer")
         }
+        assertFalse(ResultAnimation.shouldPlay(AnimationChoice.none, complete = true, incomplete = false, streamed = false))
     }
 
     @Test

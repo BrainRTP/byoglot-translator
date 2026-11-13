@@ -201,5 +201,5 @@
     <string name="animation_sample">The quick guide explains how to connect an API key.</string>
     <string name="animation_replay">Replay</string>
     <string name="animation_tap_hint">Tap a card to play the effect.</string>
-    <string name="animation_reduced_motion">Remove animations is on. Android Settings → Accessibility → Remove animations. Effects are off and translations appear immediately.</string>
+    <string name="animation_reduced_motion">Remove animations is on in Accessibility. Effects are off and translations appear immediately.</string>
 </resources>

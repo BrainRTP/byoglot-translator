@@ -178,7 +178,13 @@ fun ScreenShare(
                             val limit =
                                 (error as? RunnerError.Backend)?.error?.kind == ErrorKind.RateLimit
                             if (error is RunnerError.TooLong)
-                                Banner(errorMessage(error), "", warning = true)
+                                Banner(
+                                    errorMessage(error),
+                                    "",
+                                    action = null,
+                                    onAction = {},
+                                    warning = true,
+                                )
                             else
                                 ScreenMainErrors(
                                     error,

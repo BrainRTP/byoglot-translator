@@ -354,8 +354,8 @@ fun Segment(
 fun Banner(
     title: String,
     body: String,
-    action: String? = null,
-    onAction: () -> Unit = {},
+    action: String?,
+    onAction: () -> Unit,
     modifier: Modifier = Modifier,
     warning: Boolean = false,
 ) {

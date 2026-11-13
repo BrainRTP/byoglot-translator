@@ -56,7 +56,7 @@ impl State {
 pub fn run() -> glib::ExitCode {
     let args: Vec<String> = std::env::args().collect();
     let background = args.get(1).is_some_and(|a| a == "--background") && args.len() == 2;
-    match cli::parse(&args[1..]) {
+    match cli::parse(args.get(1..).unwrap_or_default()) {
         Command::Help if !background => {
             println!("{}", tr(Msg::CliHelp));
             return glib::ExitCode::SUCCESS;

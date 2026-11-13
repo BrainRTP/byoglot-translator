@@ -1,10 +1,10 @@
 use crate::{
-    i18n::{Msg, tr, tr_with},
+    i18n::{Msg, language_name, tr, tr_with},
     quick::controller::gui::Driver,
     ui::error_text::error_text,
 };
 use adw::prelude::*;
-use byoglot_core::{QuickEvent, QuickState, Template};
+use byoglot_core::{QuickEvent, QuickState, Template, contracts};
 use gtk::{gdk, gio, glib};
 use std::{rc::Rc, time::Duration};
 
@@ -18,6 +18,7 @@ pub struct QuickWindow {
     result: gtk::Label,
     copy: gtk::Button,
     templates: gtk::MenuButton,
+    target: gtk::MenuButton,
     open: gtk::Button,
 }
 impl QuickWindow {
@@ -57,6 +58,9 @@ impl QuickWindow {
             .build();
         let copy = gtk::Button::with_label(tr(Msg::Copy));
         let templates = gtk::MenuButton::builder().label(tr(Msg::Template)).build();
+        let target = gtk::MenuButton::builder()
+            .label(tr(Msg::TargetLanguage))
+            .build();
         let open = gtk::Button::with_label(tr(Msg::OpenMain));
         for widget in [
             hint.upcast_ref::<gtk::Widget>(),
@@ -67,6 +71,7 @@ impl QuickWindow {
             result.upcast_ref(),
             copy.upcast_ref(),
             templates.upcast_ref(),
+            target.upcast_ref(),
             open.upcast_ref(),
         ] {
             content.append(widget);
@@ -83,6 +88,7 @@ impl QuickWindow {
             result,
             copy,
             templates,
+            target,
             open,
         }
     }
@@ -165,17 +171,26 @@ impl QuickWindow {
             }
         });
         let group = gio::SimpleActionGroup::new();
-        let action = gio::SimpleAction::new("template", Some(glib::VariantTy::STRING));
-        let weak = Rc::downgrade(driver);
-        action.connect_activate(move |_, value| {
-            if let (Some(driver), Some(id)) = (weak.upgrade(), value.and_then(|v| v.str())) {
-                driver.choose_template(id.into());
-            }
-        });
-        group.add_action(&action);
+        for (name, template) in [("template", true), ("target", false)] {
+            let action = gio::SimpleAction::new(name, Some(glib::VariantTy::STRING));
+            let weak = Rc::downgrade(driver);
+            action.connect_activate(move |_, value| {
+                if let (Some(driver), Some(value)) = (weak.upgrade(), value.and_then(|v| v.str())) {
+                    if template {
+                        driver.choose_template(value.into());
+                    } else {
+                        driver.choose_target(value.into());
+                    }
+                }
+            });
+            group.add_action(&action);
+        }
         self.window.insert_action_group("quick", Some(&group));
     }
-    pub fn set_templates(&self, templates: &[Template], default: &str) {
+    pub fn clear_entry(&self) {
+        self.entry.set_text("");
+    }
+    pub fn set_choices(&self, templates: &[Template], active: &str, target: &str, ready: bool) {
         let menu = gio::Menu::new();
         for template in templates {
             let item = gio::MenuItem::new(Some(&template.name), None);
@@ -186,9 +201,25 @@ impl QuickWindow {
             menu.append_item(&item);
         }
         self.templates.set_menu_model(Some(&menu));
-        if let Some(template) = templates.iter().find(|t| t.id == default) {
-            self.templates.set_tooltip_text(Some(&template.name));
+        if let Some(template) = templates.iter().find(|t| t.id == active) {
+            self.templates.set_label(&template.name);
         }
+        self.templates.set_tooltip_text(Some(tr(Msg::Template)));
+        self.templates.set_sensitive(ready);
+        let languages = gio::Menu::new();
+        let mut codes = contracts::language_codes().to_vec();
+        if !codes.iter().any(|code| code == target) {
+            codes.push(target.into());
+        }
+        for code in codes {
+            let item = gio::MenuItem::new(Some(&language_name(&code)), None);
+            item.set_action_and_target_value(Some("quick.target"), Some(&code.to_variant()));
+            languages.append_item(&item);
+        }
+        self.target.set_menu_model(Some(&languages));
+        self.target.set_label(&language_name(target));
+        self.target.set_tooltip_text(Some(tr(Msg::TargetLanguage)));
+        self.target.set_sensitive(ready);
     }
     pub fn render(&self, state: &QuickState) {
         let needs_text = matches!(
@@ -208,7 +239,9 @@ impl QuickWindow {
         self.result
             .set_visible(done || matches!(state, QuickState::Failed { .. }));
         self.copy.set_visible(done);
-        self.templates.set_visible(done);
+        let choices = !matches!(state, QuickState::Hidden | QuickState::WaitingForFocus);
+        self.templates.set_visible(choices);
+        self.target.set_visible(choices);
         self.open
             .set_visible(done || matches!(state, QuickState::Failed { .. }));
         match state {
@@ -218,7 +251,8 @@ impl QuickWindow {
                 self.source.set_text("");
                 self.result.set_text("");
             }
-            QuickState::WaitingForFocus | QuickState::NeedsText => {
+            QuickState::WaitingForFocus => self.hint.set_text(tr(Msg::QuickHint)),
+            QuickState::NeedsText => {
                 self.hint.set_text(tr(Msg::QuickHint));
                 self.entry.grab_focus();
             }

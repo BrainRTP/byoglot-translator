@@ -43,6 +43,28 @@ public sealed class MainStateTests
         Assert.IsType<TranslatePhase.Idle>(state.Phase);
     }
     [Fact] public async Task TheBuiltinTemplateCannotBeDeleted() => await Assert.ThrowsAsync<InvalidOperationException>(() => State(new()).DeleteTemplateAsync(Contracts.BuiltinTemplate.Id));
+    [Fact] public async Task ThePickerTargetWinsAfterChoosingATemplate()
+    {
+        var template = new Template("german", "German", false, new(TargetLang: "de"));
+        var selection = new EditorSelection("ru");
+        selection.ChooseTemplate(template);
+        Assert.Equal("de", selection.TargetLang);
+        selection.ChooseTarget("fr");
+        var settings = TranslationRunnerTests.Configured("http://localhost:11434/v1", ProviderPreset.Custom) with { Templates = [Contracts.BuiltinTemplate, template] };
+        var repository = new InMemorySettingsRepository(settings);
+        var transport = new RecordingTransport { Handler = (_, _) => Task.FromResult(RecordingTransport.JsonResponse("{\"choices\":[{\"message\":{\"content\":\"bonjour\"}}]}")) };
+        var state = State(transport, repository);
+        await state.TranslateAsync("hello", selection.TemplateId, selection.TargetLang);
+        Assert.Equal("fr", Assert.IsType<TranslatePhase.Done>(state.Phase).Output.TargetLang);
+        selection.ChooseTemplate(Contracts.BuiltinTemplate);
+        Assert.Equal("fr", selection.TargetLang);
+    }
+    [Theory]
+    [InlineData(ErrorKind.Unauthorized, true)]
+    [InlineData(ErrorKind.ProviderAuth, true)]
+    [InlineData(ErrorKind.Offline, false)]
+    public void AuthenticationErrorsOpenConnectionSettings(ErrorKind kind, bool expected)
+        => Assert.Equal(expected, ErrorActions.OpensConnections(new RunnerError.Backend(new BackendException(kind))));
     [Fact] public async Task ExportThenImportPreservesPortableSettings()
     {
         var repository = new InMemorySettingsRepository(TranslationRunnerTests.Configured());

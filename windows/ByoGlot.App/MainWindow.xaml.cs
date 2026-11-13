@@ -21,7 +21,10 @@ public sealed partial class MainWindow : Window
     }
     public void Open(string page)
     {
-        ContentFrame.Content = page switch { "Connections" => new ConnectionsPage(), "Templates" => new TemplatesPage(), "Settings" => new SettingsPage(), _ => new TranslatePage(Model) };
+        var item = page == "Settings" ? Navigation.SettingsItem : Navigation.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag as string == page) ?? Navigation.MenuItems[0];
+        if (!ReferenceEquals(Navigation.SelectedItem, item)) Navigation.SelectedItem = item;
+        else LoadPage(page);
     }
-    private void Navigate(NavigationView sender, NavigationViewSelectionChangedEventArgs args) => Open(args.IsSettingsSelected ? "Settings" : (args.SelectedItemContainer?.Tag as string ?? "Translate"));
+    private void LoadPage(string page) => ContentFrame.Content = page switch { "Connections" => new ConnectionsPage(), "Templates" => new TemplatesPage(), "Settings" => new SettingsPage(), _ => new TranslatePage(Model) };
+    private void Navigate(NavigationView sender, NavigationViewSelectionChangedEventArgs args) => LoadPage(args.IsSettingsSelected ? "Settings" : (args.SelectedItemContainer?.Tag as string ?? "Translate"));
 }

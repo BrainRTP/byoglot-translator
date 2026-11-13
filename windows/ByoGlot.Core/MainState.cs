@@ -17,7 +17,7 @@ public sealed class MainState(TranslationRunner runner, ISettingsRepository sett
     public TranslatePhase Phase { get; private set; } = new TranslatePhase.Idle();
     public event Action? Changed;
 
-    public async Task TranslateAsync(string text, string? templateId)
+    public async Task TranslateAsync(string text, string? templateId, string? targetLang = null)
     {
         Cancel();
         var request = ++generation;
@@ -26,7 +26,7 @@ public sealed class MainState(TranslationRunner runner, ISettingsRepository sett
         Set(new TranslatePhase.Working());
         try
         {
-            var result = await runner.TranslateAsync(new(text, InputLimits.Editor, TemplateId: templateId), cancellation.Token);
+            var result = await runner.TranslateAsync(new(text, InputLimits.Editor, TemplateId: templateId, TargetLang: targetLang), cancellation.Token);
             if (request == generation) Set(new TranslatePhase.Done(result));
         }
         catch (OperationCanceledException) { if (request == generation) Set(new TranslatePhase.Idle()); }

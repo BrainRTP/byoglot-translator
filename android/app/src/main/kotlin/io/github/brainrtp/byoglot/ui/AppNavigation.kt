@@ -176,11 +176,19 @@ fun AppNavigation(
                                 onInterfaceLanguage,
                             )
                         "models" ->
-                            ScreenModelSettings(vm, state) { main ->
-                                modelMain = main
-                                modelReturn = null
-                                sheet = "defaultModel"
-                            }
+                            ScreenModelSettings(
+                                vm,
+                                state,
+                                { main ->
+                                    modelMain = main
+                                    modelReturn = null
+                                    sheet = "defaultModel"
+                                },
+                                {
+                                    modelReturn = null
+                                    sheet = "fallbackModel"
+                                },
+                            )
                         "prompt" -> ScreenLanguagePrompt(vm, state, back)
                         "templates" ->
                             ScreenTemplateSettings(state) { id ->
@@ -267,6 +275,16 @@ fun AppNavigation(
                     { model -> vm.action { vm.setDefaultModel(model, modelMain) } },
                     closeModel,
                     vm::refreshModels,
+                )
+            "fallbackModel" ->
+                ScreenModelSheet(
+                    state,
+                    vm.catalogue,
+                    SettingsLogic.fallbackModel(state, true),
+                    { model -> vm.action { vm.setFallbackModel(model) } },
+                    closeModel,
+                    vm::refreshModels,
+                    showEffort = false,
                 )
             "providerModel" ->
                 ScreenModelSheet(

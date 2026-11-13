@@ -18,6 +18,7 @@ data class AppSettings(
     val autoTranslate: Boolean = true,
     val mainModel: ModelRef? = null,
     val externalModel: ModelRef? = null,
+    val fallbackModel: ModelRef? = null,
 ) {
     companion object {
         fun initial(preferredLanguage: String?): AppSettings {

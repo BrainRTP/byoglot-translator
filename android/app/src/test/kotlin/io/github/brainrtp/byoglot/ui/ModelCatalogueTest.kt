@@ -57,6 +57,11 @@ class ModelCatalogueTest {
             catalogue.available(ModelRef("deepseek", "missing", connectionId = "remote"), settings),
         )
         assertEquals("m", catalogue.fallback(settings, true)?.id)
+        val localFallback = ModelRef("ollama", "m", "none", "local")
+        assertEquals(
+            localFallback,
+            catalogue.fallback(settings.copy(fallbackModel = localFallback), true),
+        )
     }
 
     @Test

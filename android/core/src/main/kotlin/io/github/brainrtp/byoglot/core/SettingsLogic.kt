@@ -54,7 +54,8 @@ object SettingsLogic {
         return Effective(
             template.settings.prePrompt.orEmpty(),
             template.settings.targetLang ?: settings.globals.targetLang,
-            own?.let { bindModel(it, settings) } ?: defaultModel(settings, main),
+            if (own == null) defaultModel(settings, main)
+            else bindModel(own, settings) ?: fallbackModel(settings, main),
         )
     }
 
@@ -68,6 +69,9 @@ object SettingsLogic {
 
     fun bindModel(model: ModelRef, settings: AppSettings): ModelRef? =
         modelConnection(model, settings)?.let { model.copy(connectionId = it.id) }
+
+    fun fallbackModel(settings: AppSettings, main: Boolean): ModelRef? =
+        settings.fallbackModel?.let { bindModel(it, settings) } ?: defaultModel(settings, main)
 
     fun defaultModel(settings: AppSettings, main: Boolean): ModelRef? {
         val selected = if (main) settings.mainModel else settings.externalModel

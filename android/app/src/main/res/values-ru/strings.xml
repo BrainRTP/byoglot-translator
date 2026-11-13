@@ -42,7 +42,7 @@
     <string name="template_copy_name">%1$s (копия)</string>
     <string name="language_profile">Языковой профиль</string>
     <string name="generic_profile">Общий</string>
-    <string name="export_explanation">Экспорт содержит шаблоны, настройки языка и адреса провайдеров. Ключи API, тема, перевод при вводе и пары моделей в файл не входят.</string>
+    <string name="export_explanation">Экспорт содержит шаблоны, настройки языка и адреса провайдеров. Ключи API, тема, перевод при вводе, пары моделей и запасная модель в файл не входят.</string>
     <string name="export_settings">Экспорт настроек</string>
     <string name="import_settings">Импорт настроек</string>
     <string name="privacy_policy">Политика конфиденциальности</string>
@@ -178,4 +178,6 @@
     <string name="collapsed">Свернуто</string>
     <string name="prompt_no_profile">Для этого языка перевода нет встроенного профиля. Используется общий профиль.</string>
     <string name="unsaved">есть правки</string>
+    <string name="models_fallback">Запасная модель</string>
+    <string name="models_fallback_help">Используется, если модели шаблона нет у подключенных провайдеров.</string>
 </resources>

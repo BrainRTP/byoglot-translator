@@ -153,7 +153,12 @@ fun ScreenLanguageSettings(
 }
 
 @Composable
-fun ScreenModelSettings(vm: MainViewModel, settings: AppSettings, onModel: (Boolean) -> Unit) {
+fun ScreenModelSettings(
+    vm: MainViewModel,
+    settings: AppSettings,
+    onModel: (Boolean) -> Unit,
+    onFallback: () -> Unit,
+) {
     ScreenColumn {
         listOf(true, false).forEach { main ->
             val model = SettingsLogic.defaultModel(settings, main)
@@ -170,6 +175,14 @@ fun ScreenModelSettings(vm: MainViewModel, settings: AppSettings, onModel: (Bool
                 vm.action { vm.setDefaultModel(it, main) }
             }
         }
+        PickerField(
+            stringResource(R.string.models_fallback),
+            SettingsLogic.fallbackModel(settings, true)?.id
+                ?: stringResource(R.string.choose_model),
+            onFallback,
+            mono = true,
+        )
+        Note(stringResource(R.string.models_fallback_help))
     }
 }
 

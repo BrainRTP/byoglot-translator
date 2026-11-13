@@ -56,7 +56,7 @@ class ModelCatalogue(
     }
 
     fun fallback(settings: AppSettings, main: Boolean): ModelRef? {
-        val preferred = SettingsLogic.defaultModel(settings, main)
+        val preferred = SettingsLogic.fallbackModel(settings, main)
         if (preferred != null && available(preferred, settings)) return preferred
         return settings.connections.firstNotNullOfOrNull { connection ->
             val info =

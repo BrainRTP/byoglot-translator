@@ -109,6 +109,7 @@ class ConnectionEditorTest {
             it.copy(
                 mainModel = second.pageModel,
                 externalModel = second.selectionModel,
+                fallbackModel = second.pageModel,
                 templates =
                     it.templates +
                         Template(
@@ -124,6 +125,7 @@ class ConnectionEditorTest {
         assertNull(settings.read().templates.last().settings.selectionModel)
         assertNull(settings.read().mainModel)
         assertNull(settings.read().externalModel)
+        assertNull(settings.read().fallbackModel)
         assertEquals(
             first.selectionModel,
             SettingsLogic.effective(settings.read().templates.last(), settings.read()).model,

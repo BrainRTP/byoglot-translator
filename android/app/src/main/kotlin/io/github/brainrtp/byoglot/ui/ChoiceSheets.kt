@@ -112,12 +112,13 @@ fun ScreenModelSheet(
     onRefresh: suspend () -> Unit = { catalogue.refresh() },
     onSettings: (() -> Unit)? = null,
     connectionId: String? = null,
+    showEffort: Boolean = true,
 ) {
     val groups by catalogue.groups.collectAsState()
     var reload by remember { mutableIntStateOf(0) }
     LaunchedEffect(reload) { onRefresh() }
     ByoBottomSheet(stringResource(R.string.model_title), onDismiss) {
-        EffortSegment(selected, catalogue.info(selected), onModel)
+        if (showEffort) EffortSegment(selected, catalogue.info(selected), onModel)
         if (settings.connections.isEmpty()) Note(stringResource(R.string.error_no_connection))
         settings.connections
             .filter { connectionId == null || it.id == connectionId }

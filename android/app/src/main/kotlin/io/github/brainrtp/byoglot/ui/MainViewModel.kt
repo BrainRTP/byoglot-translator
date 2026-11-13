@@ -533,6 +533,11 @@ class MainViewModel(
         }
     }
 
+    suspend fun setFallbackModel(model: ModelRef) {
+        update { it.copy(fallbackModel = model.copy(variant = "none")) }
+        translateChoice()
+    }
+
     suspend fun saveProfile(id: String, text: String) {
         require(text.length <= Contracts.limits.maxProfileText)
         val base = Contracts.builtinProfiles[id] ?: return

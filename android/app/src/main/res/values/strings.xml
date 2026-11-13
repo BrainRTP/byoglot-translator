@@ -42,7 +42,7 @@
     <string name="template_copy_name">%1$s (copy)</string>
     <string name="language_profile">Language profile</string>
     <string name="generic_profile">General</string>
-    <string name="export_explanation">Export includes templates, language settings and provider addresses. API keys, theme, translate as you type and model pairs are excluded.</string>
+    <string name="export_explanation">Export includes templates, language settings and provider addresses. API keys, theme, translate as you type, model pairs and the fallback model are excluded.</string>
     <string name="export_settings">Export settings</string>
     <string name="import_settings">Import settings</string>
     <string name="privacy_policy">Privacy policy</string>
@@ -176,4 +176,6 @@
     <string name="collapsed">Collapsed</string>
     <string name="prompt_no_profile">There is no built-in profile for this target language. The general profile is used.</string>
     <string name="unsaved">unsaved edits</string>
+    <string name="models_fallback">Fallback model</string>
+    <string name="models_fallback_help">Used when the template model is unavailable at connected providers.</string>
 </resources>

@@ -98,7 +98,7 @@ internal constructor(
                     if (missing == null) effective.model
                     else
                         catalogue?.fallback(settings, false)
-                            ?: SettingsLogic.defaultModel(settings, false),
+                            ?: SettingsLogic.fallbackModel(settings, false),
                 missingModel = missing,
                 changed = false,
                 detectedSourceLang = null,

@@ -32,6 +32,17 @@ class SheetParametersTest {
     fun defaults_and_template_models_can_use_an_inactive_connection() {
         assertEquals(second, SettingsLogic.effectiveMain(Contracts.builtinTemplate, settings).model)
         assertEquals(first, SettingsLogic.effective(Contracts.builtinTemplate, settings).model)
+        val missing =
+            Template(
+                "missing",
+                "Missing",
+                false,
+                TemplateSettings(pageModel = first.copy(connectionId = "deleted")),
+            )
+        assertEquals(
+            first,
+            SettingsLogic.effectiveMain(missing, settings.copy(fallbackModel = first)).model,
+        )
         val template = Template("own", "Own", false, TemplateSettings(selectionModel = second))
         assertEquals(second, SettingsLogic.effective(template, settings).model)
         assertEquals(
@@ -88,14 +99,23 @@ class SheetParametersTest {
 
     @Test
     fun new_device_preferences_never_enter_the_portable_file_and_import_preserves_them() {
-        val state = settings.copy(theme = ThemeChoice.dark, autoTranslate = false)
+        val state =
+            settings.copy(theme = ThemeChoice.dark, autoTranslate = false, fallbackModel = second)
         val export = SettingsLogic.export(state, "2026-11-13T00:00:00Z")
         val json = Json.encodeToString(export)
-        for (key in listOf("mainModel", "externalModel", "theme", "autoTranslate")) assertFalse(
+        for (key in
+            listOf(
+                "mainModel",
+                "externalModel",
+                "fallbackModel",
+                "theme",
+                "autoTranslate",
+            )) assertFalse(
             json.contains("\"$key\""),
         )
         assertEquals(state.mainModel, SettingsLogic.merge(export, state).mainModel)
         assertEquals(state.externalModel, SettingsLogic.merge(export, state).externalModel)
+        assertEquals(state.fallbackModel, SettingsLogic.merge(export, state).fallbackModel)
         assertEquals(ThemeChoice.dark, SettingsLogic.merge(export, state).theme)
     }
 }

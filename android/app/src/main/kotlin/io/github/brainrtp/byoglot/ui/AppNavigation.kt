@@ -1,100 +1,216 @@
 package io.github.brainrtp.byoglot.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.brainrtp.byoglot.R
+import io.github.brainrtp.byoglot.core.*
 
-private enum class Destination(val label: Int) {
-    translate(R.string.translate), templates(R.string.templates), connections(R.string.connections), settings(R.string.settings)
-}
-@Composable
-private fun NavigationIcon(index: Int) {
-    val color = MaterialTheme.colorScheme.onSurface
-    Canvas(Modifier.size(24.dp)) {
-        val w = size.width; val h = size.height
-        val stroke = 2.dp.toPx()
-        when (index) {
-            0 -> {
-                drawLine(color, Offset(w * .1f, h * .3f), Offset(w * .9f, h * .3f), stroke, StrokeCap.Round)
-                drawLine(color, Offset(w * .65f, h * .1f), Offset(w * .9f, h * .3f), stroke, StrokeCap.Round)
-                drawLine(color, Offset(w * .1f, h * .7f), Offset(w * .9f, h * .7f), stroke, StrokeCap.Round)
-                drawLine(color, Offset(w * .1f, h * .7f), Offset(w * .35f, h * .9f), stroke, StrokeCap.Round)
-            }
-            1 -> repeat(3) { row -> drawLine(color, Offset(w * .15f, h * (.2f + row * .3f)), Offset(w * .85f, h * (.2f + row * .3f)), stroke, StrokeCap.Round) }
-            2 -> { drawCircle(color, w * .2f, Offset(w * .25f, h * .5f), style = androidx.compose.ui.graphics.drawscope.Stroke(stroke)); drawCircle(color, w * .2f, Offset(w * .75f, h * .5f), style = androidx.compose.ui.graphics.drawscope.Stroke(stroke)); drawLine(color, Offset(w * .4f, h * .5f), Offset(w * .6f, h * .5f), stroke) }
-            else -> repeat(3) { column -> val x = w * (.2f + column * .3f); drawLine(color, Offset(x, h * .1f), Offset(x, h * .9f), stroke); drawCircle(color, w * .1f, Offset(x, h * (if (column == 1) .65f else .35f))) }
-        }
-    }
-}
 @Composable
 fun AppNavigation(
-    vm: MainViewModel, initialDestination: String?, version: String,
-    onPaste: () -> String?, onCopy: (String) -> Unit, onShare: (String) -> Unit,
-    onNetworkSettings: () -> Unit, onExport: () -> Unit, onImport: () -> Unit, onLink: (String) -> Unit,
+    vm: MainViewModel,
+    initialDestination: String?,
+    version: String,
+    onPaste: () -> String?,
+    onCopy: (String) -> Unit,
+    onShare: (String) -> Unit,
+    onNetworkSettings: () -> Unit,
+    onExport: () -> Unit,
+    onImport: () -> Unit,
+    onLink: (String) -> Unit,
 ) {
     val settings by vm.settings.collectAsState()
     val error by vm.error.collectAsState()
     val navigation by vm.navigation.collectAsState()
-    var destination by rememberSaveable { mutableStateOf(Destination.entries.find { it.name == if (initialDestination == "network") "connections" else initialDestination } ?: Destination.translate) }
-    var form by rememberSaveable { mutableStateOf<String?>(null) }
+    var route by rememberSaveable {
+        mutableStateOf(
+            if (initialDestination in listOf("connections", "network")) "connections"
+            else "translate",
+        )
+    }
     var connectionId by rememberSaveable { mutableStateOf<String?>(null) }
+    var preset by rememberSaveable { mutableStateOf(ProviderPreset.deepseek) }
     var templateId by rememberSaveable { mutableStateOf<String?>(null) }
+    var sourcePicker by rememberSaveable { mutableStateOf(true) }
     LaunchedEffect(navigation?.id) {
-        navigation?.let { request ->
-            destination = Destination.entries.find { it.name == if (request.destination == "network") "connections" else request.destination } ?: Destination.translate
-            form = null
-            vm.navigationHandled(request.id)
+        navigation?.let {
+            route =
+                if (it.destination in listOf("connections", "network")) "connections"
+                else "translate"
+            vm.navigationHandled(it.id)
         }
     }
-    val fix: (String) -> Unit = { route -> if (route == "network") onNetworkSettings() else { destination = Destination.connections; form = null } }
-    BackHandler(form != null) { form = null }
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val wide = maxWidth >= 840.dp
-        val navigate: (Destination) -> Unit = { destination = it; form = null; vm.dismissError() }
-        Scaffold(bottomBar = {
-            if (!wide) NavigationBar {
-                Destination.entries.forEachIndexed { index, item -> NavigationBarItem(selected = destination == item, onClick = { navigate(item) }, icon = { NavigationIcon(index) }, label = { Text(stringResource(item.label)) }) }
+    val state = settings
+    val firstRun = state?.connections?.isEmpty() == true && route == "translate"
+    val visibleRoute = if (firstRun) "connections" else route
+    val fix: (String) -> Unit = {
+        if (it == "network") onNetworkSettings() else route = "connections"
+    }
+    val back: () -> Unit = {
+        route =
+            when (route) {
+                "provider" -> "connections"
+                "template" -> "templates"
+                else -> "translate"
             }
-        }) { padding ->
-            Row(Modifier.fillMaxSize().padding(padding)) {
-                if (wide) NavigationRail {
-                    Destination.entries.forEachIndexed { index, item -> NavigationRailItem(selected = destination == item, onClick = { navigate(item) }, icon = { NavigationIcon(index) }, label = { Text(stringResource(item.label)) }) }
+        vm.dismissError()
+    }
+    BackHandler(route != "translate", onBack = back)
+    Surface(Modifier.fillMaxSize(), color = ByoTheme.colors.bg) {
+        Column(Modifier.safeDrawingPadding()) {
+            val title =
+                when (visibleRoute) {
+                    "connections" -> R.string.providers_title
+                    "provider" -> R.string.providers_title
+                    "settings" -> R.string.settings
+                    "parameters" -> R.string.params_title
+                    "languages" ->
+                        if (sourcePicker) R.string.lang_srcTitle else R.string.lang_dstTitle
+                    "templates",
+                    "template" -> R.string.templates
+                    else -> R.string.main_title
                 }
-                Column(Modifier.weight(1f).fillMaxHeight()) {
-                    error?.let { current ->
-                        Surface(color = MaterialTheme.colorScheme.errorContainer) {
-                            Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                                Text(errorMessage(current))
-                                Row {
-                                    errorDestination(current)?.let { route -> TextButton(onClick = { fix(route); vm.dismissError() }) { Text(stringResource(R.string.fix_in_settings)) } }
-                                    TextButton(onClick = vm::dismissError) { Text(stringResource(R.string.dismiss)) }
+            Row(
+                Modifier.fillMaxWidth()
+                    .heightIn(min = 64.dp)
+                    .padding(start = if (route == "translate") 16.dp else 4.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (route != "translate")
+                    ByoIconButton(ByoIcon.Back, stringResource(R.string.back), back)
+                Text(
+                    if (route == "provider")
+                        state?.connections?.find { it.id == connectionId }?.name
+                            ?: presetLabel(preset)
+                    else stringResource(title),
+                    Modifier.weight(1f),
+                    style = ByoType.title,
+                )
+                if (route == "translate")
+                    ByoIconButton(
+                        ByoIcon.Settings,
+                        stringResource(R.string.settings),
+                        { route = "settings" },
+                    )
+            }
+            if (error != null)
+                Banner(
+                    errorMessage(error!!),
+                    "",
+                    stringResource(R.string.dismiss),
+                    vm::dismissError,
+                    Modifier.padding(16.dp),
+                )
+            if (state == null) LinearProgressIndicator(Modifier.fillMaxWidth())
+            else
+                Box(Modifier.weight(1f)) {
+                    when (visibleRoute) {
+                        "translate" ->
+                            ScreenMain(
+                                vm,
+                                state,
+                                onPaste,
+                                onCopy,
+                                onShare,
+                                { route = "parameters" },
+                                {
+                                    connectionId = state.activeConnectionId
+                                    val active = state.connections.find { it.id == connectionId }
+                                    if (active == null) route = "connections"
+                                    else {
+                                        preset = active.preset
+                                        route = "provider"
+                                    }
+                                },
+                                { source ->
+                                    sourcePicker = source
+                                    route = "languages"
+                                },
+                                fix,
+                            )
+                        "connections" ->
+                            ScreenProviders(vm, state) { id, p ->
+                                connectionId = id
+                                preset = p
+                                route = "provider"
+                            }
+                        "provider" ->
+                            key(connectionId, preset) {
+                                ProviderKeyScreen(
+                                    vm,
+                                    state,
+                                    state.connections.find { it.id == connectionId },
+                                    preset,
+                                    onPaste,
+                                    { route = "translate" },
+                                )
+                            }
+                        "settings" ->
+                            Column {
+                                ListRow(
+                                    stringResource(R.string.providers_title),
+                                    { route = "connections" },
+                                )
+                                ListRow(stringResource(R.string.templates), { route = "templates" })
+                                Box(Modifier.weight(1f)) {
+                                    SettingsScreen(vm, state, version, onExport, onImport, onLink)
                                 }
                             }
-                        }
-                    }
-                    val state = settings
-                    if (state == null) LinearProgressIndicator(Modifier.fillMaxWidth())
-                    else when (form) {
-                        "connection" -> ConnectionFormScreen(vm, state, state.connections.find { it.id == connectionId }, { form = null }, onNetworkSettings)
-                        "template" -> TemplateFormScreen(vm, state.templates.find { it.id == templateId }, { form = null })
-                        else -> when (destination) {
-                            Destination.translate -> TranslateScreen(vm, state, onPaste, onCopy, onShare, fix)
-                            Destination.connections -> ConnectionsScreen(vm, state) { id -> connectionId = id; form = "connection" }
-                            Destination.templates -> TemplatesScreen(vm, state) { id -> templateId = id; form = "template" }
-                            Destination.settings -> SettingsScreen(vm, state, version, onExport, onImport, onLink)
-                        }
+                        "templates" ->
+                            TemplatesScreen(vm, state) { id ->
+                                templateId = id
+                                route = "template"
+                            }
+                        "template" ->
+                            TemplateFormScreen(vm, state.templates.find { it.id == templateId }) {
+                                route = "templates"
+                            }
+                        "parameters" ->
+                            ScreenColumn {
+                                val parameters by vm.parameters.collectAsState()
+                                ChoiceMenu(
+                                    stringResource(R.string.template),
+                                    state.templates
+                                        .find { it.id == parameters.templateId }
+                                        ?.let { templateLabel(it) }
+                                        .orEmpty(),
+                                    state.templates.map { it.id to templateLabel(it) },
+                                ) { id ->
+                                    vm.action { vm.selectTemplate(id) }
+                                }
+                                ByoButton(
+                                    stringResource(R.string.templates),
+                                    { route = "templates" },
+                                )
+                            }
+                        "languages" ->
+                            ScreenColumn {
+                                val params by vm.parameters.collectAsState()
+                                val codes =
+                                    (if (sourcePicker) listOf("auto") else emptyList()) +
+                                        Contracts.languageCodes
+                                ChoiceMenu(
+                                    stringResource(title),
+                                    languageLabel(
+                                        if (sourcePicker) params.sourceLang else params.targetLang,
+                                    ),
+                                    codes.map { it to languageLabel(it) },
+                                ) { code ->
+                                    vm.action {
+                                        if (sourcePicker) vm.setSourceLanguage(code)
+                                        else vm.setTargetLanguage(code)
+                                        route = "translate"
+                                    }
+                                }
+                            }
                     }
                 }
-            }
         }
     }
 }

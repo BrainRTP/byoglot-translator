@@ -20,7 +20,7 @@ public sealed class HttpClientTransportTests
             listener.Prefixes.Add(Url);
             listener.Start();
         }
-        public Task<HttpListenerContext> Accept() => listener.GetContextAsync();
+        public Task<HttpListenerContext> Accept() => listener.GetContextAsync().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         public void Dispose() => listener.Close();
     }
     private static HttpRequestData Request(string url) => new("POST", url, new Dictionary<string, string> { ["authorization"] = "Bearer private-key", ["content-type"] = "application/json" }, Encoding.UTF8.GetBytes("{}"));
@@ -85,7 +85,7 @@ public sealed class HttpClientTransportTests
     {
         using var server = new Server();
         using var transport = new HttpClientTransport();
-        var pending = transport.SendAsync(Request(server.Url), TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
+        var pending = transport.SendAsync(Request(server.Url), TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
         var context = await server.Accept();
         Assert.Equal(TransportFailure.Timeout, (await Assert.ThrowsAsync<TransportException>(() => pending)).Reason);
         context.Response.Abort();
@@ -94,7 +94,7 @@ public sealed class HttpClientTransportTests
     {
         using var server = new Server();
         using var transport = new HttpClientTransport();
-        var pending = transport.SendAsync(Request(server.Url), TimeSpan.FromMilliseconds(150), TestContext.Current.CancellationToken);
+        var pending = transport.SendAsync(Request(server.Url), TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
         var context = await server.Accept();
         context.Response.SendChunked = true;
         await context.Response.OutputStream.WriteAsync(new byte[] { 1 }, TestContext.Current.CancellationToken);

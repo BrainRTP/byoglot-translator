@@ -124,4 +124,14 @@ struct TranslationRunnerTests {
             if chunk.complete { #expect(chunk.output.detectedSourceLang == "en") }
         }
     }
+
+    @Test(arguments: ["length", "max_tokens"])
+    func translateThrowsWhenTheFinalAnswerIsIncomplete(_ reason: String) async throws {
+        let f = AppFixture()
+        try await f.connect()
+        await f.transport.configure(streamBody: "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"},\"finish_reason\":\"\(reason)\"}]}\n\ndata: [DONE]\n\n")
+        await #expect(throws: RunnerError.backend(BackendError(kind: .badResponse, detail: "incomplete completion"))) {
+            try await f.runner.translate(RunnerInput(text: "hello", limit: 100))
+        }
+    }
 }

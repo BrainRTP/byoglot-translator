@@ -25,9 +25,10 @@ struct ByoGlotApp: App {
         let secrets = KeychainSecretStore(accessGroup: group)
         let transport = URLSessionTransport()
         let cache = ModelCapabilitiesCache()
+        let translationCache = TranslationCache(directory: directory.appending(path: "translation-cache-v1"))
         let urlPolicy = AppProviderURLPolicy.httpsOnly
-        let runner = TranslationRunner(settings: settings, secrets: secrets, transport: transport, modelCapabilities: cache, urlPolicy: urlPolicy)
-        let editor = ConnectionEditor(settings: settings, secrets: secrets, transport: transport, modelCapabilities: cache, urlPolicy: urlPolicy)
+        let runner = TranslationRunner(settings: settings, secrets: secrets, transport: transport, modelCapabilities: cache, translationCache: translationCache, urlPolicy: urlPolicy)
+        let editor = ConnectionEditor(settings: settings, secrets: secrets, transport: transport, modelCapabilities: cache, translationCache: translationCache, urlPolicy: urlPolicy)
         model = AppModel(settings: settings, editor: editor, runner: runner, backgroundTask: ApplicationBackgroundTask())
     }
 }

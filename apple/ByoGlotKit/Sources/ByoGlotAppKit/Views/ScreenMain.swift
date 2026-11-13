@@ -202,7 +202,7 @@ public struct TranslatorBlock: View {
                     ShareLink(item: model.result) { Image(systemName: "square.and.arrow.up").font(.system(size: 20)).frame(minWidth: 44, minHeight: 44) }
                         .foregroundStyle(model.result.isEmpty ? ByoColor.strongBorder : ByoColor.text)
                         .accessibilityLabel(AppStrings.text("main.share")).disabled(model.result.isEmpty).modifier(ByoFocusRing())
-                    ByoIconButton(title: "main.retranslate", symbol: "arrow.clockwise", action: model.translate).disabled(!model.canTranslate)
+                    ByoIconButton(title: "main.retranslate", symbol: "arrow.clockwise", action: model.translateAgain).disabled(!model.canTranslate)
                         .keyboardShortcut(.return, modifiers: .command)
                 }
             }.padding(.horizontal, 4).padding(.bottom, 4)

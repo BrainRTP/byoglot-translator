@@ -43,14 +43,16 @@ public actor ConnectionEditor {
     var pendingMutations: Int { mutationWaiters.count }
     private let modelCapabilities: ModelCapabilitiesCache
     private let transport: any HTTPTransport
+    private let translationCache: (any TranslationCaching)?
     public nonisolated let urlPolicy: AppProviderURLPolicy
 
-    public init(settings: SettingsStore, secrets: any SecretStore, transport: any HTTPTransport, modelCapabilities: ModelCapabilitiesCache = .shared, urlPolicy: AppProviderURLPolicy) {
+    public init(settings: SettingsStore, secrets: any SecretStore, transport: any HTTPTransport, modelCapabilities: ModelCapabilitiesCache = .shared, translationCache: (any TranslationCaching)? = nil, urlPolicy: AppProviderURLPolicy) {
         self.settings = settings
         self.secrets = secrets
         self.transport = transport
         self.modelCapabilities = modelCapabilities
         self.urlPolicy = urlPolicy
+        self.translationCache = translationCache
     }
 
     public nonisolated static func presets(includeLocal: Bool = false) -> [ProviderPreset] {
@@ -126,6 +128,7 @@ public actor ConnectionEditor {
             }
         }.value
         await modelCapabilities.remove(connectionId: id)
+        await translationCache?.remove(connectionId: id)
     }
 
     private func persist(id: String, origin: String?, secret: String?, oldOrigin: String?, oldSecret: String?, change: @Sendable (inout AppSettings) -> Void) async throws {
@@ -137,6 +140,7 @@ public actor ConnectionEditor {
             else { try secrets.delete(connectionId: id) }
             throw error
         }
+        if origin != nil && oldOrigin != nil && (origin != oldOrigin || secret != oldSecret) { await translationCache?.remove(connectionId: id) }
     }
 
     private func acquireMutation() async throws {

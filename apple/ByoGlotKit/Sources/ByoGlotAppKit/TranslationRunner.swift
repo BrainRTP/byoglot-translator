@@ -26,8 +26,10 @@ public struct RunnerInput: Sendable, CustomStringConvertible, CustomDebugStringC
     public var targetLang: String?
     public var model: ModelRef?
     public var prePrompt: String?
+    public var reloadCache: Bool
+    public var networkAvailable: Bool
 
-    public init(text: String, context: String = "", appName: String = "", templateId: String? = nil, limit: Int, pair: ModelPair = .external, sourceLang: String? = nil, targetLang: String? = nil, model: ModelRef? = nil, prePrompt: String? = nil, requestId: UUID = UUID()) {
+    public init(text: String, context: String = "", appName: String = "", templateId: String? = nil, limit: Int, pair: ModelPair = .external, sourceLang: String? = nil, targetLang: String? = nil, model: ModelRef? = nil, prePrompt: String? = nil, requestId: UUID = UUID(), reloadCache: Bool = false, networkAvailable: Bool = true) {
         self.requestId = requestId
         self.text = text
         self.context = context
@@ -39,6 +41,8 @@ public struct RunnerInput: Sendable, CustomStringConvertible, CustomDebugStringC
         self.targetLang = targetLang
         self.model = model
         self.prePrompt = prePrompt
+        self.reloadCache = reloadCache
+        self.networkAvailable = networkAvailable
     }
 
     public var description: String { "RunnerInput(requestId: \(requestId), textLength: \(text.utf16.count))" }
@@ -82,6 +86,7 @@ public actor TranslationRunner {
     private let modelCapabilities: ModelCapabilitiesCache
     private let detector: any SourceLanguageDetecting
     private let urlPolicy: AppProviderURLPolicy
+    public nonisolated let translationCache: (any TranslationCaching)?
     private var cached: ClientState?
 
     private struct ClientState: CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
@@ -93,13 +98,14 @@ public actor TranslationRunner {
         var customMirror: Mirror { Mirror(self, children: ["summary": description]) }
     }
 
-    public init(settings: SettingsStore, secrets: any SecretStore, transport: any HTTPTransport, detector: any SourceLanguageDetecting = OnDeviceLanguageDetector(), modelCapabilities: ModelCapabilitiesCache = .shared, urlPolicy: AppProviderURLPolicy) {
+    public init(settings: SettingsStore, secrets: any SecretStore, transport: any HTTPTransport, detector: any SourceLanguageDetecting = OnDeviceLanguageDetector(), modelCapabilities: ModelCapabilitiesCache = .shared, translationCache: (any TranslationCaching)? = nil, urlPolicy: AppProviderURLPolicy) {
         self.settings = settings
         self.secrets = secrets
         self.transport = transport
         self.detector = detector
         self.modelCapabilities = modelCapabilities
         self.urlPolicy = urlPolicy
+        self.translationCache = translationCache
     }
 
     public static func shared(appGroup: String, keychainGroup: String?, urlPolicy: AppProviderURLPolicy) throws -> TranslationRunner {
@@ -108,14 +114,17 @@ public actor TranslationRunner {
 
     static func shared(containerURL: URL?, keychainGroup: String?, urlPolicy: AppProviderURLPolicy) throws -> TranslationRunner {
         guard let directory = containerURL else { throw RunnerError.appGroupUnavailable }
-        return TranslationRunner(settings: SettingsStore(directory: directory), secrets: KeychainSecretStore(accessGroup: keychainGroup), transport: URLSessionTransport(), urlPolicy: urlPolicy)
+        return TranslationRunner(settings: SettingsStore(directory: directory), secrets: KeychainSecretStore(accessGroup: keychainGroup), transport: URLSessionTransport(), translationCache: TranslationCache(directory: directory.appending(path: "translation-cache-v1")), urlPolicy: urlPolicy)
     }
 
     public func translate(_ input: RunnerInput) async throws(RunnerError) -> RunnerOutput {
         do {
-            let prepared = try await prepare(input)
-            let text = try await prepared.translator.translate(prepared.request)
-            return output(text: text, request: prepared.request, completed: true)
+            var final: RunnerStreamOutput?
+            for try await chunk in stream(input) { final = chunk }
+            try Task.checkCancellation()
+            guard let final, final.complete else { throw RunnerError.backend(BackendError(kind: .badResponse)) }
+            guard !final.incomplete else { throw RunnerError.backend(BackendError(kind: .badResponse, detail: "incomplete completion")) }
+            return final.output
         } catch { throw runnerError(error) }
     }
 
@@ -123,11 +132,29 @@ public actor TranslationRunner {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
+                    let generation = await self.translationCache?.generation()
                     let prepared = try await self.prepare(input)
-                    for try await chunk in prepared.translator.stream(prepared.request) {
+                    let lookup = await self.translationCache?.lookup(prepared.key, bypass: input.reloadCache)
+                    try Task.checkCancellation()
+                    if let value = lookup?.value, !input.reloadCache {
+                        var output = await self.output(text: value.text, request: prepared.request, completed: true)
+                        output.targetLang = value.targetLang
+                        continuation.yield(RunnerStreamOutput(requestId: input.requestId, output: output, complete: true, incomplete: false, finishReason: nil, usage: nil))
+                        continuation.finish()
+                        return
+                    }
+                    let translator = try await self.authorize(prepared, networkAvailable: input.networkAvailable)
+                    var final: RunnerStreamOutput?
+                    for try await chunk in translator.stream(prepared.request) {
                         try Task.checkCancellation()
                         let output = await self.output(text: chunk.text, request: prepared.request, completed: chunk.complete && !chunk.incomplete)
-                        continuation.yield(RunnerStreamOutput(requestId: input.requestId, output: output, complete: chunk.complete, incomplete: chunk.incomplete, finishReason: chunk.finishReason, usage: chunk.usage))
+                        let value = RunnerStreamOutput(requestId: input.requestId, output: output, complete: chunk.complete, incomplete: chunk.incomplete, finishReason: chunk.finishReason, usage: chunk.usage)
+                        final = value
+                        continuation.yield(value)
+                    }
+                    try Task.checkCancellation()
+                    if let final, final.complete, !final.incomplete, final.finishReason == nil || final.finishReason == "stop" || final.finishReason == "end_turn" {
+                        await self.translationCache?.store(CachedTranslation(text: final.output.text, targetLang: final.output.targetLang), for: prepared.key, connectionId: prepared.connection.id, generation: generation)
                     }
                     continuation.finish()
                 } catch { continuation.finish(throwing: runnerError(error)) }
@@ -141,7 +168,16 @@ public actor TranslationRunner {
         return RunnerOutput(text: text, sourceLang: request.sourceLang, targetLang: request.targetLang, model: request.model, detectedSourceLang: detected)
     }
 
-    private func prepare(_ input: RunnerInput) async throws -> (translator: Translator, request: TextRequest) {
+    private struct Prepared: Sendable {
+        let request: TextRequest
+        let connection: Connection
+        let secret: String?
+        let origin: String
+        let consented: Bool
+        let key: TranslationCacheKey
+    }
+
+    private func prepare(_ input: RunnerInput) async throws -> Prepared {
         let text = jsTrim(input.text)
         guard !text.isEmpty else { throw RunnerError.empty }
         guard text.utf16.count <= input.limit else { throw RunnerError.tooLong(limit: input.limit) }
@@ -154,22 +190,26 @@ public actor TranslationRunner {
         guard let connection = SettingsLogic.modelConnection(model, settings: state) else { throw RunnerError.noModel }
         model.connectionId = connection.id
         guard let origin = originOf(connection.baseUrl), let url = URL(string: origin), urlPolicy.permits(url) else { throw RunnerError.backend(BackendError(kind: .providerError)) }
-        if !HTTPDestinationPolicy.isLocalOrLAN(url.host ?? ""), !state.consentedOrigins.contains(origin) { throw RunnerError.consentNeeded(origin: origin) }
         let secret: String?
         do { secret = try secrets.secret(connectionId: connection.id, origin: origin) }
         catch { throw secretRunnerError(error) }
-        if (secret?.isEmpty ?? true) && ProviderEffort.needsKey(preset: connection.preset, baseUrl: connection.baseUrl) { throw RunnerError.keyMissing }
-        let client = ProviderClient(connection: connection, secret: secret, transport: transport)
         model = await modelCapabilities.clamp(model, connection: connection, secret: secret)
-        let translator: Translator
-        if let cached, cached.connection == connection, cached.secret == secret { translator = cached.translator }
-        else {
-            translator = Translator(generator: { client })
-            cached = ClientState(connection: connection, secret: secret, translator: translator)
-        }
         let target = input.targetLang ?? effective.targetLang
         let language = LanguageProfiles.text(enabled: state.globals.languagePromptEnabled, profile: state.globals.languageProfile, targetLang: target, builtins: Contracts.builtinProfiles, overrides: state.profileOverrides)
-        return (translator, TextRequest(text: text, context: input.context, appName: input.appName, sourceLang: input.sourceLang ?? state.globals.sourceLang, targetLang: target, prePrompt: input.prePrompt ?? effective.prePrompt, languagePrompt: language, model: model))
+        let request = TextRequest(text: text, context: input.context, appName: input.appName, sourceLang: input.sourceLang ?? state.globals.sourceLang, targetLang: target, prePrompt: input.prePrompt ?? effective.prePrompt, languagePrompt: language, model: model)
+        return Prepared(request: request, connection: connection, secret: secret, origin: origin, consented: HTTPDestinationPolicy.isLocalOrLAN(url.host ?? "") || state.consentedOrigins.contains(origin), key: try TranslationCacheKey(connection: connection, request: request))
+    }
+
+    private func authorize(_ prepared: Prepared, networkAvailable: Bool) throws -> Translator {
+        guard networkAvailable else { throw RunnerError.backend(BackendError(kind: .offline)) }
+        guard prepared.consented else { throw RunnerError.consentNeeded(origin: prepared.origin) }
+        let connection = prepared.connection, secret = prepared.secret
+        if (secret?.isEmpty ?? true) && ProviderEffort.needsKey(preset: connection.preset, baseUrl: connection.baseUrl) { throw RunnerError.keyMissing }
+        if let cached, cached.connection == connection, cached.secret == secret { return cached.translator }
+        let client = ProviderClient(connection: connection, secret: secret, transport: transport)
+        let translator = Translator(generator: { client }, cacheLimit: 0)
+        cached = ClientState(connection: connection, secret: secret, translator: translator)
+        return translator
     }
 }
 

@@ -1,10 +1,11 @@
 package io.github.brainrtp.byoglot.core
 
 import java.net.URI
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.last
 
 sealed interface RunnerError {
     data object NoConnection : RunnerError
@@ -37,6 +38,8 @@ data class RunnerInput(
     val mainModel: Boolean = false,
     val model: ModelRef? = null,
     val prePrompt: String? = null,
+    val forceRequest: Boolean = false,
+    val networkAvailable: Boolean = true,
 ) {
     override fun toString(): String =
         "RunnerInput(textLength=${text.length}, contextLength=${context.length}, limit=$limit)"
@@ -58,6 +61,7 @@ class TranslationRunner(
     private val settings: SettingsRepository,
     private val secrets: SecretStore,
     private val transport: HttpTransport,
+    val cache: TranslationCache = NoTranslationCache,
 ) {
     private class ClientState(
         val connection: Connection,
@@ -68,43 +72,51 @@ class TranslationRunner(
     private val clientLock = Any()
     private var clientState: ClientState? = null
 
-    private data class Prepared(val translator: Translator, val request: TextRequest)
+    private data class Resolved(
+        val state: AppSettings,
+        val connection: Connection,
+        val origin: String,
+        val request: TextRequest,
+    )
 
-    suspend fun translate(input: RunnerInput): RunnerOutput {
-        val prepared = prepare(input)
-        return backend {
-            val result = prepared.translator.translate(prepared.request)
-            RunnerOutput(
-                result,
-                prepared.request.sourceLang,
-                prepared.request.targetLang,
-                prepared.request.model,
-            )
-        }
-    }
+    suspend fun translate(input: RunnerInput): RunnerOutput = stream(input).last().output
 
     fun stream(input: RunnerInput): Flow<RunnerStreamOutput> = flow {
-        val prepared = prepare(input)
-        backend {
-            prepared.translator.stream(prepared.request).collect { chunk ->
-                emit(
-                    RunnerStreamOutput(
-                        RunnerOutput(
-                            chunk.text,
-                            prepared.request.sourceLang,
-                            prepared.request.targetLang,
-                            prepared.request.model,
-                        ),
-                        chunk.complete,
-                        chunk.incomplete,
-                    ),
-                )
+        val generation = cache.generation()
+        val resolved = resolve(input)
+        val request = resolved.request
+        val key = TranslationCacheKey.of(resolved.connection, request)
+        if (!input.forceRequest) {
+            val hit = cache.get(key)
+            currentCoroutineContext().ensureActive()
+            if (hit != null) {
+                emit(RunnerStreamOutput(
+                    RunnerOutput(hit.text, request.sourceLang, hit.targetLang, request.model), true,
+                ))
+                return@flow
             }
         }
-    }
-        .flowOn(Dispatchers.Default)
+        if (!input.networkAvailable)
+            throw RunnerException(RunnerError.Backend(BackendException(ErrorKind.Offline)))
+        val translator = prepare(resolved)
+        var finished: RunnerStreamOutput? = null
+        backend {
+            translator.stream(request).collect { chunk ->
+                val output = RunnerStreamOutput(
+                    RunnerOutput(chunk.text, request.sourceLang, request.targetLang, request.model),
+                    chunk.complete, chunk.incomplete,
+                )
+                finished = output
+                emit(output)
+            }
+        }
+        currentCoroutineContext().ensureActive()
+        finished?.takeIf { it.complete && !it.incomplete }?.let {
+            cache.put(key, resolved.connection.id, CachedTranslation(it.output.text, it.output.targetLang), generation)
+        }
+    }.flowOn(Dispatchers.Default)
 
-    private suspend fun prepare(input: RunnerInput): Prepared {
+    private suspend fun resolve(input: RunnerInput): Resolved {
         val text = input.text.jsTrim()
         if (text.isEmpty()) throw RunnerException(RunnerError.Empty)
         if (text.length > input.limit) throw RunnerException(RunnerError.TooLong(input.limit))
@@ -118,19 +130,25 @@ class TranslationRunner(
             else SettingsLogic.effective(template, state)
         val target = input.targetLang ?: effective.targetLang
         if (state.connections.isEmpty()) throw RunnerException(RunnerError.NoConnection)
-        val model =
-            input.model
-                ?: effective.model
-                ?: throw RunnerException(
-                    if (state.activeConnectionId == null) RunnerError.NoConnection
-                    else RunnerError.NoModel,
-                )
-        val connection =
-            SettingsLogic.modelConnection(model, state)
-                ?: throw RunnerException(RunnerError.NoConnection)
-        val origin =
-            originOf(connection.baseUrl)
-                ?: throw RunnerException(RunnerError.Backend(BackendException(ErrorKind.Offline)))
+        val model = input.model ?: effective.model ?: throw RunnerException(
+            if (state.activeConnectionId == null) RunnerError.NoConnection else RunnerError.NoModel,
+        )
+        val connection = SettingsLogic.modelConnection(model, state)
+            ?: throw RunnerException(RunnerError.NoConnection)
+        val origin = originOf(connection.baseUrl)
+            ?: throw RunnerException(RunnerError.Backend(BackendException(ErrorKind.Offline)))
+        val language = LanguageProfiles.text(
+            state.globals.languagePromptEnabled, state.globals.languageProfile, target,
+            Contracts.builtinProfiles, state.profileOverrides,
+        )
+        return Resolved(state, connection, origin, TextRequest(
+            text, input.context, input.appName, input.sourceLang ?: state.globals.sourceLang,
+            target, input.prePrompt ?: effective.prePrompt, language, model,
+        ))
+    }
+
+    private suspend fun prepare(resolved: Resolved): Translator {
+        val (state, connection, origin) = resolved
         val local = isLocalHost(URI(origin).host)
         if (!local && origin !in state.consentedOrigins)
             throw RunnerException(RunnerError.ConsentNeeded(origin))
@@ -144,14 +162,6 @@ class TranslationRunner(
             secret.isNullOrEmpty() && ProviderEffort.needsKey(connection.preset, connection.baseUrl)
         )
             throw RunnerException(RunnerError.KeyMissing)
-        val language =
-            LanguageProfiles.text(
-                state.globals.languagePromptEnabled,
-                state.globals.languageProfile,
-                target,
-                Contracts.builtinProfiles,
-                state.profileOverrides,
-            )
         val translator =
             synchronized(clientLock) {
                 val cached = clientState
@@ -164,19 +174,7 @@ class TranslationRunner(
                     }
                 }
             }
-        return Prepared(
-            translator,
-            TextRequest(
-                text,
-                input.context,
-                input.appName,
-                input.sourceLang ?: state.globals.sourceLang,
-                target,
-                input.prePrompt ?: effective.prePrompt,
-                language,
-                model,
-            ),
-        )
+        return translator
     }
 
     private suspend fun <T> backend(block: suspend () -> T): T =

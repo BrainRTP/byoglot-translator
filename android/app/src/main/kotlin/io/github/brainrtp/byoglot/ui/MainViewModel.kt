@@ -50,12 +50,13 @@ class MainViewModel(
     stream: ((RunnerInput) -> Flow<RunnerStreamOutput>)? = null,
     private val networkOnline: () -> Boolean = { true },
     private val nowMs: () -> Long = System::currentTimeMillis,
+    private val cache: TranslationCache = NoTranslationCache,
     private val sourceLanguageDetector: SourceLanguageDetector = SourceLanguageDetector {
         emptyList()
     },
 ) : ViewModel() {
     private val workScope = scope ?: viewModelScope
-    private val translationRunner = TranslationRunner(repository, secrets, transport)
+    private val translationRunner = TranslationRunner(repository, secrets, transport, cache)
     private val streamRunner: (RunnerInput) -> Flow<RunnerStreamOutput> =
         stream
             ?: if (translate != null)
@@ -69,7 +70,7 @@ class MainViewModel(
     private var networkAvailable = false
     private var autoJob: Job? = null
     private var detectionJob: Job? = null
-    val editor = ConnectionEditor(repository, secrets, transport)
+    val editor = ConnectionEditor(repository, secrets, transport, cache)
     val catalogue = ModelCatalogue(editor, repository, networkOnline)
     private val mutableRecentLanguages = MutableStateFlow<List<String>>(emptyList())
     val recentLanguages = mutableRecentLanguages.asStateFlow()
@@ -282,6 +283,7 @@ class MainViewModel(
         text: String = this.text.value,
         templateId: String? = null,
         targetLang: String? = null,
+        forceRequest: Boolean = false,
     ) {
         autoJob?.cancel()
         lastRequestInputs = settings.value?.let { mainRequestInputs(text, parameters.value, it) }
@@ -300,13 +302,15 @@ class MainViewModel(
                 mainModel = true,
                 model = params.model,
                 prePrompt = params.prePrompt,
+                forceRequest = forceRequest,
+                networkAvailable = networkOnline(),
             )
         val validation =
             when {
                 text.isBlank() -> RunnerError.Empty
                 InputCounter.editor(text).overLimit -> RunnerError.TooLong(EDITOR_INPUT_LIMIT)
                 params.missingModel != null && params.model == null -> RunnerError.NoModel
-                !networkOnline() -> RunnerError.Backend(BackendException(ErrorKind.Offline))
+                !networkOnline() && cache === NoTranslationCache -> RunnerError.Backend(BackendException(ErrorKind.Offline))
                 else -> null
             }
         if (validation != null) {
@@ -581,12 +585,17 @@ class MainViewModel(
         }
     }
 
+    suspend fun cacheStats(): TranslationCacheStats = cache.stats()
+
+    suspend fun clearCache() { cache.clear() }
+
     suspend fun export(now: String = Instant.now().toString()): String =
         portableJson.encodeToString(SettingsLogic.export(repository.read(), now))
 
     suspend fun import(json: String) {
         val file = ExportFile.decode(json)
         update { SettingsLogic.merge(file, it) }
+        cache.clear()
     }
 
     fun action(block: suspend () -> Unit) {

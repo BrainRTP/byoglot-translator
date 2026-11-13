@@ -181,4 +181,9 @@
     <string name="unsaved">unsaved edits</string>
     <string name="models_fallback">Fallback model</string>
     <string name="models_fallback_help">Used when the template model is unavailable at connected providers.</string>
+    <string name="cache_title">Cache</string>
+    <string name="cache_entries">Entries</string>
+    <string name="cache_size">Size</string>
+    <string name="cache_megabytes">%1$s MB</string>
+    <string name="cache_clear">Clear cache</string>
 </resources>

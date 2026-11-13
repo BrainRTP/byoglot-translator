@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
                             container.secrets,
                             container.transport,
                             networkOnline = network::online,
+                            cache = container.cache,
                             sourceLanguageDetector =
                                 PlatformSourceLanguageDetector(applicationContext),
                         )

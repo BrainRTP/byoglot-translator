@@ -239,7 +239,7 @@ fun ScreenShare(
                                     if (result.isEmpty() && state.error == null) R.string.translate
                                     else R.string.main_retranslate,
                                 ),
-                                vm::retry,
+                                { vm.translate(forceRequest = result.isNotEmpty()) },
                             )
                             if (
                                 vm.request.canReplace &&

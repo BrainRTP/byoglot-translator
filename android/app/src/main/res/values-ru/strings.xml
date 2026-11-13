@@ -183,4 +183,9 @@
     <string name="unsaved">есть правки</string>
     <string name="models_fallback">Запасная модель</string>
     <string name="models_fallback_help">Используется, если модели шаблона нет у подключенных провайдеров.</string>
+    <string name="cache_title">Кэш</string>
+    <string name="cache_entries">Записей</string>
+    <string name="cache_size">Размер</string>
+    <string name="cache_megabytes">%1$s МБ</string>
+    <string name="cache_clear">Очистить кэш</string>
 </resources>

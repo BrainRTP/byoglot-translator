@@ -47,6 +47,7 @@ fun ScreenSettingsSections(settings: AppSettings, version: String, onSection: (S
                         .find { it.id == settings.globals.defaultTemplateId }
                         ?.let { templateLabel(it) },
             )
+            ListRow(stringResource(R.string.cache_title), { onSection("cache") })
             ListRow(stringResource(R.string.about), { onSection("about") }, value = version)
         }
     }
@@ -568,6 +569,41 @@ fun ScreenAbout(
             stringResource(R.string.source_code),
             { onLink("https://github.com/BrainRTP/byoglot-translator") },
             style = ButtonStyle.Text,
+        )
+    }
+}
+
+@Composable
+fun ScreenCacheSettings(vm: MainViewModel) {
+    var stats by remember { mutableStateOf<TranslationCacheStats?>(null) }
+    LaunchedEffect(vm) { stats = vm.cacheStats() }
+    ScreenColumn {
+        ByoGroup {
+            listOf(
+                stringResource(R.string.cache_entries) to stats?.entries?.toString(),
+                stringResource(R.string.cache_size) to stats?.let {
+                    stringResource(R.string.cache_megabytes,
+                        java.text.NumberFormat.getNumberInstance().apply {
+                            minimumFractionDigits = 1
+                            maximumFractionDigits = 1
+                        }.format(it.bytes / 1_000_000.0),
+                    )
+                },
+            ).forEachIndexed { index, (title, value) ->
+                if (index > 0) HorizontalDivider(color = ByoTheme.colors.bd)
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(title, Modifier.weight(1f), style = ByoType.body)
+                    Text(value.orEmpty(), style = ByoType.mono, color = ByoTheme.colors.mu)
+                }
+            }
+        }
+        ByoButton(
+            stringResource(R.string.cache_clear),
+            { vm.action { vm.clearCache(); stats = vm.cacheStats() } },
+            style = ButtonStyle.Danger,
         )
     }
 }

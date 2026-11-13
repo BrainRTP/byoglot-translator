@@ -95,6 +95,7 @@ fun AppNavigation(
                             "models" -> R.string.models
                             "templates",
                             "template" -> R.string.templates
+                            "cache" -> R.string.cache_title
                             "about" -> R.string.about
                             else -> R.string.main_title
                         }
@@ -204,6 +205,7 @@ fun AppNavigation(
                                     back,
                                 )
                             }
+                        "cache" -> ScreenCacheSettings(vm)
                         "about" -> ScreenAbout(version, onExport, onImport, onLink)
                     }
                 }

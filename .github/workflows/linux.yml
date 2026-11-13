@@ -1,0 +1,46 @@
+name: Linux
+
+on:
+  push:
+    branches: [main]
+    paths: ["linux/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/linux.yml"]
+  pull_request:
+    paths: ["linux/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/linux.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: linux
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the pinned Rust toolchain
+        run: rustup show active-toolchain
+      - run: cargo fmt --check
+      - run: cargo clippy -p byoglot-core -- -D warnings
+      - run: cargo test -p byoglot-core --locked
+  app:
+    runs-on: ubuntu-latest
+    container: fedora:45
+    defaults:
+      run:
+        working-directory: linux
+    steps:
+      - name: Install system libraries
+        working-directory: /
+        run: dnf install -y git gtk4-devel libadwaita-devel gcc rustup
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Rust
+        run: |
+          rustup-init -y --profile minimal --default-toolchain none --no-modify-path
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Install the pinned Rust toolchain
+        run: rustup show active-toolchain
+      - run: cargo clippy --workspace -- -D warnings
+      - run: cargo test --workspace --locked
+      - run: cargo build -p byoglot --release --locked

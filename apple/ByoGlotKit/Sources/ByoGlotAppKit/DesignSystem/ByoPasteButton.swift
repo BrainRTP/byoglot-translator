@@ -25,28 +25,31 @@ private struct NativePasteControl: UIViewRepresentable {
     let iconOnly: Bool
     let label: String
     let action: (String) -> Void
-    func makeCoordinator() -> PasteTarget { PasteTarget(action: action) }
-    func makeUIView(context: Context) -> UIPasteControl {
+    func makeUIView(context: Context) -> PasteControl {
         let configuration = UIPasteControl.Configuration()
         configuration.displayMode = iconOnly ? .iconOnly : .iconAndLabel
-        configuration.baseBackgroundColor = .clear
+        configuration.baseBackgroundColor = UIColor(ByoColor.background)
         configuration.baseForegroundColor = UIColor(ByoColor.accent)
-        let control = UIPasteControl(configuration: configuration)
-        control.target = context.coordinator
+        let control = PasteControl(configuration: configuration)
+        control.action = action
         control.accessibilityLabel = AppStrings.text(label)
         return control
     }
-    func updateUIView(_ control: UIPasteControl, context: Context) { context.coordinator.action = action }
-    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIPasteControl, context: Context) -> CGSize? {
+    func updateUIView(_ control: PasteControl, context: Context) { control.action = action }
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: PasteControl, context: Context) -> CGSize? {
         let size = uiView.intrinsicContentSize
         return CGSize(width: max(44, size.width), height: max(44, size.height))
     }
-    final class PasteTarget: UIResponder {
-        var action: (String) -> Void
-        init(action: @escaping (String) -> Void) {
-            self.action = action
-            super.init()
+    final class PasteControl: UIPasteControl {
+        var action: (String) -> Void = { _ in }
+        override init(configuration: UIPasteControl.Configuration) {
+            super.init(configuration: configuration)
             pasteConfiguration = UIPasteConfiguration(forAccepting: NSString.self)
+            target = self
+        }
+        required init?(coder: NSCoder) { nil }
+        override func canPaste(_ itemProviders: [NSItemProvider]) -> Bool {
+            itemProviders.contains { $0.canLoadObject(ofClass: NSString.self) }
         }
         override func paste(itemProviders: [NSItemProvider]) {
             guard let provider = itemProviders.first(where: { $0.canLoadObject(ofClass: NSString.self) }) else { return }

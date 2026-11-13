@@ -106,24 +106,35 @@ public struct LangBar: View {
         return model.detectedSourceLang.map { AppStrings.text("main.auto") + " " + AppStrings.language($0) } ?? AppStrings.text("main.autoUndetected")
     }
     public var body: some View {
-        HStack(spacing: 2) {
-            Menu {
-                Button(AppStrings.text("lang.auto")) { Task { await model.chooseSource("auto") } }
-                ForEach(Contracts.languageCodes, id: \.self) { code in
-                    Button(AppStrings.language(code)) { Task { await model.chooseSource(code) } }
-                }
-            } label: { languageLabel(sourceLabel) }
-                .accessibilityLabel(AppStrings.text("lang.srcTitle") + ": " + sourceLabel)
-            ByoIconButton(title: "main.swap", symbol: "arrow.left.arrow.right", action: swap).disabled(!model.canSwap)
-            Menu {
-                ForEach(Contracts.languageCodes, id: \.self) { code in
-                    Button(AppStrings.language(code)) { Task { await model.chooseTarget(code) } }
-                }
-            } label: { languageLabel(AppStrings.language(model.targetLang)) }
-                .accessibilityLabel(AppStrings.text("lang.dstTitle") + ": " + AppStrings.language(model.targetLang))
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(spacing: 2) { sourceMenu; swapButton; targetMenu }
+            } else {
+                HStack(spacing: 2) { sourceMenu; swapButton; targetMenu }
+            }
         }.padding(2).frame(minHeight: 48)
-            .overlay { RoundedRectangle(cornerRadius: 10).stroke(ByoColor.border) }
+            .overlay { RoundedRectangle(cornerRadius: 10).stroke(ByoColor.border).allowsHitTesting(false) }
             .accessibilityElement(children: .contain)
+    }
+    private var sourceMenu: some View {
+        Menu {
+            Button(AppStrings.text("lang.auto")) { Task { await model.chooseSource("auto") } }
+            ForEach(Contracts.languageCodes, id: \.self) { code in
+                Button(AppStrings.language(code)) { Task { await model.chooseSource(code) } }
+            }
+        } label: { languageLabel(sourceLabel) }
+            .accessibilityLabel(AppStrings.text("lang.srcTitle") + ": " + sourceLabel)
+    }
+    private var swapButton: some View {
+        ByoIconButton(title: "main.swap", symbol: "arrow.left.arrow.right", action: swap).disabled(!model.canSwap)
+    }
+    private var targetMenu: some View {
+        Menu {
+            ForEach(Contracts.languageCodes, id: \.self) { code in
+                Button(AppStrings.language(code)) { Task { await model.chooseTarget(code) } }
+            }
+        } label: { languageLabel(AppStrings.language(model.targetLang)) }
+            .accessibilityLabel(AppStrings.text("lang.dstTitle") + ": " + AppStrings.language(model.targetLang))
     }
     private func languageLabel(_ label: String) -> some View {
         HStack(spacing: 4) { Text(label).lineLimit(typeSize.isAccessibilitySize ? 2 : 1); Image(systemName: "chevron.down").font(.caption2).accessibilityHidden(true) }
@@ -183,15 +194,12 @@ public struct TranslatorBlock: View {
                 }
                 SourceTextEditor(text: $text, autoTranslate: model.settings.autoTranslate, edit: { model.edit($0, composing: $1) }, paste: { value in text = value; model.edit(value, pasted: true) }, submit: model.keyboardTranslate, focus: { editing = $0 })
             }
-            HStack {
-                Text(AppStrings.format("main.counter", ["n": String(AppModel.inputCount(text))]))
-                    .modifier(ByoTypography(13, relativeTo: .caption)).foregroundStyle(model.overLimit ? ByoColor.error : ByoColor.muted)
-                    .accessibilityLabel(AppStrings.format("main.counter", ["n": String(AppModel.inputCount(text))]))
-                Spacer()
-                if text.isEmpty {
-                    ByoPasteButton { value in text = value; model.edit(value, pasted: true) }
+            Group {
+                if typeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 4) { counter; inputAction }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    ByoIconButton(title: "main.clear", symbol: "xmark") { text = ""; model.edit("") }
+                    HStack { counter; Spacer(); inputAction }
                 }
             }.padding(.leading, 14).padding(.trailing, 4).padding(.bottom, 4)
             if model.overLimit {
@@ -200,6 +208,18 @@ public struct TranslatorBlock: View {
             }
         }.background(ByoColor.background, in: RoundedRectangle(cornerRadius: 10))
             .overlay { RoundedRectangle(cornerRadius: 10).stroke(editing ? ByoColor.accent : ByoColor.border, lineWidth: editing ? 2 : 1).allowsHitTesting(false) }
+    }
+    private var counter: some View {
+        Text(AppStrings.format("main.counter", ["n": String(AppModel.inputCount(text))]))
+            .modifier(ByoTypography(13, relativeTo: .caption)).foregroundStyle(model.overLimit ? ByoColor.error : ByoColor.muted)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+    @ViewBuilder private var inputAction: some View {
+        if text.isEmpty {
+            ByoPasteButton { value in text = value; model.edit(value, pasted: true) }
+        } else {
+            ByoIconButton(title: "main.clear", symbol: "xmark") { text = ""; model.edit("") }
+        }
     }
     private var output: some View {
         VStack(spacing: 0) {

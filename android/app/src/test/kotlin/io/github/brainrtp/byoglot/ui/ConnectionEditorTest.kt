@@ -30,14 +30,36 @@ class ConnectionEditorTest {
     fun validate_table() {
         listOf(
                 Triple(draft("garbage"), false, DraftProblem.BaseUrl),
-                Triple(draft("http://example.com"), false, DraftProblem.InsecureRemote),
+                Triple(draft("http://example.com"), false, DraftProblem.HttpsRequired),
                 Triple(draft(key = ""), false, DraftProblem.ApiKey),
                 Triple(draft(key = ""), true, null),
-                Triple(draft("http://localhost", ""), false, null),
+                Triple(draft("http://localhost", ""), false, DraftProblem.HttpsRequired),
+                Triple(draft("http://127.0.0.1:11434/v1"), true, DraftProblem.HttpsRequired),
+                Triple(draft("http://[::1]:11434/v1"), false, DraftProblem.HttpsRequired),
+                Triple(draft("http://192.168.1.2", ""), false, DraftProblem.HttpsRequired),
+                Triple(draft("http://provider.local"), false, DraftProblem.HttpsRequired),
+                Triple(draft("ftp://provider.test"), false, DraftProblem.BaseUrl),
+                Triple(draft("https://192.168.1.2"), false, null),
+                Triple(draft("HTTPS://a.test/v1"), false, null),
                 Triple(draft(), false, null),
             )
             .forEach { (d, stored, expected) -> assertEquals(expected, editor.validate(d, stored)) }
-        assertEquals(DraftProblem.ApiKey, editor.validate(draft("http://192.168.1.2", ""), false))
+    }
+
+    @Test
+    fun non_https_save_fails_before_consent_key_checks_and_requests() = runTest {
+        for (url in listOf("http://localhost", "http://192.168.1.2", "http://provider.test", "ftp://provider.test")) {
+            for (consent in listOf(false, true)) {
+                val failure = runCatching { editor.save(draft(url, ""), consent) }.exceptionOrNull()
+                val error = assertInstanceOf(RunnerException::class.java, failure).error
+                assertEquals(
+                    ErrorKind.ProviderError,
+                    assertInstanceOf(RunnerError.Backend::class.java, error).error.kind,
+                )
+            }
+        }
+        assertEquals(0, calls)
+        assertEquals(initial, settings.read())
     }
 
     @Test

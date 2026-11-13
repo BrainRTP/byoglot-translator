@@ -69,6 +69,7 @@
     <string name="err_down_unknown">The provider did not respond. Retry in a minute or choose another model.</string>
     <string name="providers_key_unchecked">The key was not checked. Check your connection and retry.</string>
     <string name="https_only">Enter a valid HTTPS address.</string>
+    <string name="legacy_https_only">This address is not HTTPS. Delete it and add the provider again.</string>
     <string name="key_mask">••••••••</string>
     <string name="providers_title">Providers</string>
     <string name="providers_firstTitle">Connect a provider</string>

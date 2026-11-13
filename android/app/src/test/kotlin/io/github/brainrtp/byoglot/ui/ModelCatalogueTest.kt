@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test
 
 class ModelCatalogueTest {
     @Test
-    fun all_connections_include_legacy_local_models_and_use_provider_effort_levels() = runTest {
+    fun legacy_http_connections_stay_listed_without_model_requests() = runTest {
         val settings =
             AppSettings.initial("en")
                 .copy(
@@ -31,15 +31,19 @@ class ModelCatalogueTest {
         val repository = InMemorySettingsRepository(settings)
         val secrets =
             InMemorySecretStore().apply { set("fixture", "remote", "https://remote.test") }
+        var calls = 0
         val transport =
             object : HttpTransport {
-                override suspend fun send(request: HttpRequest, timeoutMs: Long) =
-                    HttpResponse(
+                override suspend fun send(request: HttpRequest, timeoutMs: Long): HttpResponse {
+                    calls++
+                    assertTrue(request.url.startsWith("https://remote.test/"))
+                    return HttpResponse(
                         200,
                         emptyMap(),
                         """{"data":[{"id":"m","effort":{"supported_levels":["low","max"]}}]}"""
                             .toByteArray(),
                     )
+                }
             }
         val catalogue =
             ModelCatalogue(ConnectionEditor(repository, secrets, transport), repository) { true }
@@ -49,10 +53,14 @@ class ModelCatalogueTest {
             listOf("none", "low", "max"),
             catalogue.groups.value.getValue("remote").models.single().variants,
         )
+        val legacy = catalogue.groups.value.getValue("local")
+        assertTrue(legacy.models.isEmpty())
         assertEquals(
-            listOf("none"),
-            catalogue.groups.value.getValue("local").models.single().variants,
+            ErrorKind.ProviderError,
+            assertInstanceOf(RunnerError.Backend::class.java, legacy.error).error.kind,
         )
+        assertEquals(1, calls)
+        assertEquals(settings, repository.read())
         assertFalse(
             catalogue.available(ModelRef("deepseek", "missing", connectionId = "remote"), settings),
         )

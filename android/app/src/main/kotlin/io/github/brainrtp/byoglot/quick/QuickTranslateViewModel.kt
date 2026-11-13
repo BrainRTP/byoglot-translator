@@ -3,6 +3,7 @@ package io.github.brainrtp.byoglot.quick
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.brainrtp.byoglot.core.*
+import io.github.brainrtp.byoglot.net.PhoneProviderPolicy
 import io.github.brainrtp.byoglot.ui.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -199,18 +200,19 @@ internal constructor(
         mutableState.value = TranslationState(working = true)
         job = workScope.launch {
             try {
-                var latest: RunnerStreamOutput? = null
-                stream(
-                        RunnerInput(
-                            request.text,
-                            templateId = params.templateId,
-                            targetLang = params.targetLang,
-                            sourceLang = params.sourceLang,
-                            model = params.model,
-                            prePrompt = params.prePrompt,
-                            limit = EXTERNAL_INPUT_LIMIT,
-                        ),
+                val input =
+                    RunnerInput(
+                        request.text,
+                        templateId = params.templateId,
+                        targetLang = params.targetLang,
+                        sourceLang = params.sourceLang,
+                        model = params.model,
+                        prePrompt = params.prePrompt,
+                        limit = EXTERNAL_INPUT_LIMIT,
                     )
+                PhoneProviderPolicy.check(input, repository.read())
+                var latest: RunnerStreamOutput? = null
+                stream(input)
                     .map {
                         latest = it
                         Result.success(it)

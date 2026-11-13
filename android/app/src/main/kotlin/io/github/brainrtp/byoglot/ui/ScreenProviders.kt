@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.brainrtp.byoglot.R
 import io.github.brainrtp.byoglot.core.*
+import io.github.brainrtp.byoglot.net.PhoneProviderPolicy
 import java.net.URI
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -83,7 +84,7 @@ fun ScreenProviders(
                         ByoIconImage(ByoIcon.Chevron, c.mu)
                     },
                 )
-                if (legacyLocalConnection(connection)) ConnectionDelete(vm, connection) {}
+                if (legacyPhoneConnection(connection)) ConnectionDelete(vm, connection) {}
             }
         }
         Column(Modifier.border(1.dp, c.bd, RoundedCornerShape(8.dp))) {
@@ -114,19 +115,22 @@ fun ProviderKeyScreen(
     onDone: () -> Unit,
     onModel: (String) -> Unit,
 ) {
-    if (initial != null && legacyLocalConnection(initial)) {
+    if (initial != null && legacyPhoneConnection(initial)) {
         ScreenColumn {
             Text(initial.baseUrl, style = ByoType.mono)
-            ByoButton(
-                stringResource(R.string.use_connection),
-                {
-                    vm.action {
-                        vm.activate(initial.id)
-                        onDone()
-                    }
-                },
-                enabled = initial.id != settings.activeConnectionId,
-            )
+            if (PhoneProviderPolicy.origin(initial.baseUrl) == null)
+                Text(stringResource(R.string.legacy_https_only), style = ByoType.body)
+            else
+                ByoButton(
+                    stringResource(R.string.use_connection),
+                    {
+                        vm.action {
+                            vm.activate(initial.id)
+                            onDone()
+                        }
+                    },
+                    enabled = initial.id != settings.activeConnectionId,
+                )
             ConnectionDelete(vm, initial, onDone)
         }
         return
@@ -155,9 +159,14 @@ fun ProviderKeyScreen(
     val stored =
         keys[id] == true &&
             origin == settings.connections.find { it.id == id }?.let { originOf(it.baseUrl) }
-    val secure = origin?.startsWith("https://") == true
     val displayName = name.ifBlank { presetLabel(preset) }
-    val valid = secure && (key.isNotBlank() || stored && !replacing) && consent
+    val problem =
+        vm.editor.validate(
+            ConnectionDraft(id, preset, displayName, url, key),
+            stored && !replacing,
+        )
+    val secure = problem != DraftProblem.BaseUrl && problem != DraftProblem.HttpsRequired
+    val valid = problem == null && consent
     val save: () -> Unit = {
         if (!saving && valid) {
             saving = true
@@ -269,7 +278,7 @@ fun ProviderKeyScreen(
                     )
                 },
             )
-        if (origin != null && origin !in settings.consentedOrigins)
+        if (secure && origin != null && origin !in settings.consentedOrigins)
             Row(
                 Modifier.fillMaxWidth()
                     .heightIn(min = 48.dp)
@@ -380,10 +389,10 @@ fun ProviderKeyScreen(
     }
 }
 
-internal fun legacyLocalConnection(connection: Connection): Boolean =
+internal fun legacyPhoneConnection(connection: Connection): Boolean =
     connection.preset == ProviderPreset.ollama ||
         connection.preset == ProviderPreset.lmstudio ||
-        originOf(connection.baseUrl)?.startsWith("http://") == true
+        PhoneProviderPolicy.origin(connection.baseUrl) == null
 
 @Composable
 private fun ConnectionDelete(vm: MainViewModel, connection: Connection, onDone: () -> Unit) {
@@ -393,7 +402,7 @@ private fun ConnectionDelete(vm: MainViewModel, connection: Connection, onDone: 
     val deleteFocus = remember { FocusRequester() }
     var returnDeleteFocus by remember { mutableStateOf(false) }
     val displayName = connection.name
-    val local = legacyLocalConnection(connection)
+    val local = legacyPhoneConnection(connection)
     LaunchedEffect(removing) {
         if (removing) confirmFocus.requestFocus()
         else if (returnDeleteFocus) {

@@ -3,6 +3,7 @@ package io.github.brainrtp.byoglot.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.brainrtp.byoglot.core.*
+import io.github.brainrtp.byoglot.net.PhoneProviderPolicy
 import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.*
@@ -315,6 +316,7 @@ class MainViewModel(
         mutableTranslation.value = TranslationState(working = true)
         job = workScope.launch {
             try {
+                PhoneProviderPolicy.check(input, repository.read())
                 var latest: RunnerStreamOutput? = null
                 streamRunner(input)
                     .map { chunk ->

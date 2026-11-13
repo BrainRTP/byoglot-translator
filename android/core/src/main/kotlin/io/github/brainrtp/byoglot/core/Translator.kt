@@ -17,6 +17,10 @@ data class TextRequest(
     val languagePrompt: String,
     val model: ModelRef,
 ) {
+    fun prompt(): String = PromptBuilder.text(
+        TextPromptInput(prePrompt, languagePrompt, sourceLang, targetLang, text, context, appName),
+    )
+
     override fun toString(): String =
         "TextRequest(textLength=${text.length}, contextLength=${context.length}, prePromptLength=${prePrompt.length}, languagePromptLength=${languagePrompt.length})"
 }
@@ -48,18 +52,7 @@ class Translator(
                     }
                     generation
                 }
-            val prompt =
-                PromptBuilder.text(
-                    TextPromptInput(
-                        request.prePrompt,
-                        request.languagePrompt,
-                        request.sourceLang,
-                        request.targetLang,
-                        request.text,
-                        request.context,
-                        request.appName,
-                    ),
-                )
+            val prompt = request.prompt()
             val result = generator().generate(prompt, request.model).jsTrim()
             currentCoroutineContext().ensureActive()
             synchronized(cache) {
@@ -74,18 +67,7 @@ class Translator(
 
     fun stream(request: TextRequest): Flow<TranslationChunk> = flow {
         semaphore.withPermit {
-            val prompt =
-                PromptBuilder.text(
-                    TextPromptInput(
-                        request.prePrompt,
-                        request.languagePrompt,
-                        request.sourceLang,
-                        request.targetLang,
-                        request.text,
-                        request.context,
-                        request.appName,
-                    ),
-                )
+            val prompt = request.prompt()
             val client = generator()
             val text = StringBuilder()
             var reason: String? = null

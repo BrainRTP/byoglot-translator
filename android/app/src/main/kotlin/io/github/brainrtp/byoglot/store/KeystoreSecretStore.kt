@@ -17,7 +17,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.*
 
-class KeystoreSecretStore(context: Context) : SecretStore {
+class KeystoreSecretStore(context: Context, private val cache: TranslationCache = NoTranslationCache) : SecretStore {
     private val file = AtomicFile(File(context.noBackupFilesDir, "secrets.json"))
     private val keyStore get() = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
 
@@ -55,7 +55,7 @@ class KeystoreSecretStore(context: Context) : SecretStore {
         }
     }
     override suspend fun has(connectionId: String): Boolean = withContext(Dispatchers.IO) { lock.withLock { connectionId in read() } }
-    override suspend fun delete(connectionId: String) = withContext(Dispatchers.IO + NonCancellable) { lock.withLock { write(JsonObject(read() - connectionId)) } }
+    override suspend fun delete(connectionId: String) = withContext(Dispatchers.IO + NonCancellable) { lock.withLock { cache.removeConnection(connectionId); write(JsonObject(read() - connectionId)) } }
     private fun read(): JsonObject = try { Json.parseToJsonElement(file.openRead().bufferedReader().use { it.readText() }).jsonObject }
         catch (_: java.io.FileNotFoundException) { JsonObject(emptyMap()) }
         catch (_: IllegalArgumentException) { JsonObject(emptyMap()) }

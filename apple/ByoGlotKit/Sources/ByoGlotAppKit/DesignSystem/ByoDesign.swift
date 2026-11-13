@@ -60,8 +60,18 @@ public enum ByoRadius {
 }
 
 public enum AppStrings {
+    public static let interfaceLanguageKey = "ByoGlotInterfaceLanguage"
+    public static var interfaceLanguage: String { UserDefaults.standard.string(forKey: interfaceLanguageKey) ?? "system" }
+    public static var locale: Locale { interfaceLanguage == "system" ? .current : Locale(identifier: interfaceLanguage) }
     public static func text(_ key: String) -> String {
-        String(localized: String.LocalizationValue(key), bundle: .module)
+        let code = interfaceLanguage == "system" ? Bundle.module.preferredLocalizations.first ?? "en" : interfaceLanguage
+        let bundle = Bundle.module.path(forResource: code, ofType: "lproj").flatMap(Bundle.init(path:)) ?? .module
+        return bundle.localizedString(forKey: key, value: nil, table: nil)
+    }
+    public static func error(_ error: RunnerError) -> String {
+        var resource = UserFacingError.message(error)
+        resource.locale = locale
+        return String(localized: resource)
     }
     public static func format(_ key: String, _ values: [String: String]) -> String {
         values.reduce(text(key)) { $0.replacingOccurrences(of: "{\($1.key)}", with: $1.value) }
@@ -70,8 +80,15 @@ public enum AppStrings {
         let value = value ?? "none"
         return ["none", "low", "medium", "high", "max"].contains(value) ? text("effort." + value) : value
     }
+    public static func profile(_ id: String) -> String {
+        switch id {
+        case "auto": text("profile.auto")
+        case "generic": text("profile.generic")
+        default: language(id)
+        }
+    }
     public static func language(_ code: String) -> String {
-        Locale.current.localizedString(forLanguageCode: code) ?? code
+        locale.localizedString(forLanguageCode: code) ?? code
     }
 }
 

@@ -21,6 +21,11 @@ public actor ModelCapabilitiesCache {
         entries[connection.id] = Entry(preset: connection.preset, baseUrl: connection.baseUrl, secret: secret, models: models)
     }
 
+    func models(connection: Connection, secret: String?) -> [ModelInfo]? {
+        guard let entry = entries[connection.id], entry.preset == connection.preset, entry.baseUrl == connection.baseUrl, entry.secret == secret else { return nil }
+        return entry.models
+    }
+
     func remove(connectionId: String) { entries[connectionId] = nil }
 
     func clamp(_ model: ModelRef, connection: Connection, secret: String?) -> ModelRef {

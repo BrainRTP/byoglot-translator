@@ -163,6 +163,14 @@ public actor ConnectionEditor {
         } catch { throw runnerError(error) }
     }
 
+    public func cachedModels(connectionId: String) async -> [ModelInfo]? {
+        guard let state = try? await settings.read(), let connection = state.connections.first(where: { $0.id == connectionId }), let origin = originOf(connection.baseUrl) else { return nil }
+        do {
+            let secret = try secrets.secret(connectionId: connectionId, origin: origin)
+            return await modelCapabilities.models(connection: connection, secret: secret)
+        } catch { return nil }
+    }
+
     public func keyState(connectionId: String) async -> Bool {
         guard let state = try? await settings.read(), let connection = state.connections.first(where: { $0.id == connectionId }), let origin = originOf(connection.baseUrl) else { return false }
         guard let secret = try? secrets.secret(connectionId: connectionId, origin: origin) else { return false }

@@ -32,6 +32,8 @@ public final class AppModel {
     public private(set) var models: [String: [ModelInfo]] = [:]
     public private(set) var keyStates: [String: Bool] = [:]
     public private(set) var catalogueErrors: [String: RunnerError] = [:]
+    public private(set) var recentLanguages: [String] = []
+    public private(set) var interfaceLanguage = AppStrings.interfaceLanguage
     public let editor: ConnectionEditor
     @ObservationIgnored private let store: SettingsStore
     @ObservationIgnored private let stream: Stream
@@ -42,6 +44,7 @@ public final class AppModel {
     @ObservationIgnored private var request: Task<Void, Never>?
     private var composing = false
     @ObservationIgnored private var requestId: UUID?
+    private var manualTarget: String?
     private var manualModel: ModelRef?
     private var manualPrompt: String?
 
@@ -65,7 +68,11 @@ public final class AppModel {
 
     public var targetLang: String { selection.targetLang }
     public var template: Template { settings.templates.first { $0.id == selection.templateId } ?? Contracts.builtinTemplate }
-    public var model: ModelRef? { clamp(manualModel ?? SettingsLogic.effectiveMain(template: template, settings: settings).model) }
+    public var model: ModelRef? {
+        if let manualModel { return clamp(manualModel) }
+        if missingTemplateModel != nil { return clamp(SettingsLogic.fallbackModel(settings: settings, main: true)) }
+        return clamp(SettingsLogic.effectiveMain(template: template, settings: settings).model)
+    }
     public var prePrompt: String { manualPrompt ?? SettingsLogic.effectiveMain(template: template, settings: settings).prePrompt }
     public var changed: Bool {
         let effective = SettingsLogic.effectiveMain(template: template, settings: settings)
@@ -113,7 +120,10 @@ public final class AppModel {
                 loaded = true
             }
             storageError = nil
-            for connection in settings.connections { keyStates[connection.id] = await editor.keyState(connectionId: connection.id) }
+            for connection in settings.connections {
+                keyStates[connection.id] = await editor.keyState(connectionId: connection.id)
+                models[connection.id] = await editor.cachedModels(connectionId: connection.id)
+            }
             if !first && before != inputs { invalidate(); schedule() }
             else if previous.autoTranslate != settings.autoTranslate {
                 pending?.cancel()
@@ -122,9 +132,10 @@ public final class AppModel {
         } catch { storageError = .appGroupUnavailable }
     }
 
-    public func updateSettings(_ change: @Sendable (inout AppSettings) -> Void) async {
-        do { _ = try await store.update(change); await refresh() }
-        catch { storageError = .appGroupUnavailable }
+    @discardableResult
+    public func updateSettings(_ change: @Sendable (inout AppSettings) -> Void) async -> Bool {
+        do { _ = try await store.update(change); await refresh(); return true }
+        catch { storageError = .appGroupUnavailable; return false }
     }
 
     public func edit(_ text: String, pasted: Bool = false, composing: Bool = false) {
@@ -277,6 +288,7 @@ public final class AppModel {
 
     public func chooseSource(_ code: String) async {
         guard code != sourceLang, code == "auto" || Contracts.languageCodes.contains(code) else { return }
+        rememberLanguage(code)
         sourceLang = code
         detectedSourceLang = nil
         invalidate()
@@ -286,6 +298,8 @@ public final class AppModel {
 
     public func chooseTarget(_ code: String) async {
         guard Contracts.languageCodes.contains(code), selection.selectTarget(code) else { return }
+        manualTarget = code
+        rememberLanguage(code)
         invalidate()
         await updateSettings { $0.globals.targetLang = code }
         if canTranslate { translate() }
@@ -294,6 +308,7 @@ public final class AppModel {
     public func chooseTemplate(_ value: Template) async {
         let before = inputs
         guard selection.selectTemplate(value) else { return }
+        manualTarget = nil
         manualModel = nil
         manualPrompt = nil
         let changed = before != inputs
@@ -314,6 +329,133 @@ public final class AppModel {
         manualPrompt = value
         invalidate()
         schedule()
+    }
+
+    public var templateChanges: Bool {
+        (manualTarget != nil && template.settings.targetLang != manualTarget) ||
+        (manualModel != nil && clamp(template.settings.pageModel) != manualModel)
+    }
+
+    public var missingTemplateModel: ModelRef? {
+        guard let own = template.settings.pageModel else { return nil }
+        guard let bound = SettingsLogic.bindModel(own, settings: settings) else { return own }
+        if let id = bound.connectionId, let catalogue = models[id], !catalogue.contains(where: { $0.id == bound.id && $0.providerID == bound.providerID }) { return own }
+        return nil
+    }
+
+    public func modelInfo(_ ref: ModelRef?) -> ModelInfo? {
+        guard let ref, let id = ref.connectionId else { return nil }
+        return models[id]?.first { $0.id == ref.id && $0.providerID == ref.providerID }
+    }
+
+    public func clampedModel(_ ref: ModelRef?) -> ModelRef? { clamp(ref) }
+
+    public func resetParameters() {
+        let before = inputs
+        manualTarget = nil
+        manualModel = nil
+        manualPrompt = nil
+        _ = selection.selectTarget(SettingsLogic.effectiveMain(template: template, settings: settings).targetLang)
+        if before != inputs { invalidate(); if canTranslate { translate() } }
+    }
+
+    @discardableResult
+    public func storeCurrentTemplate(name: String? = nil) async -> Bool {
+        guard name != nil || (!template.builtin && templateChanges) else { return false }
+        if let name, jsTrim(name).isEmpty { return false }
+        var saved = template
+        if let name { saved.id = UUID().uuidString; saved.name = jsTrim(name); saved.builtin = false }
+        if let manualTarget { saved.settings.targetLang = manualTarget }
+        if let manualModel { saved.settings.pageModel = manualModel }
+        // A parameter prompt is never written, including when creating a template.
+        let value = saved
+        guard await updateSettings({ state in
+            if let index = state.templates.firstIndex(where: { $0.id == value.id }) { state.templates[index] = value }
+            else { state.templates.append(value) }
+            state.globals.defaultTemplateId = value.id
+        }) else { return false }
+        _ = selection.selectTemplate(value)
+        manualTarget = nil
+        manualModel = nil
+        return true
+    }
+
+    @discardableResult
+    public func saveTemplate(_ value: Template) async -> Bool {
+        guard !value.builtin, !jsTrim(value.name).isEmpty,
+              settings.templates.first(where: { $0.id == value.id })?.builtin != true else { return false }
+        return await updateSettings { state in
+            if let index = state.templates.firstIndex(where: { $0.id == value.id }) { state.templates[index] = value }
+            else { state.templates.append(value) }
+        }
+    }
+
+    @discardableResult
+    public func deleteTemplate(_ id: String) async -> Bool {
+        guard let value = settings.templates.first(where: { $0.id == id }), !value.builtin else { return false }
+        let selected = template.id == id
+        guard await updateSettings({ state in
+            state.templates.removeAll { $0.id == id }
+            state.siteRules.removeAll { $0.templateId == id }
+            if state.globals.defaultTemplateId == id { state.globals.defaultTemplateId = Contracts.builtinTemplate.id }
+        }) else { return false }
+        if selected { await chooseTemplate(Contracts.builtinTemplate) }
+        return true
+    }
+
+    public func setConfiguredModel(_ value: ModelRef, slot: String) async {
+        let before = inputs
+        guard await updateSettings({ state in
+            switch slot {
+            case "main": state.mainModel = value
+            case "external": state.externalModel = value
+            case "fallback": state.fallbackModel = value
+            default: break
+            }
+        }) else { return }
+        if before != inputs && canTranslate { translate() }
+    }
+
+    public func setInterfaceLanguage(_ code: String) {
+        guard ["system", "en", "ru"].contains(code), interfaceLanguage != code else { return }
+        UserDefaults.standard.set(code, forKey: AppStrings.interfaceLanguageKey)
+        interfaceLanguage = code
+    }
+
+    public func saveProfile(id: String, text: String) async -> Bool {
+        guard let base = Contracts.builtinProfiles[id], text.utf16.count <= Contracts.limits.maxProfileText else { return false }
+        let override = ProfileOverride(text: text, base: base, savedAt: Date.now.timeIntervalSince1970 * 1000)
+        return await updateSettings { $0.profileOverrides[id] = override }
+    }
+
+    public func exportData(now: Date = .now) async throws -> Data {
+        let file = SettingsLogic.export(try await store.read(), now: now)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        return try encoder.encode(file)
+    }
+
+    public func applyImport(_ file: ExportFile) async -> Bool {
+        let before = inputs
+        do {
+            settings = try await store.update { state in state = SettingsLogic.merge(file, into: state) }
+            sourceLang = settings.globals.sourceLang
+            selection = LanguageSelection(targetLang: settings.globals.targetLang)
+            _ = selection.selectTemplate(settings.templates.first { $0.id == settings.globals.defaultTemplateId } ?? Contracts.builtinTemplate)
+            manualTarget = nil
+            manualModel = nil
+            manualPrompt = nil
+            if before != inputs { invalidate(); schedule() }
+            storageError = nil
+            return true
+        } catch { storageError = .appGroupUnavailable; return false }
+    }
+
+    private func rememberLanguage(_ code: String) {
+        guard Contracts.languageCodes.contains(code) else { return }
+        recentLanguages.removeAll { $0 == code }
+        recentLanguages.insert(code, at: 0)
+        recentLanguages = Array(recentLanguages.prefix(5))
     }
 
     @discardableResult

@@ -42,13 +42,19 @@ public enum Contracts: Sendable {
         }
     )
     public static let presetOrder: [ProviderPreset] = {
-        let url = Bundle.module.resourceURL!.appending(path: "Resources/contracts/presets.json")
-        let data = try! Data(contentsOf: url)
-        let text = String(decoding: data, as: UTF8.self)
-        return ProviderPreset.allCases.sorted {
-            text.range(of: "\"\($0.rawValue)\":")!.lowerBound < text.range(of: "\"\($1.rawValue)\":")!.lowerBound
-        }
+        guard let url = Bundle.module.resourceURL?.appending(path: "Resources/contracts/presets.json"), let data = try? Data(contentsOf: url) else { return ProviderPreset.allCases }
+        return presetOrder(in: data)
     }()
+
+    static func presetOrder(in data: Data) -> [ProviderPreset] {
+        guard let keys = orderedKeys(in: data, object: "presets") else { return ProviderPreset.allCases }
+        var result: [ProviderPreset] = []
+        for key in keys {
+            if let preset = ProviderPreset(rawValue: key), !result.contains(preset) { result.append(preset) }
+        }
+        return result + ProviderPreset.allCases.filter { !result.contains($0) }
+    }
+
     public static let favoriteModel = presetFile.favoriteModel
     public static let selectionDefaultEffort = presetFile.selectionDefaultEffort
     public static let limits: Limits = load("limits")

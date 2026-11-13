@@ -53,12 +53,12 @@ private final class StreamingStub: URLProtocol, @unchecked Sendable {
         let client = ProviderClient(connection: Connection(id: "c", preset: .custom, name: "Test", baseUrl: "https://stream.example/wait"), secret: nil, transport: transport())
         let task = Task {
             for try await _ in client.stream(prompt: "private text", model: ModelRef(providerID: "custom", id: "m")) {}
+            try Task.checkCancellation()
         }
         var starts = StreamingStub.starts.stream.makeAsyncIterator()
         while let path = await starts.next() { if path == "/wait/chat/completions" { break } }
         task.cancel()
-        do { try await task.value }
-        catch { #expect(error as? BackendError == BackendError(kind: .aborted)) }
+        await #expect(throws: CancellationError.self) { try await task.value }
         var stops = StreamingStub.stops.stream.makeAsyncIterator()
         while let path = await stops.next() { if path == "/wait/chat/completions" { break } }
     }

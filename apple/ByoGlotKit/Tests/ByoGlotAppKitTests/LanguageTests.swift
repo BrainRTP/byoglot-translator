@@ -42,10 +42,10 @@ struct LanguageTests {
         state.externalModel = external
         state.fallbackModel = main
         #expect(SettingsLogic.effectiveMain(template: Contracts.builtinTemplate, settings: state).model == main)
-        #expect(SettingsLogic.effective(template: Contracts.builtinTemplate, settings: state).model == external)
+        #expect(SettingsLogic.effectiveForApp(template: Contracts.builtinTemplate, settings: state).model == external)
         let broken = ModelRef(providerID: "custom", id: "deleted", connectionId: "gone")
         let template = Template(id: "broken", name: "Broken", builtin: false, settings: TemplateSettings(selectionModel: broken))
-        #expect(SettingsLogic.effective(template: template, settings: state).model == main)
+        #expect(SettingsLogic.effectiveForApp(template: template, settings: state).model == main)
     }
 
     @Test func localizedErrorsNeverIncludeRemoteErrorDetails() {

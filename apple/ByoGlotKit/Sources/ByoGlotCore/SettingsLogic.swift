@@ -93,14 +93,19 @@ public enum SettingsLogic: Sendable {
     }
 
     public static func effective(template: Template, settings: AppSettings) -> (prePrompt: String, targetLang: String, model: ModelRef?) {
-        effective(template: template, settings: settings, main: false)
+        let active = settings.connections.first { $0.id == settings.activeConnectionId }
+        let model: ModelRef?
+        if let id = settings.activeConnectionId, let ref = template.settings.selectionModel, ref.connectionId == id {
+            model = ref
+        } else { model = active?.selectionModel }
+        return (template.settings.prePrompt ?? "", template.settings.targetLang ?? settings.globals.targetLang, model)
     }
 
     public static func effectiveMain(template: Template, settings: AppSettings) -> (prePrompt: String, targetLang: String, model: ModelRef?) {
-        effective(template: template, settings: settings, main: true)
+        effectiveForApp(template: template, settings: settings, main: true)
     }
 
-    private static func effective(template: Template, settings: AppSettings, main: Bool) -> (prePrompt: String, targetLang: String, model: ModelRef?) {
+    public static func effectiveForApp(template: Template, settings: AppSettings, main: Bool = false) -> (prePrompt: String, targetLang: String, model: ModelRef?) {
         let own = main ? template.settings.pageModel : template.settings.selectionModel
         let model = own.map { bindModel($0, settings: settings) ?? fallbackModel(settings: settings, main: main) } ?? defaultModel(settings: settings, main: main)
         return (template.settings.prePrompt ?? "", template.settings.targetLang ?? settings.globals.targetLang, model)

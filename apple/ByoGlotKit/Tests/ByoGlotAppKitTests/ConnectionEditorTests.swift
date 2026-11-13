@@ -62,20 +62,24 @@ struct ConnectionEditorTests {
         #expect(try f.secrets.secret(connectionId: "c1", origin: "https://provider.example") == "fixture-key")
     }
 
-    @Test func editingToAnotherOriginDeletesOldKeyBeforeCheckingModels() async throws {
+    @Test func editingToAnotherOriginPreservesOldKeyAndSettingsUntilSuccess() async throws {
         let f = AppFixture()
         try await f.connect()
+        let before = try await f.settings.read()
         let changed = ConnectionDraft(id: "c1", preset: .custom, name: "Changed", baseUrl: "https://other.example/v1")
         await #expect(throws: RunnerError.consentNeeded(origin: "https://other.example")) { try await f.editor.save(changed, consent: false) }
-        #expect(try f.secrets.has(connectionId: "c1"))
         await #expect(throws: RunnerError.keyMissing) { try await f.editor.save(changed, consent: true) }
-        #expect(try !f.secrets.has(connectionId: "c1"))
         #expect(await f.transport.requests.isEmpty)
         var replacement = changed
         replacement.apiKey = "new-key"
+        await f.transport.configure(status: 401)
+        await #expect(throws: RunnerError.backend(BackendError(kind: .providerAuth, status: 401))) { try await f.editor.save(replacement, consent: true) }
+        #expect(try await f.settings.read() == before)
+        #expect(try f.secrets.secret(connectionId: "c1", origin: "https://provider.example") == "fixture-key")
+        #expect(await f.transport.requests.first?.headers["authorization"] == "Bearer new-key")
+        await f.transport.configure()
         _ = try await f.editor.save(replacement, consent: true)
         #expect(try f.secrets.secret(connectionId: "c1", origin: "https://other.example") == "new-key")
-        #expect(await f.transport.requests.first?.headers["authorization"] == "Bearer new-key")
     }
 
     @Test func noProviderDefaultSavesWithoutAModel() async throws {

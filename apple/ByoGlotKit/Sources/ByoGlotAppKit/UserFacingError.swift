@@ -5,6 +5,7 @@ public enum UserFacingError {
     public static func message(_ error: RunnerError) -> LocalizedStringResource {
         let bundle = LocalizedStringResource.BundleDescription.atURL(Bundle.module.bundleURL)
         switch error {
+        case .appGroupUnavailable: return LocalizedStringResource("ByoGlot cannot access shared storage.", bundle: bundle)
         case .noConnection: return LocalizedStringResource("Add a provider in ByoGlot first.", bundle: bundle)
         case .noModel: return LocalizedStringResource("Choose a model in ByoGlot.", bundle: bundle)
         case .keyMissing: return LocalizedStringResource("The API key for this provider is missing.", bundle: bundle)

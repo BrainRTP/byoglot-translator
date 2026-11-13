@@ -176,6 +176,22 @@
           }
         }
       }
+    },
+    "ByoGlot cannot access shared storage.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ByoGlot cannot access shared storage."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ByoGlot не может открыть общее хранилище."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

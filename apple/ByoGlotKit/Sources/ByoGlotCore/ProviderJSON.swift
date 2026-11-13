@@ -6,10 +6,50 @@ func providerJSON(_ data: Data) throws -> Data {
     return Data(try parser.document())
 }
 
+func orderedKeys(in data: Data, object: String) -> [String]? {
+    guard (try? JSONDecoder().decode(JSONValue.self, from: data)) != nil else { return nil }
+    var parser = ProviderJSONParser(bytes: Array(data))
+    return try? parser.topLevelKeys(object: object)
+}
+
 private struct ProviderJSONParser {
     let bytes: [UInt8]
     var index = 0
     enum Invalid: Error { case json }
+
+    mutating func topLevelKeys(object: String) throws -> [String] {
+        if bytes.starts(with: [0xef, 0xbb, 0xbf]) { index = 3 }
+        guard consume(123) else { throw Invalid.json }
+        var keys: [String]?
+        if !consume(125) {
+            repeat {
+                let key = try JSONDecoder().decode(String.self, from: Data(string()))
+                guard consume(58) else { throw Invalid.json }
+                if key == object { keys = try objectKeys() }
+                else { _ = try value() }
+                if consume(125) { break }
+                guard consume(44) else { throw Invalid.json }
+            } while true
+        }
+        whitespace()
+        guard index == bytes.count, let keys else { throw Invalid.json }
+        return keys
+    }
+
+    private mutating func objectKeys() throws -> [String] {
+        guard consume(123) else { throw Invalid.json }
+        var keys: [String] = []
+        if !consume(125) {
+            repeat {
+                keys.append(try JSONDecoder().decode(String.self, from: Data(string())))
+                guard consume(58) else { throw Invalid.json }
+                _ = try value()
+                if consume(125) { break }
+                guard consume(44) else { throw Invalid.json }
+            } while true
+        }
+        return keys
+    }
 
     mutating func document() throws -> [UInt8] {
         if bytes.starts(with: [0xef, 0xbb, 0xbf]) { index = 3 }

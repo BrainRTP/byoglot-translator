@@ -55,9 +55,10 @@ final class AppFixture: Sendable {
     let directory = FileManager.default.temporaryDirectory.appending(path: "byoglot-appkit-\(UUID().uuidString)")
     let settings: SettingsStore
     let secrets = InMemorySecretStore()
+    let capabilities = ModelCapabilitiesCache()
     let transport = AppTransport()
-    var runner: TranslationRunner { TranslationRunner(settings: settings, secrets: secrets, transport: transport, detector: FixedDetector()) }
-    var editor: ConnectionEditor { ConnectionEditor(settings: settings, secrets: secrets, transport: transport) }
+    var runner: TranslationRunner { TranslationRunner(settings: settings, secrets: secrets, transport: transport, detector: FixedDetector(), modelCapabilities: capabilities) }
+    var editor: ConnectionEditor { ConnectionEditor(settings: settings, secrets: secrets, transport: transport, modelCapabilities: capabilities) }
 
     init() { settings = SettingsStore(directory: directory) }
     deinit { try? FileManager.default.removeItem(at: directory) }

@@ -8,7 +8,7 @@ public let editorInputLimit = Contracts.limits.maxEditorText
 public let extensionTimeoutSeconds = 55
 
 public enum RunnerError: Error, Equatable, Sendable {
-    case noConnection, noModel, keyMissing, consentNeeded(origin: String), deviceLocked, tooLong(limit: Int), empty
+    case noConnection, noModel, keyMissing, consentNeeded(origin: String), deviceLocked, tooLong(limit: Int), empty, appGroupUnavailable
     case backend(BackendError)
 }
 
@@ -79,6 +79,7 @@ public actor TranslationRunner {
     private let settings: SettingsStore
     private let secrets: any SecretStore
     private let transport: any HTTPTransport
+    private let modelCapabilities: ModelCapabilitiesCache
     private let detector: any SourceLanguageDetecting
     private var cached: ClientState?
 
@@ -91,17 +92,20 @@ public actor TranslationRunner {
         var customMirror: Mirror { Mirror(self, children: ["summary": description]) }
     }
 
-    public init(settings: SettingsStore, secrets: any SecretStore, transport: any HTTPTransport, detector: any SourceLanguageDetecting = OnDeviceLanguageDetector()) {
+    public init(settings: SettingsStore, secrets: any SecretStore, transport: any HTTPTransport, detector: any SourceLanguageDetecting = OnDeviceLanguageDetector(), modelCapabilities: ModelCapabilitiesCache = .shared) {
         self.settings = settings
         self.secrets = secrets
         self.transport = transport
         self.detector = detector
+        self.modelCapabilities = modelCapabilities
     }
 
     public static func shared(appGroup: String, keychainGroup: String?) throws -> TranslationRunner {
-        guard let directory = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
-            throw RunnerError.backend(BackendError(kind: .providerError))
-        }
+        try shared(containerURL: FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup), keychainGroup: keychainGroup)
+    }
+
+    static func shared(containerURL: URL?, keychainGroup: String?) throws -> TranslationRunner {
+        guard let directory = containerURL else { throw RunnerError.appGroupUnavailable }
         return TranslationRunner(settings: SettingsStore(directory: directory), secrets: KeychainSecretStore(accessGroup: keychainGroup), transport: URLSessionTransport())
     }
 
@@ -141,11 +145,11 @@ public actor TranslationRunner {
         guard text.utf16.count <= input.limit else { throw RunnerError.tooLong(limit: input.limit) }
         try Task.checkCancellation()
         let state = try await settings.read()
-        guard state.connections.contains(where: { $0.id == state.activeConnectionId }) else { throw RunnerError.noConnection }
+        guard !state.connections.isEmpty else { throw RunnerError.noConnection }
         let template = state.templates.first { $0.id == input.templateId } ?? state.templates.first { $0.id == state.globals.defaultTemplateId } ?? Contracts.builtinTemplate
-        let effective = input.pair == .main ? SettingsLogic.effectiveMain(template: template, settings: state) : SettingsLogic.effective(template: template, settings: state)
+        let effective = SettingsLogic.effectiveForApp(template: template, settings: state, main: input.pair == .main)
         guard var model = input.model ?? effective.model else { throw RunnerError.noModel }
-        guard let connection = SettingsLogic.modelConnection(model, settings: state) else { throw RunnerError.noConnection }
+        guard let connection = SettingsLogic.modelConnection(model, settings: state) else { throw RunnerError.noModel }
         model.connectionId = connection.id
         guard let origin = originOf(connection.baseUrl), let url = URL(string: origin), HTTPDestinationPolicy.permits(url) else { throw RunnerError.backend(BackendError(kind: .offline)) }
         if !HTTPDestinationPolicy.isLocalOrLAN(url.host ?? ""), !state.consentedOrigins.contains(origin) { throw RunnerError.consentNeeded(origin: origin) }
@@ -154,10 +158,7 @@ public actor TranslationRunner {
         catch { throw secretRunnerError(error) }
         if (secret?.isEmpty ?? true) && ProviderEffort.needsKey(preset: connection.preset, baseUrl: connection.baseUrl) { throw RunnerError.keyMissing }
         let client = ProviderClient(connection: connection, secret: secret, transport: transport)
-        if let effort = model.variant, effort != "none" {
-            let models = try await client.listModels()
-            if !models.contains(where: { $0.id == model.id && $0.variants.contains(effort) }) { model.variant = "none" }
-        }
+        model = await modelCapabilities.clamp(model, connection: connection, secret: secret)
         let translator: Translator
         if let cached, cached.connection == connection, cached.secret == secret { translator = cached.translator }
         else {

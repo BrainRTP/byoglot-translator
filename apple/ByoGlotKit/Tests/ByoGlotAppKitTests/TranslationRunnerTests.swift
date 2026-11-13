@@ -79,6 +79,7 @@ struct TranslationRunnerTests {
             state.templates.append(chosen)
             state.mainModel = main
         }
+        _ = try await f.editor.models(connectionId: "c1")
         let before = try await f.settings.read()
         let output = try await f.runner.translate(RunnerInput(text: "hello", templateId: "special", limit: 100, pair: .main, sourceLang: "en", targetLang: "fr", prePrompt: "ephemeral pre-prompt"))
         #expect(output.targetLang == "fr")

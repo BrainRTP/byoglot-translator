@@ -24,7 +24,7 @@ class ReviewRegressionTest {
                             "c",
                             ProviderPreset.custom,
                             "C",
-                            "http://localhost",
+                            "https://localhost",
                             model,
                             model,
                         ),

@@ -46,11 +46,8 @@ class HttpEngineTransport(context: Context) : HttpTransport {
     }
 
     private fun responseFlow(request: HttpRequest): Flow<HttpStreamEvent> = callbackFlow {
-        val origin =
-            originOf(request.url) ?: throw TransportException(TransportException.Reason.Offline)
+        val origin = PhoneProviderPolicy.requireOrigin(request.url)
         val local = isLocalHost(URI(origin).host)
-        if (URI(origin).scheme == "http" && !local)
-            throw TransportException(TransportException.Reason.Offline)
         if (local && !localAllowed())
             throw TransportException(TransportException.Reason.LocalNetworkDenied)
         var redirects = 0

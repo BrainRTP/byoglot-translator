@@ -1,6 +1,7 @@
 package io.github.brainrtp.byoglot.ui
 
 import io.github.brainrtp.byoglot.core.*
+import io.github.brainrtp.byoglot.net.PhoneProviderPolicy
 import java.net.URI
 import java.util.UUID
 import kotlinx.coroutines.*
@@ -20,7 +21,7 @@ data class ConnectionDraft(
 enum class DraftProblem {
     BaseUrl,
     ApiKey,
-    InsecureRemote,
+    HttpsRequired,
 }
 
 data class SavedConnection(val connection: Connection, val models: List<ModelInfo>)
@@ -31,9 +32,8 @@ class ConnectionEditor(
     private val transport: HttpTransport,
 ) {
     fun validate(draft: ConnectionDraft, hasStoredKey: Boolean): DraftProblem? {
-        val origin = originOf(draft.baseUrl) ?: return DraftProblem.BaseUrl
-        if (URI(origin).scheme == "http" && !isLocalHost(URI(origin).host))
-            return DraftProblem.InsecureRemote
+        if (originOf(draft.baseUrl) == null) return DraftProblem.BaseUrl
+        if (PhoneProviderPolicy.origin(draft.baseUrl) == null) return DraftProblem.HttpsRequired
         if (
             ProviderEffort.needsKey(draft.preset, draft.baseUrl) &&
                 draft.apiKey.isBlank() &&
@@ -45,9 +45,7 @@ class ConnectionEditor(
 
     suspend fun save(draft: ConnectionDraft, consent: Boolean): SavedConnection = lock.withLock {
         val state = settings.read()
-        val origin =
-            originOf(draft.baseUrl)
-                ?: throw RunnerException(RunnerError.Backend(BackendException(ErrorKind.Offline)))
+        val origin = PhoneProviderPolicy.requireOrigin(draft.baseUrl)
         val old = state.connections.find { it.id == draft.id }
         val oldOrigin = old?.let { originOf(it.baseUrl) }
         val oldSecret =
@@ -58,8 +56,8 @@ class ConnectionEditor(
         when (validate(draft, !secret.isNullOrEmpty())) {
             DraftProblem.ApiKey -> throw RunnerException(RunnerError.KeyMissing)
             DraftProblem.BaseUrl,
-            DraftProblem.InsecureRemote ->
-                throw RunnerException(RunnerError.Backend(BackendException(ErrorKind.Offline)))
+            DraftProblem.HttpsRequired ->
+                throw RunnerException(RunnerError.Backend(BackendException(ErrorKind.ProviderError)))
             null -> Unit
         }
         if (!isLocalHost(URI(origin).host) && !consent)
@@ -164,9 +162,7 @@ class ConnectionEditor(
         val connection =
             state.connections.find { it.id == connectionId }
                 ?: throw RunnerException(RunnerError.NoConnection)
-        val origin =
-            originOf(connection.baseUrl)
-                ?: throw RunnerException(RunnerError.Backend(BackendException(ErrorKind.Offline)))
+        val origin = PhoneProviderPolicy.requireOrigin(connection.baseUrl)
         if (!isLocalHost(URI(origin).host) && origin !in state.consentedOrigins)
             throw RunnerException(RunnerError.ConsentNeeded(origin))
         val key = readSecret(connectionId, origin)

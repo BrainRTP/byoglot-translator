@@ -10,7 +10,7 @@
     <string name="error_consent">Confirm in ByoGlot that text may be sent to %1$s.</string>
     <string name="error_too_long">The text is longer than %1$d characters.</string>
     <string name="error_empty">There is no text to translate.</string>
-    <string name="error_local_network">Allow ByoGlot to use the local network in system settings.</string>
+    <string name="error_local_network">Allow ByoGlot network access in system settings.</string>
     <string name="error_offline">The provider did not answer. Check the connection.</string>
     <string name="error_auth">The provider rejected the API key (HTTP %1$d).</string>
     <string name="error_rate_limit">The provider limit is reached. Try again later.</string>

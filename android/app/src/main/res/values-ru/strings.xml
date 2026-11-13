@@ -10,7 +10,7 @@
     <string name="error_consent">Подтвердите в ByoGlot отправку текста на %1$s.</string>
     <string name="error_too_long">Текст длиннее %1$d символов.</string>
     <string name="error_empty">Нет текста для перевода.</string>
-    <string name="error_local_network">Разрешите ByoGlot доступ к локальной сети в настройках системы.</string>
+    <string name="error_local_network">Разрешите ByoGlot доступ к сети в настройках системы.</string>
     <string name="error_offline">Провайдер не ответил. Проверьте соединение.</string>
     <string name="error_auth">Провайдер отклонил API-ключ (HTTP %1$d).</string>
     <string name="error_rate_limit">Достигнут лимит провайдера. Повторите позже.</string>

@@ -402,3 +402,24 @@ private actor ModelStream {
     #expect(model.settings.mainModel?.variant == "max")
     model.stop()
 }
+
+@MainActor @Test func parameterUpdatePreservesFieldsChangedInTheStoreSinceTheSheetOpened() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    let template = Template(id: "concurrent", name: "Original", builtin: false, settings: TemplateSettings(targetLang: "de"))
+    #expect(await model.saveTemplate(template))
+    await model.chooseTemplate(template)
+    await model.chooseTarget("fr")
+    _ = try await f.settings.update { state in
+        let index = state.templates.firstIndex { $0.id == "concurrent" }!
+        state.templates[index].name = "Renamed elsewhere"
+        state.templates[index].settings.prePrompt = "Stored instructions"
+        state.templates[index].settings.selectionModel = ModelRef(providerID: "custom", id: "external", connectionId: "c1")
+    }
+    #expect(await model.storeCurrentTemplate())
+    let saved = try #require(model.settings.templates.first { $0.id == "concurrent" })
+    #expect(saved.name == "Renamed elsewhere")
+    #expect(saved.settings.targetLang == "fr")
+    #expect(saved.settings.prePrompt == "Stored instructions")
+    #expect(saved.settings.selectionModel?.id == "external")
+    #expect(saved.settings.pageModel == nil)
+}

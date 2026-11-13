@@ -369,12 +369,19 @@ public final class AppModel {
         if let manualModel { saved.settings.pageModel = manualModel }
         // A parameter prompt is never written, including when creating a template.
         let value = saved
+        let target = manualTarget
+        let chosenModel = manualModel
+        let creating = name != nil
         guard await updateSettings({ state in
-            if let index = state.templates.firstIndex(where: { $0.id == value.id }) { state.templates[index] = value }
-            else { state.templates.append(value) }
+            if creating { state.templates.append(value) }
+            else {
+                guard let index = state.templates.firstIndex(where: { $0.id == value.id && !$0.builtin }) else { return }
+                if let target { state.templates[index].settings.targetLang = target }
+                if let chosenModel { state.templates[index].settings.pageModel = chosenModel }
+            }
             state.globals.defaultTemplateId = value.id
-        }) else { return false }
-        _ = selection.selectTemplate(value)
+        }), let stored = settings.templates.first(where: { $0.id == value.id && !$0.builtin }) else { return false }
+        _ = selection.selectTemplate(stored)
         manualTarget = nil
         manualModel = nil
         return true

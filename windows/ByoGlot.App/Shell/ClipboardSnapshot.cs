@@ -35,7 +35,7 @@ public sealed class ClipboardSnapshot : IDataObject, IClipboardSnapshot
             if ((requested & TYMED.TYMED_HGLOBAL) != 0) return new() { tymed = TYMED.TYMED_HGLOBAL, unionmember = (nint)global.Value };
             var status = PInvoke.CreateStreamOnHGlobal(global, true, out var stream);
             if (status.Failed) { PInvoke.GlobalFree(global); throw new COMException("Clipboard stream could not be created.", status.Value); }
-            try { return new() { tymed = TYMED.TYMED_ISTREAM, unionmember = Marshal.GetIUnknownForObject(stream) }; }
+            try { return new() { tymed = TYMED.TYMED_ISTREAM, unionmember = StreamPointer(stream) }; }
             finally { Marshal.ReleaseComObject(stream); }
         }
         public void Dispose()
@@ -53,9 +53,13 @@ public sealed class ClipboardSnapshot : IDataObject, IClipboardSnapshot
         {
             formats = source.EnumFormatEtc(DATADIR.DATADIR_GET);
             var next = new FORMATETC[1];
+            var fetched = new int[1];
             long total = 0;
-            while (formats.Next(1, next, new int[1]) == 0)
+            while (true)
             {
+                var status = formats.Next(1, next, fetched);
+                if (status == 1 && fetched[0] == 0) break;
+                if (status != 0 || fetched[0] != 1) throw new COMException("Clipboard formats could not be enumerated.");
                 var format = next[0];
                 try
                 {
@@ -166,6 +170,17 @@ public sealed class ClipboardSnapshot : IDataObject, IClipboardSnapshot
         var native = new Windows.Win32.System.Com.STGMEDIUM { tymed = (Windows.Win32.System.Com.TYMED)medium.tymed, u = new() { hGlobal = new(medium.unionmember) }, pUnkForRelease = medium.pUnkForRelease! };
         PInvoke.ReleaseStgMedium(ref native);
         medium = default;
+    }
+    internal static nint StreamPointer(object stream)
+    {
+        var unknown = Marshal.GetIUnknownForObject(stream);
+        try
+        {
+            var id = typeof(IStream).GUID;
+            Marshal.ThrowExceptionForHR(Marshal.QueryInterface(unknown, ref id, out var pointer));
+            return pointer;
+        }
+        finally { Marshal.Release(unknown); }
     }
     private Entry? Find(FORMATETC format) => entries.FirstOrDefault(e => e.Format.cfFormat == format.cfFormat && e.Format.dwAspect == format.dwAspect && e.Format.lindex == format.lindex && (e.Format.tymed & format.tymed) != 0);
     public void GetData(ref FORMATETC format, out STGMEDIUM medium) => medium = (Find(format) ?? throw new COMException("Clipboard format is unavailable.", FormatError)).Materialize(format.tymed);

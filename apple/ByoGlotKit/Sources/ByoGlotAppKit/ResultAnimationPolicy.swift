@@ -21,7 +21,6 @@ public enum ResultAnimationTiming {
         switch effect {
         case .fade: 0.18
         case .typewriter: 0.12
-        case .pen: 0.5
         case .wave: 0.35
         default: 0
         }

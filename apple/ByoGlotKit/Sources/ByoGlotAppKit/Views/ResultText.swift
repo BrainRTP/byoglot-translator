@@ -26,16 +26,21 @@ private struct ResultTextPresentation: View {
     let text: String
     let playback: ResultAnimationPlayback?
     @State private var elapsed = 0.0
+    @State private var advanceWidth: Double?
     @ScaledMetric private var fontSize: CGFloat = 17
 
     var body: some View {
         Text(text.isEmpty ? " " : text)
             .font(.system(size: fontSize))
             .textSelection(.enabled).lineSpacing(5)
-            .textRenderer(ResultEffectRenderer(effect: playback?.effect ?? .none, elapsed: elapsed, utf16Count: text.utf16.count, glyphs: Array(text.utf16.prefix(ResultEffectRenderer.glyphLimit)), fontSize: fontSize))
-            .task(id: playback?.id) {
-                guard let playback else { return }
-                let duration = ResultAnimationTiming.duration(playback.effect, utf16Count: text.utf16.count)
+            .textRenderer(ResultEffectRenderer(effect: playback?.effect ?? .none, elapsed: elapsed, utf16Count: text.utf16.count, glyphs: text.utf16.prefix(ResultEffectRenderer.glyphLimit).map { ResultAnimationGlyph($0, effect: playback?.effect ?? .none) }, fontSize: fontSize, advanceWidth: advanceWidth))
+            .onPreferenceChange(Text.LayoutKey.self) { layouts in
+                guard advanceWidth == nil, playback != nil, let layout = layouts.first?.layout else { return }
+                advanceWidth = layout.reduce(0) { $0 + $1.typographicBounds.rect.width }
+            }
+            .task(id: advanceWidth) {
+                guard let playback, let advanceWidth else { return }
+                let duration = ResultAnimationTiming.duration(playback.effect, utf16Count: text.utf16.count, advanceWidth: advanceWidth)
                 await Task.yield()
                 guard !Task.isCancelled else { return }
                 withAnimation(.linear(duration: duration)) { elapsed = duration }
@@ -48,8 +53,9 @@ private struct ResultEffectRenderer: TextRenderer {
     let effect: ResultAnimation
     var elapsed: Double
     let utf16Count: Int
-    let glyphs: [UInt16]
+    let glyphs: [ResultAnimationGlyph]
     let fontSize: CGFloat
+    let advanceWidth: Double?
     var animatableData: Double {
         get { elapsed }
         set { elapsed = newValue }
@@ -57,12 +63,13 @@ private struct ResultEffectRenderer: TextRenderer {
 
     func draw(layout: Text.Layout, in context: inout GraphicsContext) {
         let width = layout.reduce(0) { $0 + $1.typographicBounds.rect.width }
-        let duration = ResultAnimationTiming.duration(effect, utf16Count: utf16Count, advanceWidth: width)
+        let timingWidth = advanceWidth ?? width
+        let duration = ResultAnimationTiming.duration(effect, utf16Count: utf16Count, advanceWidth: timingWidth)
         guard effect != .none, elapsed < duration else {
             for line in layout { context.draw(line) }
             return
         }
-        let progress = ResultAnimationTiming.revealProgress(effect, elapsed: elapsed, utf16Count: utf16Count, advanceWidth: width)
+        let progress = ResultAnimationTiming.revealProgress(effect, elapsed: elapsed, utf16Count: utf16Count, advanceWidth: timingWidth)
         switch effect {
         case .none: break
         case .fade:
@@ -78,6 +85,7 @@ private struct ResultEffectRenderer: TextRenderer {
 
     private func drawGlyphs(_ layout: Text.Layout, in context: inout GraphicsContext, duration: Double) {
         var index = 0
+        var resolved: [String: GraphicsContext.ResolvedText] = [:]
         let firstIndex = layout.first?.first?.characterIndices.first
         for line in layout {
             for run in line {
@@ -85,13 +93,18 @@ private struct ResultEffectRenderer: TextRenderer {
                 for offset in 0..<available {
                     let slice = run[run.startIndex + offset]
                     let position = firstIndex.flatMap { first in slice.characterIndices.first.map { first.distance(to: $0) } } ?? index
-                    let target = glyphs.indices.contains(position) ? glyphs[position] : 32
+                    let target = glyphs.indices.contains(position) ? glyphs[position] : .fixed
                     let replacement = replacement(target, index: position)
                     if let replacement {
+                        if resolved[replacement] == nil {
+                            resolved[replacement] = context.resolve(Text(replacement).font(.system(size: fontSize)).foregroundStyle(ByoColor.text))
+                        }
                         let rect = slice.typographicBounds.rect
                         var copy = context
                         copy.clip(to: Path(rect.insetBy(dx: -1, dy: -2)))
-                        copy.draw(Text(replacement).font(.system(size: fontSize)).foregroundStyle(ByoColor.text), at: CGPoint(x: rect.midX, y: rect.midY), anchor: .center)
+                        if let glyph = resolved[replacement] {
+                            copy.draw(glyph, at: CGPoint(x: rect.midX, y: rect.midY), anchor: .center)
+                        }
                     } else { context.draw(slice) }
                     index += 1
                 }
@@ -105,43 +118,30 @@ private struct ResultEffectRenderer: TextRenderer {
         }
     }
 
-    private func replacement(_ target: UInt16, index: Int) -> String? {
-        let alphabet: [UInt16]
+    private func replacement(_ target: ResultAnimationGlyph, index: Int) -> String? {
         switch target {
-        case 65...90: alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ".utf16)
-        case 97...122: alphabet = Array("abcdefghijklmnopqrstuvwxyz".utf16)
-        case 1040...1071: alphabet = Array("АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ".utf16)
-        case 1072...1103: alphabet = Array("абвгдежзийклмнопрстуфхцчшщъыьэюя".utf16)
-        case 48...57: alphabet = Array("0123456789".utf16)
-        default: return nil
-        }
-        if effect == .scramble {
+        case .fixed: return nil
+        case .scramble(let alphabet):
             let settle = ResultAnimationTiming.scrambleSettleTime(utf16Count: utf16Count, sample: random(index, 0))
             guard elapsed < settle else { return nil }
             let frame = ResultAnimationTiming.scrambleFrame(elapsed: elapsed)
-            return String(UnicodeScalar(alphabet[Int(random(index, frame + 1) * Double(alphabet.count)) % alphabet.count])!)
+            return alphabet[Int(random(index, frame + 1) * Double(alphabet.count)) % alphabet.count]
+        case .flap(let end, let lower):
+            let alphabet = lower ? ResultAnimationGlyph.flapLower : ResultAnimationGlyph.flapUpper
+            let steps = min(10, end)
+            let step = ResultAnimationTiming.flapStep(elapsed: elapsed, position: index, utf16Count: utf16Count, steps: steps)
+            guard step < steps else { return nil }
+            guard step > 0 else { return " " }
+            return alphabet[(end - steps + step + alphabet.count) % alphabet.count]
         }
-        let steps = min(10, (alphabet.firstIndex(of: target) ?? 0) + 1)
-        let step = ResultAnimationTiming.flapStep(elapsed: elapsed, position: index, utf16Count: utf16Count, steps: steps)
-        guard step < steps else { return nil }
-        guard step > 0 else { return " " }
-        let end = alphabet.firstIndex(of: target) ?? 0
-        return String(UnicodeScalar(alphabet[(end - steps + step + alphabet.count) % alphabet.count])!)
     }
 
     private func drawReveal(_ layout: Text.Layout, in context: inout GraphicsContext, progress: Double, advanceWidth: Double) {
         let preparation = ResultAnimationTiming.preparationDuration(effect)
-        if effect == .pen && elapsed < preparation {
-            drawDust(layout, in: &context)
-            return
-        }
         if effect == .wave && elapsed < preparation {
             let shine = elapsed / preparation
             for line in layout {
                 let rect = line.typographicBounds.rect
-                var copy = context
-                copy.opacity = 0.3
-                copy.draw(line)
                 drawBand(rect, fraction: shine, in: &context)
             }
             return
@@ -186,20 +186,6 @@ private struct ResultEffectRenderer: TextRenderer {
         var copy = context
         copy.clip(to: Path(rect))
         copy.fill(Path(band), with: .linearGradient(Gradient(colors: [.clear, .white.opacity(0.3), .clear]), startPoint: CGPoint(x: band.minX, y: band.midY), endPoint: CGPoint(x: band.maxX, y: band.midY)))
-    }
-
-    private func drawDust(_ layout: Text.Layout, in context: inout GraphicsContext) {
-        let progress = elapsed / ResultAnimationTiming.preparationDuration(.pen)
-        for (lineIndex, line) in layout.prefix(12).enumerated() {
-            let rect = line.typographicBounds.rect
-            for particle in 0..<8 {
-                let seed = lineIndex * 8 + particle
-                let x = rect.minX + rect.width * random(seed, 0) + (random(seed, 1) * 2 - 1) * 70 * elapsed
-                let y = rect.midY - (30 + 110 * random(seed, 2)) * elapsed
-                let size = 1.5 + 1.5 * random(seed, 3)
-                context.fill(Path(CGRect(x: x, y: y, width: size, height: size)), with: .color(ByoColor.text.opacity(1 - progress)))
-            }
-        }
     }
 
     private func random(_ index: Int, _ frame: Int) -> Double {

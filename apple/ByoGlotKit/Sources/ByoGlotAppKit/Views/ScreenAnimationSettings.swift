@@ -86,7 +86,7 @@ private struct AnimationCard: View {
                     Spacer(minLength: 0)
                     if selected { Image(systemName: "checkmark").foregroundStyle(ByoColor.accent).accessibilityHidden(true) }
                 }
-                Text(AppStrings.text("anim.detail." + effect.rawValue)).modifier(ByoTypography(15)).foregroundStyle(ByoColor.muted)
+                Text(effect == .none ? AppStrings.text("anim.detail.none") : AppStrings.format("anim.detail.duration", ["duration": String(Int((ResultAnimationTiming.duration(effect, utf16Count: 20_000) * 1000).rounded()))])).modifier(ByoTypography(15)).foregroundStyle(ByoColor.muted)
             }.frame(maxWidth: .infinity, minHeight: 56, alignment: .topLeading).padding(.horizontal, 12).padding(.vertical, 10)
                 .background(ByoColor.background, in: RoundedRectangle(cornerRadius: ByoRadius.group))
                 .overlay { RoundedRectangle(cornerRadius: ByoRadius.group).stroke(selected ? ByoColor.accent : ByoColor.border, lineWidth: selected ? 2 : 1).allowsHitTesting(false) }

@@ -3977,103 +3977,18 @@
       },
       "extractionState": "manual"
     },
-    "anim.detail.fade": {
+    "anim.detail.duration": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "500 ms"
+            "value": "Up to {duration} ms"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "500 мс"
-          }
-        }
-      },
-      "extractionState": "manual"
-    },
-    "anim.detail.scramble": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Up to 1800 ms"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "До 1800 мс"
-          }
-        }
-      },
-      "extractionState": "manual"
-    },
-    "anim.detail.flap": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Up to 1600 ms"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "До 1600 мс"
-          }
-        }
-      },
-      "extractionState": "manual"
-    },
-    "anim.detail.typewriter": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1520 ms"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1520 мс"
-          }
-        }
-      },
-      "extractionState": "manual"
-    },
-    "anim.detail.pen": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Up to 2100 ms"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "До 2100 мс"
-          }
-        }
-      },
-      "extractionState": "manual"
-    },
-    "anim.detail.wave": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Up to 1550 ms"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "До 1550 мс"
+            "value": "До {duration} мс"
           }
         }
       },

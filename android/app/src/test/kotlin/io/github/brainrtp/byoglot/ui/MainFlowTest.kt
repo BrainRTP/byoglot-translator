@@ -181,7 +181,7 @@ class MainFlowTest {
         runCurrent()
         assertEquals("fr", calls.last().targetLang)
         assertTrue(vm.parameters.value.changed)
-        vm.selectTemplate("ru")
+        vm.resetParameters()
         assertEquals("ru", vm.parameters.value.targetLang)
         assertFalse(vm.parameters.value.changed)
     }
@@ -361,7 +361,7 @@ class MainFlowTest {
         assertEquals("en", vm.parameters.value.targetLang)
         assertEquals("en", vm.translation.value.output?.targetLang)
         assertFalse(vm.translation.value.working)
-        vm.selectTemplate("ru")
+        vm.resetParameters()
         assertEquals("ru", vm.parameters.value.targetLang)
     }
 

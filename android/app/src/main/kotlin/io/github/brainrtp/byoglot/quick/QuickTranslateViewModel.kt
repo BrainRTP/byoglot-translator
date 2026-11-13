@@ -68,11 +68,18 @@ internal constructor(
     private var job: Job? = null
     private var identity = 0L
     private var modelOverride: ModelRef? = null
+    val needsConfirmation: Boolean
+        get() = !confirmed
 
     init {
         workScope.launch {
             val settings = repository.read()
             mutableSettings.value = settings
+            mutableParameters.value =
+                parameters.value.copy(
+                    sourceLang = settings.globals.sourceLang,
+                    targetLang = settings.globals.targetLang,
+                )
             applyTemplate(settings.globals.defaultTemplateId)
             if (confirmed) retry()
         }
@@ -91,19 +98,25 @@ internal constructor(
         mutableParameters.value =
             parameters.value.copy(
                 templateId = template.id,
-                targetLang = effective.targetLang,
-                sourceLang = settings.globals.sourceLang,
+                targetLang = template.settings.targetLang ?: parameters.value.targetLang,
                 prePrompt = effective.prePrompt,
                 model =
-                    if (missing == null) effective.model
-                    else
-                        catalogue?.fallback(settings, false)
-                            ?: SettingsLogic.fallbackModel(settings, false),
+                    clampModel(
+                        if (missing == null) effective.model
+                        else
+                            catalogue?.fallback(settings, false)
+                                ?: SettingsLogic.fallbackModel(settings, false),
+                    ),
                 missingModel = missing,
                 changed = false,
-                detectedSourceLang = null,
             )
     }
+
+    private fun clampModel(model: ModelRef?): ModelRef? = catalogue?.clamp(model) ?: model
+
+    private fun sameModel(first: ModelRef?, second: ModelRef?): Boolean =
+        first?.let { it.copy(variant = it.variant ?: "none") } ==
+            second?.let { it.copy(variant = it.variant ?: "none") }
 
     suspend fun refreshModels() {
         catalogue?.refresh()
@@ -114,20 +127,33 @@ internal constructor(
         val requested = modelOverride ?: template.settings.selectionModel
         val missing = requested?.takeIf { catalogue?.available(it, settings) == false }
         val model =
-            if (missing != null) catalogue?.fallback(settings, false)
-            else modelOverride ?: SettingsLogic.effective(template, settings).model
+            clampModel(
+                if (missing != null) catalogue?.fallback(settings, false)
+                else modelOverride ?: SettingsLogic.effective(template, settings).model,
+            )
         mutableParameters.value = params.copy(model = model, missingModel = missing)
-        if (confirmed && model != params.model) retry()
+        if (confirmed && !sameModel(model, params.model)) retry()
     }
 
     fun useTemplate(id: String) {
-        cancel()
+        if (id == parameters.value.templateId) return
+        val before = parameters.value
         applyTemplate(id)
+        val after = parameters.value
+        if (
+            before.sourceLang == after.sourceLang &&
+                before.targetLang == after.targetLang &&
+                sameModel(before.model, after.model) &&
+                before.prePrompt.jsTrim() == after.prePrompt.jsTrim()
+        )
+            return
+        cancel()
         if (confirmed) retry()
     }
 
     fun setLanguage(code: String, source: Boolean) {
         if (code !in Contracts.languageCodes && !(source && code == "auto")) return
+        if (code == if (source) parameters.value.sourceLang else parameters.value.targetLang) return
         cancel()
         mutableParameters.value =
             if (source) parameters.value.copy(sourceLang = code, detectedSourceLang = null)
@@ -138,11 +164,16 @@ internal constructor(
 
     fun chooseModel(model: ModelRef) {
         val settings = settings.value ?: return
-        if (catalogue?.available(model, settings) == false) return
+        val selected = clampModel(model) ?: return
+        if (
+            sameModel(selected, parameters.value.model) ||
+                catalogue?.available(selected, settings) == false
+        )
+            return
         cancel()
-        modelOverride = model
+        modelOverride = selected
         mutableParameters.value =
-            parameters.value.copy(model = model, missingModel = null, changed = true)
+            parameters.value.copy(model = selected, missingModel = null, changed = true)
         if (confirmed) retry()
     }
 

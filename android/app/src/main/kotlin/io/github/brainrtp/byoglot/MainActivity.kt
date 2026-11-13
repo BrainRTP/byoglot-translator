@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
                 },
             )[MainViewModel::class.java]
         model = vm
-        if (savedInstanceState == null) intent.getStringExtra(Intent.EXTRA_TEXT)?.let(vm::setText)
+        val destination = mainDestination(intent::getStringExtra)
         val export =
             registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) {
                 uri ->
@@ -95,8 +95,7 @@ class MainActivity : ComponentActivity() {
                     }
             }
         val networkSettings = { openNetworkSettings() }
-        if (savedInstanceState == null && intent.getStringExtra("destination") == "network")
-            networkSettings()
+        if (savedInstanceState == null && destination == "network") networkSettings()
         val version = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
         setContent {
             val appSettings by vm.settings.collectAsState()
@@ -111,7 +110,7 @@ class MainActivity : ComponentActivity() {
                 }
                 AppNavigation(
                     vm,
-                    intent.getStringExtra("destination"),
+                    destination,
                     version,
                     onPaste = {
                         getSystemService(ClipboardManager::class.java)
@@ -167,13 +166,9 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.hasExtra(Intent.EXTRA_TEXT) || intent.hasExtra("destination")) {
-            model.receiveQuickRequest(
-                intent.getStringExtra(Intent.EXTRA_TEXT),
-                intent.getStringExtra("destination"),
-            )
-            if (intent.getStringExtra("destination") == "network") openNetworkSettings()
-        }
+        val destination = mainDestination(intent::getStringExtra)
+        model.receiveQuickRequest(destination)
+        if (destination == "network") openNetworkSettings()
     }
 
     private fun openNetworkSettings() {

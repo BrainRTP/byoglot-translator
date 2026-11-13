@@ -1,7 +1,7 @@
 import Foundation
 
-enum HTTPDestinationPolicy {
-    static func permits(_ url: URL) -> Bool {
+public enum HTTPDestinationPolicy {
+    public static func permits(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased(), let host = url.host?.lowercased(), !host.isEmpty else { return false }
         if scheme == "https" { return true }
         return scheme == "http" && isLocalOrLAN(host)

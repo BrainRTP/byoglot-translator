@@ -8,13 +8,16 @@ let package = Package(
         .library(name: "ByoGlotCore", targets: ["ByoGlotCore"]),
         .library(name: "ByoGlotStore", targets: ["ByoGlotStore"]),
         .library(name: "ByoGlotStoreTesting", targets: ["ByoGlotStoreTesting"]),
+        .library(name: "ByoGlotBridge", targets: ["ByoGlotBridge"]),
     ],
     targets: [
         .target(name: "ByoGlotCore", resources: [.copy("Resources")]),
         .target(name: "ByoGlotStore", dependencies: ["ByoGlotCore"]),
         .target(name: "ByoGlotStoreTesting", dependencies: ["ByoGlotStore"]),
+        .target(name: "ByoGlotBridge", dependencies: ["ByoGlotCore", "ByoGlotStore"]),
         .testTarget(name: "ByoGlotCoreTests", dependencies: ["ByoGlotCore"]),
         .testTarget(name: "ByoGlotStoreTests", dependencies: ["ByoGlotStore", "ByoGlotStoreTesting"]),
+        .testTarget(name: "ByoGlotBridgeTests", dependencies: ["ByoGlotBridge"]),
     ],
     swiftLanguageModes: [.v6]
 )

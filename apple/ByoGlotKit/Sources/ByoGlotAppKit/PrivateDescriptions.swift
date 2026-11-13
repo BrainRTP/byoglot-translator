@@ -15,3 +15,9 @@ extension RunnerStreamOutput: CustomReflectable {
 extension ConnectionDraft: CustomReflectable {
     public var customMirror: Mirror { Mirror(self, children: ["summary": description]) }
 }
+
+extension AppModel: CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+    public nonisolated var description: String { "AppModel" }
+    public nonisolated var debugDescription: String { description }
+    public nonisolated var customMirror: Mirror { Mirror(self, children: ["summary": description]) }
+}

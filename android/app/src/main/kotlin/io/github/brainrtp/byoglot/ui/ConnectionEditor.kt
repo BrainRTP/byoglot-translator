@@ -30,6 +30,7 @@ class ConnectionEditor(
     private val settings: SettingsRepository,
     private val secrets: SecretStore,
     private val transport: HttpTransport,
+    private val cache: TranslationCache = NoTranslationCache,
 ) {
     fun validate(draft: ConnectionDraft, hasStoredKey: Boolean): DraftProblem? {
         if (originOf(draft.baseUrl) == null) return DraftProblem.BaseUrl
@@ -115,6 +116,7 @@ class ConnectionEditor(
         val old = origin?.let { readSecret(id, it) }
         currentCoroutineContext().ensureActive()
         withContext(NonCancellable) {
+            cache.removeConnection(id)
             secrets.delete(id)
             try {
                 settings.update { state ->

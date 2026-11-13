@@ -45,6 +45,7 @@ internal constructor(
     private val online: () -> Boolean = { true },
     val catalogue: ModelCatalogue? = null,
     private val detector: SourceLanguageDetector = SourceLanguageDetector { emptyList() },
+    private val cache: TranslationCache = NoTranslationCache,
 ) : ViewModel() {
     constructor(
         runner: TranslationRunner,
@@ -54,7 +55,7 @@ internal constructor(
         online: () -> Boolean = { true },
         catalogue: ModelCatalogue? = null,
         detector: SourceLanguageDetector = SourceLanguageDetector { emptyList() },
-    ) : this(request, repository, runner::stream, scope, online, catalogue, detector)
+    ) : this(request, repository, runner::stream, scope, online, catalogue, detector, runner.cache)
 
     private val workScope = scope ?: viewModelScope
     private val mutableState = MutableStateFlow(TranslationState())
@@ -82,7 +83,7 @@ internal constructor(
                     targetLang = settings.globals.targetLang,
                 )
             applyTemplate(settings.globals.defaultTemplateId)
-            if (confirmed) retry()
+            if (confirmed) translate()
         }
     }
 
@@ -133,7 +134,7 @@ internal constructor(
                 else modelOverride ?: SettingsLogic.effective(template, settings).model,
             )
         mutableParameters.value = params.copy(model = model, missingModel = missing)
-        if (confirmed && !sameModel(model, params.model)) retry()
+        if (confirmed && !sameModel(model, params.model)) translate()
     }
 
     fun useTemplate(id: String) {
@@ -149,7 +150,7 @@ internal constructor(
         )
             return
         cancel()
-        if (confirmed) retry()
+        if (confirmed) translate()
     }
 
     fun setLanguage(code: String, source: Boolean) {
@@ -160,7 +161,7 @@ internal constructor(
             if (source) parameters.value.copy(sourceLang = code, detectedSourceLang = null)
             else parameters.value.copy(targetLang = code, changed = true)
         if (code != "auto") mutableRecent.update { (listOf(code) + it).distinct().take(5) }
-        if (confirmed) retry()
+        if (confirmed) translate()
     }
 
     fun chooseModel(model: ModelRef) {
@@ -175,10 +176,12 @@ internal constructor(
         modelOverride = selected
         mutableParameters.value =
             parameters.value.copy(model = selected, missingModel = null, changed = true)
-        if (confirmed) retry()
+        if (confirmed) translate()
     }
 
-    fun retry() {
+    fun retry() = translate(forceRequest = true)
+
+    fun translate(forceRequest: Boolean = false) {
         if (settings.value == null) return
         confirmed = true
         cancel()
@@ -189,7 +192,7 @@ internal constructor(
                 request.text.jsTrim().length > EXTERNAL_INPUT_LIMIT ->
                     RunnerError.TooLong(EXTERNAL_INPUT_LIMIT)
                 params.missingModel != null && params.model == null -> RunnerError.NoModel
-                !online() -> RunnerError.Backend(BackendException(ErrorKind.Offline))
+                !online() && cache === NoTranslationCache -> RunnerError.Backend(BackendException(ErrorKind.Offline))
                 else -> null
             }
         if (validation != null) {
@@ -209,6 +212,8 @@ internal constructor(
                         model = params.model,
                         prePrompt = params.prePrompt,
                         limit = EXTERNAL_INPUT_LIMIT,
+                        forceRequest = forceRequest,
+                        networkAvailable = online(),
                     )
                 PhoneProviderPolicy.check(input, repository.read())
                 var latest: RunnerStreamOutput? = null
@@ -280,7 +285,7 @@ internal constructor(
             repository.update {
                 it.copy(consentedOrigins = (it.consentedOrigins + origin).distinct())
             }
-            retry()
+            translate()
         }
     }
 

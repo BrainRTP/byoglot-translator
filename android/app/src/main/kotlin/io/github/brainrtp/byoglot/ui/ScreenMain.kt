@@ -89,7 +89,7 @@ fun ScreenMain(
             { onLanguage(true) },
             { onLanguage(false) },
             { vm.action { vm.swap() } },
-            { vm.translate() },
+            { vm.translate(forceRequest = state.output != null) },
             vm::keyboardTranslate,
             vm::cancel,
             onCopy,

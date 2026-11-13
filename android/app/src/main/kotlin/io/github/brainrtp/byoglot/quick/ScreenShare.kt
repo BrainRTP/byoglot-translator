@@ -10,13 +10,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import io.github.brainrtp.byoglot.R
 import io.github.brainrtp.byoglot.core.*
@@ -36,15 +32,7 @@ fun ScreenShare(
     val recent by vm.recentLanguages.collectAsState()
     var picker by rememberSaveable { mutableStateOf<String?>(null) }
     val current = settings
-    val context = LocalContext.current
-    val reducedMotion =
-        android.provider.Settings.Global.getFloat(
-            context.contentResolver,
-            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f,
-        ) == 0f
-    val resultDescription = stringResource(R.string.translating)
-    val accent = ByoTheme.colors.ac
+    val reducedMotion = rememberReducedMotion()
     when (picker) {
         "template" ->
             if (current != null)
@@ -122,26 +110,19 @@ fun ScreenShare(
                     val result = state.output?.text.orEmpty()
                     if (result.isNotEmpty())
                         SelectionContainer {
-                            Text(
-                                buildAnnotatedString {
-                                    append(result)
-                                    if (state.working && !reducedMotion)
-                                        withStyle(SpanStyle(color = accent)) { append(" ▏") }
-                                },
+                            ResultText(
+                                result,
+                                state.working,
+                                state.complete,
+                                state.animation,
+                                ByoTheme.colors.sf,
                                 Modifier.fillMaxWidth()
                                     .heightIn(max = 300.dp)
                                     .background(ByoTheme.colors.sf, RoundedCornerShape(10.dp))
                                     .border(1.dp, ByoTheme.colors.bd, RoundedCornerShape(10.dp))
                                     .padding(12.dp)
-                                    .verticalScroll(rememberScrollState())
-                                    .semantics {
-                                        if (state.complete) liveRegion = LiveRegionMode.Polite
-                                    }
-                                    .clearAndSetSemantics {
-                                        contentDescription =
-                                            if (state.working) resultDescription else result
-                                    },
-                                style = ByoType.text,
+                                    .verticalScroll(rememberScrollState()),
+                                reducedMotion = reducedMotion,
                             )
                         }
                     if (state.working && result.isEmpty())

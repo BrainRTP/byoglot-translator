@@ -217,10 +217,14 @@ internal constructor(
                     )
                 PhoneProviderPolicy.check(input, repository.read())
                 var latest: RunnerStreamOutput? = null
+                var streamed = false
                 stream(input)
-                    .map {
-                        latest = it
-                        Result.success(it)
+                    .map { chunk ->
+                        streamed = streamed || chunk.streamed || !chunk.complete
+                        chunk.copy(streamed = streamed).let {
+                            latest = it
+                            Result.success(it)
+                        }
                     }
                     .catch {
                         if (it is CancellationException) throw it
@@ -265,6 +269,7 @@ internal constructor(
                     output = chunk.output,
                     complete = chunk.complete,
                     incomplete = chunk.incomplete,
+                    animation = resultAnimation(chunk, settings.value?.animation ?: AnimationChoice.fade),
                 )
     }
 
@@ -274,6 +279,7 @@ internal constructor(
                 state.value.copy(
                     working = false,
                     complete = false,
+                    animation = null,
                     error = error,
                     errorAtMs = System.currentTimeMillis(),
                 )
@@ -292,7 +298,7 @@ internal constructor(
     fun cancel() {
         identity++
         job?.cancel()
-        mutableState.value = state.value.copy(working = false)
+        mutableState.value = state.value.copy(working = false, animation = null)
     }
 
     override fun onCleared() {

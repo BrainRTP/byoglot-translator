@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="Translate" xml:space="preserve"><value>Translate</value></data>
+  <data name="Templates" xml:space="preserve"><value>Templates</value></data>
+  <data name="Connections" xml:space="preserve"><value>Connections</value></data>
+  <data name="Settings" xml:space="preserve"><value>Settings</value></data>
+  <data name="Input" xml:space="preserve"><value>Text to translate</value></data>
+  <data name="Paste" xml:space="preserve"><value>Paste</value></data>
+  <data name="Copy" xml:space="preserve"><value>Copy</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="Close" xml:space="preserve"><value>Close</value></data>
+  <data name="Save" xml:space="preserve"><value>Save</value></data>
+  <data name="Delete" xml:space="preserve"><value>Delete</value></data>
+  <data name="Edit" xml:space="preserve"><value>Edit</value></data>
+  <data name="Name" xml:space="preserve"><value>Name</value></data>
+  <data name="Source" xml:space="preserve"><value>Source language</value></data>
+  <data name="Target" xml:space="preserve"><value>Target language</value></data>
+  <data name="Auto" xml:space="preserve"><value>Detect automatically</value></data>
+  <data name="Template" xml:space="preserve"><value>Template</value></data>
+  <data name="FixConnection" xml:space="preserve"><value>Open connections</value></data>
+  <data name="AddConnection" xml:space="preserve"><value>Add provider</value></data>
+  <data name="EditConnection" xml:space="preserve"><value>Edit provider</value></data>
+  <data name="Preset" xml:space="preserve"><value>Provider preset</value></data>
+  <data name="BaseUrl" xml:space="preserve"><value>Base URL</value></data>
+  <data name="ApiKey" xml:space="preserve"><value>API key (leave blank to keep the saved key)</value></data>
+  <data name="Active" xml:space="preserve"><value>active</value></data>
+  <data name="KeyMissing" xml:space="preserve"><value>key missing</value></data>
+  <data name="Activate" xml:space="preserve"><value>Use this provider</value></data>
+  <data name="ChooseModels" xml:space="preserve"><value>Choose models</value></data>
+  <data name="PageModel" xml:space="preserve"><value>Editor model</value></data>
+  <data name="SelectionModel" xml:space="preserve"><value>Selection model</value></data>
+  <data name="Effort" xml:space="preserve"><value>Reasoning effort</value></data>
+  <data name="DeleteConnection" xml:space="preserve"><value>Delete this provider and its key?</value></data>
+  <data name="AddTemplate" xml:space="preserve"><value>Add template</value></data>
+  <data name="Duplicate" xml:space="preserve"><value>Duplicate</value></data>
+  <data name="BuiltinTemplate" xml:space="preserve"><value>Default template</value></data>
+  <data name="Instructions" xml:space="preserve"><value>Instructions</value></data>
+  <data name="OptionalTarget" xml:space="preserve"><value>Target language (optional)</value></data>
+  <data name="ClearTarget" xml:space="preserve"><value>Use the global target language</value></data>
+  <data name="UseDefault" xml:space="preserve"><value>Use as default</value></data>
+  <data name="DeleteTemplate" xml:space="preserve"><value>Delete this template?</value></data>
+  <data name="Startup" xml:space="preserve"><value>Start with Windows</value></data>
+  <data name="Startup_Enabled" xml:space="preserve"><value>Startup is enabled.</value></data>
+  <data name="Startup_Disabled" xml:space="preserve"><value>Startup is disabled.</value></data>
+  <data name="Startup_DisabledByUser" xml:space="preserve"><value>Startup was disabled in Task Manager. Enable it there.</value></data>
+  <data name="Startup_DisabledByPolicy" xml:space="preserve"><value>Startup is disabled by your administrator.</value></data>
+  <data name="Startup_EnabledByPolicy" xml:space="preserve"><value>Startup is enabled by your administrator.</value></data>
+  <data name="LanguageStyle" xml:space="preserve"><value>Use language style instructions</value></data>
+  <data name="Profile" xml:space="preserve"><value>Language profile</value></data>
+  <data name="Export" xml:space="preserve"><value>Export settings</value></data>
+  <data name="Import" xml:space="preserve"><value>Import settings</value></data>
+  <data name="SettingsFile" xml:space="preserve"><value>ByoGlot settings</value></data>
+  <data name="Project" xml:space="preserve"><value>Project and issue tracker</value></data>
+  <data name="Privacy" xml:space="preserve"><value>Privacy policy</value></data>
+  <data name="Version" xml:space="preserve"><value>Version</value></data>
+  <data name="Err_NoConnection" xml:space="preserve"><value>Add a provider first.</value></data>
+  <data name="Err_NoModel" xml:space="preserve"><value>Choose a model.</value></data>
+  <data name="Err_KeyMissing" xml:space="preserve"><value>The API key for this provider is missing.</value></data>
+  <data name="Err_ConsentNeeded" xml:space="preserve"><value>Confirm that text may be sent to {0}.</value></data>
+  <data name="Err_TooLong" xml:space="preserve"><value>The text is longer than {0} characters.</value></data>
+  <data name="Err_Empty" xml:space="preserve"><value>There is no text to translate.</value></data>
+  <data name="Err_Offline" xml:space="preserve"><value>The provider did not answer. Check the connection.</value></data>
+  <data name="Err_ProviderAuth" xml:space="preserve"><value>The provider rejected the API key (HTTP {0}).</value></data>
+  <data name="Err_RateLimit" xml:space="preserve"><value>The provider limit is reached. Try again later.</value></data>
+  <data name="Err_Provider" xml:space="preserve"><value>The provider returned an error: {0}</value></data>
+  <data name="Err_Invalid" xml:space="preserve"><value>This settings file or value is invalid.</value></data>
+  <data name="Err_InvalidConnection" xml:space="preserve"><value>Check the URL and API key. Public endpoints require HTTPS.</value></data>
+  <data name="Err_Storage" xml:space="preserve"><value>The settings or API key could not be saved.</value></data>
+  <data name="Consent_Text" xml:space="preserve"><value>Text I translate and my instructions are sent to {0}.</value></data>
+  <data name="Quick_NoText" xml:space="preserve"><value>No text was selected.</value></data>
+  <data name="Quick_Elevated" xml:space="preserve"><value>ByoGlot cannot read text from apps that run as administrator.</value></data>
+  <data name="Quick_Private" xml:space="preserve"><value>ByoGlot does not read private clipboard content.</value></data>
+  <data name="Quick_TooLong" xml:space="preserve"><value>The selection is longer than 5000 characters.</value></data>
+  <data name="TranslateSelection" xml:space="preserve"><value>Translate selection</value></data>
+  <data name="TranslateClipboard" xml:space="preserve"><value>Translate clipboard</value></data>
+  <data name="Open" xml:space="preserve"><value>Open ByoGlot</value></data>
+  <data name="Quit" xml:space="preserve"><value>Quit</value></data>
+  <data name="HotKey" xml:space="preserve"><value>Global shortcut</value></data>
+  <data name="HotKeyHint" xml:space="preserve"><value>Click here and press a shortcut</value></data>
+  <data name="HotKeyInvalid" xml:space="preserve"><value>Use Ctrl, Alt or Win with a key.</value></data>
+  <data name="HotKeyTaken" xml:space="preserve"><value>This shortcut is already in use.</value></data>
+  <data name="Fallback" xml:space="preserve"><value>Use Ctrl+C when an app does not expose the selection</value></data>
+  <data name="DoubleCopy" xml:space="preserve"><value>Translate on double copy (Ctrl+C twice)</value></data>
+  <data name="Pin" xml:space="preserve"><value>Keep this window open</value></data>
+  <data name="Working" xml:space="preserve"><value>Translating...</value></data>
+  <data name="OpenEditor" xml:space="preserve"><value>Open in ByoGlot</value></data>
+  <data name="Preset_Deepseek" xml:space="preserve"><value>DeepSeek</value></data>
+  <data name="Preset_Openrouter" xml:space="preserve"><value>OpenRouter</value></data>
+  <data name="Preset_Ollama" xml:space="preserve"><value>Ollama</value></data>
+  <data name="Preset_Lmstudio" xml:space="preserve"><value>LM Studio</value></data>
+  <data name="Preset_Custom" xml:space="preserve"><value>Custom</value></data>
+  <data name="Profile_auto" xml:space="preserve"><value>Automatic</value></data>
+  <data name="Profile_generic" xml:space="preserve"><value>General</value></data>
+  <data name="Profile_ru" xml:space="preserve"><value>Russian</value></data>
+  <data name="Effort_none" xml:space="preserve"><value>None</value></data>
+  <data name="Effort_low" xml:space="preserve"><value>Low</value></data>
+  <data name="Effort_medium" xml:space="preserve"><value>Medium</value></data>
+  <data name="Effort_high" xml:space="preserve"><value>High</value></data>
+  <data name="ProviderFailure" xml:space="preserve"><value>unexpected response</value></data>
+  <data name="Quick_ClipboardRestoreFailed" xml:space="preserve"><value>ByoGlot could not restore the clipboard. Check its contents before pasting.</value></data>
+</root>

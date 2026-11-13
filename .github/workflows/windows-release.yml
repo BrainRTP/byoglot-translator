@@ -1,0 +1,52 @@
+name: Windows Release
+
+on:
+  push:
+    tags: ["windows-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: windows/global.json
+      - name: Check tag and package versions
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          [xml]$props = Get-Content windows/Directory.Build.props
+          $version = [string]$props.Project.PropertyGroup.Version
+          if ($env:RELEASE_TAG -cne "windows-v$version") { throw 'Tag does not match the Windows version.' }
+          [xml]$manifest = Get-Content windows/ByoGlot.App/Package.appxmanifest
+          if ($manifest.Package.Identity.Version -cne "$version.0") { throw 'Manifest does not match the Windows version.' }
+      - run: dotnet test windows/ByoGlot.Core.Tests
+      - run: dotnet test windows/ByoGlot.App.Tests
+      - name: Build unsigned x64 and ARM64 Store bundle
+        run: >-
+          dotnet build windows/ByoGlot.App -c Release -p:Platform=x64
+          -p:AppxBundlePlatforms="x64|ARM64" -p:AppxBundle=Always
+          -p:UapAppxPackageBuildMode=StoreUpload -p:AppxPackageSigningEnabled=false
+          -p:GenerateAppxPackageOnBuild=true -p:AppxSymbolPackageEnabled=false
+          -p:DebugType=None -p:DebugSymbols=false -p:AppxPackageDir="${{ github.workspace }}/artifacts/windows/"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-store-upload
+          path: artifacts/windows/**/*.msixupload
+          if-no-files-found: error
+          retention-days: 7
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $packages = @(Get-ChildItem artifacts/windows -Recurse -Filter *.msixupload | ForEach-Object FullName)
+          if ($packages.Count -eq 0) { throw 'Store upload package is missing.' }
+          gh release create $env:RELEASE_TAG @packages --draft --verify-tag --title $env:RELEASE_TAG --generate-notes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

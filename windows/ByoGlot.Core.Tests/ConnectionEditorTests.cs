@@ -154,4 +154,38 @@ public class ConnectionEditorTests
         Assert.Equal("old-key", await secrets.GetAsync("c", "https://api.deepseek.com"));
     }
 
+    private sealed class FailingSettings(AppSettings initial) : ISettingsRepository
+    {
+        public Task<AppSettings> ReadAsync() => Task.FromResult(initial);
+        public Task<AppSettings> UpdateAsync(Func<AppSettings, AppSettings> change) => throw new IOException();
+    }
+
+    [Fact]
+    public async Task SettingsFailureRestoresThePreviousOriginAndKey()
+    {
+        var secrets = new InMemorySecretStore();
+        await secrets.SetAsync("old-key", "c", "https://api.deepseek.com");
+        var editor = new ConnectionEditor(new FailingSettings(TranslationRunnerTests.Configured()), secrets, new RecordingTransport(RecordingTransport.JsonResponse(Models)));
+        await Assert.ThrowsAsync<IOException>(() => editor.SaveAsync(Draft("https://other.example", "new-key", "c"), true, CancellationToken.None));
+        Assert.Equal("old-key", await secrets.GetAsync("c", "https://api.deepseek.com"));
+    }
+
+    private sealed class FailingSecrets : ISecretStore
+    {
+        public Task SetAsync(string secret, string connectionId, string origin) => throw new IOException();
+        public Task<string?> GetAsync(string connectionId, string origin) => Task.FromResult<string?>("old-key");
+        public Task<bool> HasAsync(string connectionId) => Task.FromResult(true);
+        public Task DeleteAsync(string connectionId) => throw new InvalidOperationException("Must not delete before replacement");
+    }
+
+    [Fact]
+    public async Task FailedKeyReplacementDoesNotDeleteThePreviousKey()
+    {
+        var initial = TranslationRunnerTests.Configured();
+        var repository = new InMemorySettingsRepository(initial);
+        var editor = new ConnectionEditor(repository, new FailingSecrets(), new RecordingTransport(RecordingTransport.JsonResponse(Models)));
+        await Assert.ThrowsAsync<IOException>(() => editor.SaveAsync(Draft("https://other.example", "new-key", "c"), true, CancellationToken.None));
+        Assert.Same(initial, await repository.ReadAsync());
+    }
+
 }

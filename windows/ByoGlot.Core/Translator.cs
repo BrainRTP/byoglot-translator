@@ -1,6 +1,9 @@
 namespace ByoGlot.Core;
 
-public sealed record TextRequest(string Text, string Context, string AppName, string SourceLang, string TargetLang, string PrePrompt, string LanguagePrompt, ModelRef Model);
+public sealed record TextRequest(string Text, string Context, string AppName, string SourceLang, string TargetLang, string PrePrompt, string LanguagePrompt, ModelRef Model)
+{
+    public override string ToString() => "TextRequest { [redacted] }";
+}
 
 public sealed class Translator(Func<CancellationToken, Task<ITextGenerator>> generator, int cacheLimit = 200)
 {

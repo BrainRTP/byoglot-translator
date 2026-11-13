@@ -4,10 +4,10 @@ on:
   push:
     branches: [main]
     paths:
-      ["windows/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/windows.yml"]
+      ["windows/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/windows*.yml"]
   pull_request:
     paths:
-      ["windows/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/windows.yml"]
+      ["windows/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/windows*.yml"]
   workflow_dispatch:
 
 permissions:
@@ -22,3 +22,17 @@ jobs:
         with:
           global-json-file: windows/global.json
       - run: dotnet test windows/ByoGlot.Core.Tests
+      - run: dotnet test windows/ByoGlot.App.Tests
+      - name: Build unsigned x64 and ARM64 Store bundle
+        run: >-
+          dotnet build windows/ByoGlot.App -c Release -p:Platform=x64
+          -p:AppxBundlePlatforms="x64|ARM64" -p:AppxBundle=Always
+          -p:UapAppxPackageBuildMode=StoreUpload -p:AppxPackageSigningEnabled=false
+          -p:GenerateAppxPackageOnBuild=true -p:AppxSymbolPackageEnabled=false
+          -p:DebugType=None -p:DebugSymbols=false -p:AppxPackageDir="${{ github.workspace }}/artifacts/windows/"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-unsigned-msix
+          path: artifacts/windows/**
+          if-no-files-found: error
+          retention-days: 7

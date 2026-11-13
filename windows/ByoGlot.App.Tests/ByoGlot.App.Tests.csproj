@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework Condition="$([MSBuild]::IsOSPlatform('Windows'))">net11.0-windows10.0.28000.0</TargetFramework>
+    <TargetFramework Condition="!$([MSBuild]::IsOSPlatform('Windows'))">net11.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CsWin32PlatformTarget>x64</CsWin32PlatformTarget>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <ProjectReference Include="../ByoGlot.Core/ByoGlot.Core.csproj" />
+    <Compile Include="../ByoGlot.App/Services/HttpClientTransport.cs" Link="Services/HttpClientTransport.cs" />
+    <Compile Include="../ByoGlot.App/Services/FileSettingsRepository.cs" Link="Services/FileSettingsRepository.cs" />
+    <Using Include="Xunit" />
+    <Using Include="ByoGlot.Core" />
+    <Using Include="ByoGlot.App.Services" />
+  </ItemGroup>
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+    <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
+    <Compile Include="../ByoGlot.App/Services/DpapiSecretStore.cs" Link="Services/DpapiSecretStore.cs" />
+    <Compile Include="../ByoGlot.App/Shell/ClipboardSnapshot.cs" Link="Shell/ClipboardSnapshot.cs" />
+    <Compile Include="../ByoGlot.App/Shell/ClipboardAccess.cs" Link="Shell/ClipboardAccess.cs" />
+    <AdditionalFiles Include="../ByoGlot.App/NativeMethods.txt" />
+  </ItemGroup>
+  <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))"><Compile Remove="DpapiSecretStoreTests.cs;ClipboardSnapshotTests.cs" /></ItemGroup>
+</Project>

@@ -5,6 +5,14 @@ namespace ByoGlot.Core.Tests.Capture;
 public class CapturePlanTests
 {
     [Fact]
+    public async Task UnavailableAutomationNeverSimulatesACopy()
+    {
+        var copied = false;
+        var result = await CapturePlan.RunAsync(new(false, null, true, () => { copied = true; return Task.FromResult<ClipboardRead>(new ClipboardRead.Text("private")); }, AutomationAvailable: false));
+        Assert.IsType<CaptureResult.Nothing>(result);
+        Assert.False(copied);
+    }
+    [Fact]
     public async Task ElevatedForegroundIsReported() => Assert.IsType<CaptureResult.Elevated>(await CapturePlan.RunAsync(new(true, "automation", true, () => throw new InvalidOperationException("Must not copy elevated content."))));
     [Fact]
     public async Task AutomationTextWins() => Assert.Equal(new CaptureResult.Text("selection", SelectionSource.Automation), await CapturePlan.RunAsync(new(false, " selection ", true, () => throw new InvalidOperationException("Must not copy when automation works."))));

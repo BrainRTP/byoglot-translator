@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net11.0-windows10.0.28000.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.26300.0</TargetPlatformMinVersion>
+    <SupportedOSPlatformVersion>10.0.26300.0</SupportedOSPlatformVersion>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifier Condition="'$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(Platform)' != 'ARM64'">win-x64</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <WindowsPackageType>MSIX</WindowsPackageType>
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>ByoGlot.App</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ByoGlot.Core/ByoGlot.Core.csproj" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
+    <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+    <Content Include="Assets/**" />
+  </ItemGroup>
+</Project>

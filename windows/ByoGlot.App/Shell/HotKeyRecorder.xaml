@@ -1,0 +1,1 @@
+<UserControl x:Class="ByoGlot.App.Shell.HotKeyRecorder" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"><StackPanel Spacing="8"><TextBox x:Name="Input" IsReadOnly="True" KeyDown="Record" /><TextBlock x:Name="Error" TextWrapping="Wrap" /></StackPanel></UserControl>

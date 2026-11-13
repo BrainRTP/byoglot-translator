@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="Translate" xml:space="preserve"><value>Перевод</value></data>
+  <data name="Templates" xml:space="preserve"><value>Шаблоны</value></data>
+  <data name="Connections" xml:space="preserve"><value>Подключения</value></data>
+  <data name="Settings" xml:space="preserve"><value>Настройки</value></data>
+  <data name="Input" xml:space="preserve"><value>Текст для перевода</value></data>
+  <data name="Paste" xml:space="preserve"><value>Вставить</value></data>
+  <data name="Copy" xml:space="preserve"><value>Копировать</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Отмена</value></data>
+  <data name="Close" xml:space="preserve"><value>Закрыть</value></data>
+  <data name="Save" xml:space="preserve"><value>Сохранить</value></data>
+  <data name="Delete" xml:space="preserve"><value>Удалить</value></data>
+  <data name="Edit" xml:space="preserve"><value>Изменить</value></data>
+  <data name="Name" xml:space="preserve"><value>Название</value></data>
+  <data name="Source" xml:space="preserve"><value>Исходный язык</value></data>
+  <data name="Target" xml:space="preserve"><value>Язык перевода</value></data>
+  <data name="Auto" xml:space="preserve"><value>Определить автоматически</value></data>
+  <data name="Template" xml:space="preserve"><value>Шаблон</value></data>
+  <data name="FixConnection" xml:space="preserve"><value>Открыть подключения</value></data>
+  <data name="AddConnection" xml:space="preserve"><value>Добавить провайдера</value></data>
+  <data name="EditConnection" xml:space="preserve"><value>Изменить провайдера</value></data>
+  <data name="Preset" xml:space="preserve"><value>Тип провайдера</value></data>
+  <data name="BaseUrl" xml:space="preserve"><value>Базовый URL</value></data>
+  <data name="ApiKey" xml:space="preserve"><value>API-ключ (оставьте пустым, чтобы сохранить текущий)</value></data>
+  <data name="Active" xml:space="preserve"><value>активно</value></data>
+  <data name="KeyMissing" xml:space="preserve"><value>ключ не задан</value></data>
+  <data name="Activate" xml:space="preserve"><value>Использовать провайдера</value></data>
+  <data name="ChooseModels" xml:space="preserve"><value>Выбрать модели</value></data>
+  <data name="PageModel" xml:space="preserve"><value>Модель редактора</value></data>
+  <data name="SelectionModel" xml:space="preserve"><value>Модель выделения</value></data>
+  <data name="Effort" xml:space="preserve"><value>Уровень рассуждения</value></data>
+  <data name="DeleteConnection" xml:space="preserve"><value>Удалить провайдера и его ключ?</value></data>
+  <data name="AddTemplate" xml:space="preserve"><value>Добавить шаблон</value></data>
+  <data name="Duplicate" xml:space="preserve"><value>Создать копию</value></data>
+  <data name="BuiltinTemplate" xml:space="preserve"><value>Стандартный шаблон</value></data>
+  <data name="Instructions" xml:space="preserve"><value>Инструкции</value></data>
+  <data name="OptionalTarget" xml:space="preserve"><value>Язык перевода (необязательно)</value></data>
+  <data name="ClearTarget" xml:space="preserve"><value>Использовать общий язык перевода</value></data>
+  <data name="UseDefault" xml:space="preserve"><value>Использовать по умолчанию</value></data>
+  <data name="DeleteTemplate" xml:space="preserve"><value>Удалить этот шаблон?</value></data>
+  <data name="Startup" xml:space="preserve"><value>Запускать вместе с Windows</value></data>
+  <data name="Startup_Enabled" xml:space="preserve"><value>Автозапуск включен.</value></data>
+  <data name="Startup_Disabled" xml:space="preserve"><value>Автозапуск выключен.</value></data>
+  <data name="Startup_DisabledByUser" xml:space="preserve"><value>Автозапуск отключен в диспетчере задач. Включите его там.</value></data>
+  <data name="Startup_DisabledByPolicy" xml:space="preserve"><value>Автозапуск отключен администратором.</value></data>
+  <data name="Startup_EnabledByPolicy" xml:space="preserve"><value>Автозапуск включен администратором.</value></data>
+  <data name="LanguageStyle" xml:space="preserve"><value>Учитывать стиль языка</value></data>
+  <data name="Profile" xml:space="preserve"><value>Языковой профиль</value></data>
+  <data name="Export" xml:space="preserve"><value>Экспорт настроек</value></data>
+  <data name="Import" xml:space="preserve"><value>Импорт настроек</value></data>
+  <data name="SettingsFile" xml:space="preserve"><value>Настройки ByoGlot</value></data>
+  <data name="Project" xml:space="preserve"><value>Проект и сообщения об ошибках</value></data>
+  <data name="Privacy" xml:space="preserve"><value>Политика конфиденциальности</value></data>
+  <data name="Version" xml:space="preserve"><value>Версия</value></data>
+  <data name="Err_NoConnection" xml:space="preserve"><value>Сначала добавьте провайдера.</value></data>
+  <data name="Err_NoModel" xml:space="preserve"><value>Выберите модель.</value></data>
+  <data name="Err_KeyMissing" xml:space="preserve"><value>Для этого провайдера не задан API-ключ.</value></data>
+  <data name="Err_ConsentNeeded" xml:space="preserve"><value>Подтвердите отправку текста на {0}.</value></data>
+  <data name="Err_TooLong" xml:space="preserve"><value>Текст длиннее {0} символов.</value></data>
+  <data name="Err_Empty" xml:space="preserve"><value>Нет текста для перевода.</value></data>
+  <data name="Err_Offline" xml:space="preserve"><value>Провайдер не ответил. Проверьте соединение.</value></data>
+  <data name="Err_ProviderAuth" xml:space="preserve"><value>Провайдер отклонил API-ключ (HTTP {0}).</value></data>
+  <data name="Err_RateLimit" xml:space="preserve"><value>Достигнут лимит провайдера. Повторите позже.</value></data>
+  <data name="Err_Provider" xml:space="preserve"><value>Провайдер вернул ошибку: {0}</value></data>
+  <data name="Err_Invalid" xml:space="preserve"><value>Некорректный файл настроек или значение.</value></data>
+  <data name="Err_InvalidConnection" xml:space="preserve"><value>Проверьте URL и API-ключ. Публичные серверы требуют HTTPS.</value></data>
+  <data name="Err_Storage" xml:space="preserve"><value>Не удалось сохранить настройки или API-ключ.</value></data>
+  <data name="Consent_Text" xml:space="preserve"><value>Переводимый текст и мои инструкции отправляются на {0}.</value></data>
+  <data name="Quick_NoText" xml:space="preserve"><value>Текст не выделен.</value></data>
+  <data name="Quick_Elevated" xml:space="preserve"><value>ByoGlot не читает текст из приложений, запущенных от имени администратора.</value></data>
+  <data name="Quick_Private" xml:space="preserve"><value>ByoGlot не читает приватное содержимое буфера обмена.</value></data>
+  <data name="Quick_TooLong" xml:space="preserve"><value>Выделение длиннее 5000 символов.</value></data>
+  <data name="TranslateSelection" xml:space="preserve"><value>Перевести выделение</value></data>
+  <data name="TranslateClipboard" xml:space="preserve"><value>Перевести буфер обмена</value></data>
+  <data name="Open" xml:space="preserve"><value>Открыть ByoGlot</value></data>
+  <data name="Quit" xml:space="preserve"><value>Выход</value></data>
+  <data name="HotKey" xml:space="preserve"><value>Глобальное сочетание клавиш</value></data>
+  <data name="HotKeyHint" xml:space="preserve"><value>Нажмите здесь и введите сочетание</value></data>
+  <data name="HotKeyInvalid" xml:space="preserve"><value>Используйте Ctrl, Alt или Win вместе с клавишей.</value></data>
+  <data name="HotKeyTaken" xml:space="preserve"><value>Это сочетание уже используется.</value></data>
+  <data name="Fallback" xml:space="preserve"><value>Использовать Ctrl+C, если приложение не предоставляет выделение</value></data>
+  <data name="DoubleCopy" xml:space="preserve"><value>Переводить при двойном копировании (Ctrl+C дважды)</value></data>
+  <data name="Pin" xml:space="preserve"><value>Закрепить окно</value></data>
+  <data name="Working" xml:space="preserve"><value>Переводим...</value></data>
+  <data name="OpenEditor" xml:space="preserve"><value>Открыть в ByoGlot</value></data>
+  <data name="Preset_Deepseek" xml:space="preserve"><value>DeepSeek</value></data>
+  <data name="Preset_Openrouter" xml:space="preserve"><value>OpenRouter</value></data>
+  <data name="Preset_Ollama" xml:space="preserve"><value>Ollama</value></data>
+  <data name="Preset_Lmstudio" xml:space="preserve"><value>LM Studio</value></data>
+  <data name="Preset_Custom" xml:space="preserve"><value>Другой</value></data>
+  <data name="Profile_auto" xml:space="preserve"><value>Автоматически</value></data>
+  <data name="Profile_generic" xml:space="preserve"><value>Общий</value></data>
+  <data name="Profile_ru" xml:space="preserve"><value>Русский</value></data>
+  <data name="Effort_none" xml:space="preserve"><value>Нет</value></data>
+  <data name="Effort_low" xml:space="preserve"><value>Низкий</value></data>
+  <data name="Effort_medium" xml:space="preserve"><value>Средний</value></data>
+  <data name="Effort_high" xml:space="preserve"><value>Высокий</value></data>
+  <data name="ProviderFailure" xml:space="preserve"><value>неожиданный ответ</value></data>
+  <data name="Quick_ClipboardRestoreFailed" xml:space="preserve"><value>ByoGlot не смог восстановить буфер обмена. Проверьте его содержимое перед вставкой.</value></data>
+</root>

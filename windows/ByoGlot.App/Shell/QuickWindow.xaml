@@ -1,0 +1,3 @@
+<Window x:Class="ByoGlot.App.Shell.QuickWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ScrollViewer><StackPanel x:Name="Panel" Padding="16" Spacing="8" KeyDown="OnKeyDown" PointerPressed="OnPointerPressed" /></ScrollViewer>
+</Window>

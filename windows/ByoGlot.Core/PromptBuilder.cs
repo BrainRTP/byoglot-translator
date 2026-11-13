@@ -1,6 +1,9 @@
 namespace ByoGlot.Core;
 
-public sealed record TextPromptInput(string PrePrompt, string LanguagePrompt, string SourceLang, string TargetLang, string Text, string Context, string AppName);
+public sealed record TextPromptInput(string PrePrompt, string LanguagePrompt, string SourceLang, string TargetLang, string Text, string Context, string AppName)
+{
+    public override string ToString() => "TextPromptInput { [redacted] }";
+}
 
 public static class PromptBuilder
 {

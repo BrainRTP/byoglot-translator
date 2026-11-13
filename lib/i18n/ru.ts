@@ -1,6 +1,17 @@
 import type { MessageKey } from "./index";
 
 export const ru = {
+  "translator.title": "Переводчик текста",
+  "translator.open": "Перевести текст",
+  "translator.input": "Текст для перевода",
+  "translator.placeholder": "Вставьте или введите текст",
+  "translator.source": "Исходный язык",
+  "translator.target": "Язык перевода",
+  "translator.translate": "Перевести",
+  "translator.result": "Перевод",
+  "translator.limit": "Текст превышает лимит в {limit} символов. Сократите его для перевода.",
+  "translator.count": "{count} / {limit}",
+  "translator.privacy": "Без истории. Текст и перевод хранятся только на открытой странице.",
   "template.builtin": "Обычный перевод",
   "unit.h": "ч",
   "unit.min": "мин",

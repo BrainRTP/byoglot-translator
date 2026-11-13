@@ -1,4 +1,6 @@
+import { seedProvider } from "./extension";
 import { expect, test } from "./fixtures";
+import { startMockProvider } from "./mock-provider";
 
 test("opens the translator from options, translates at 320px, and reuses its tab", async ({
   paired,
@@ -8,6 +10,10 @@ test("opens the translator from options, translates at 320px, and reuses its tab
   await options.goto(`chrome-extension://${paired.id}/options.html`);
   const opened = paired.context.waitForEvent("page");
   await options.getByRole("link", { name: "Translate text", exact: true }).click();
+  expect(
+    (await options.getByRole("link", { name: "Translate text", exact: true }).boundingBox())
+      ?.height,
+  ).toBeGreaterThanOrEqual(44);
   const translator = await opened;
   await translator.waitForURL(`chrome-extension://${paired.id}/translator.html`);
   await translator.addInitScript(() => {
@@ -21,7 +27,7 @@ test("opens the translator from options, translates at 320px, and reuses its tab
   await expect(translator.getByLabel("Source language")).toHaveValue("auto");
   await expect(translator.getByLabel("Target language")).toHaveValue("ru");
   await input.fill("x".repeat(20_001));
-  await expect(translator.getByRole("alert")).toContainText("20000 character limit");
+  await expect(translator.getByRole("alert")).toContainText("Text is too long (20001 / 20000)");
   await expect(translate).toBeDisabled();
   await input.fill("Hello from the translator");
   await translate.click();
@@ -29,6 +35,7 @@ test("opens the translator from options, translates at 320px, and reuses its tab
     "[ru] Hello from the translator",
   );
   await expect(translator.getByRole("button", { name: "Copy", exact: true })).toBeEnabled();
+  await expect(translator.getByRole("status")).toContainText("does not report whether");
   const requests = mock.requests.filter(
     (request) => request.path === "/api/experimental/generate/text",
   );
@@ -60,4 +67,43 @@ test("opens the translator from options, translates at 320px, and reuses its tab
   expect(JSON.stringify(storage)).not.toContain("Hello from the translator");
   await translator.reload();
   await expect(input).toHaveValue("");
+});
+
+test("keeps truncated output visible with a warning", async ({ ext }) => {
+  const provider = await startMockProvider({ mode: "length" });
+  try {
+    await seedProvider(ext.worker, provider);
+    const page = await ext.context.newPage();
+    await page.goto(`chrome-extension://${ext.id}/translator.html`);
+    await page.getByRole("textbox", { name: "Text to translate", exact: true }).fill("A long text");
+    await page.getByRole("button", { name: "Translate", exact: true }).click();
+    await expect(page.getByLabel("Translation", { exact: true })).toContainText("[ru] A long text");
+    await expect(page.getByRole("status")).toContainText("translation was cut off");
+    await expect(page.getByRole("button", { name: "Copy", exact: true })).toBeEnabled();
+  } finally {
+    await provider.stop();
+  }
+});
+
+test("closing the translator tab aborts its provider request", async ({ ext }) => {
+  const provider = await startMockProvider({ mode: "slow" });
+  try {
+    await seedProvider(ext.worker, provider);
+    const page = await ext.context.newPage();
+    await page.goto(`chrome-extension://${ext.id}/translator.html`);
+    await page
+      .getByRole("textbox", { name: "Text to translate", exact: true })
+      .fill("Slow request");
+    await page.getByRole("button", { name: "Translate", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Cancel", exact: true })).toBeEnabled();
+    await expect
+      .poll(
+        () => provider.requests.filter((request) => request.path === "/v1/chat/completions").length,
+      )
+      .toBe(1);
+    await page.close();
+    await expect.poll(() => provider.aborted).toBe(1);
+  } finally {
+    await provider.stop();
+  }
 });

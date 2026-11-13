@@ -9,14 +9,12 @@ public struct ScreenMain: View {
     let openProviders: () -> Void
     @State private var text = ""
     @State private var showModels = false
+    @Environment(\.dynamicTypeSize) private var typeSize
     public init(model: AppModel, openProviders: @escaping () -> Void) { self.model = model; self.openProviders = openProviders }
     public var body: some View {
-        VStack(spacing: 0) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { templateMenu; changedChip; Spacer(minLength: 0); modelMenu }
-                VStack(alignment: .leading, spacing: 0) { HStack { templateMenu; changedChip }; modelMenu }
-            }.padding(.horizontal, 16).padding(.bottom, 4)
-            TranslatorBlock(model: model, text: $text, openProviders: openProviders, openModels: { showModels = true })
+        Group {
+            if typeSize.isAccessibilitySize { ScrollView { mainContent } }
+            else { mainContent }
         }
         .background(ByoColor.background).foregroundStyle(ByoColor.text)
         .navigationTitle(AppStrings.text("main.title"))
@@ -33,6 +31,16 @@ public struct ScreenMain: View {
             }.task { for c in model.settings.connections { await model.warmModels(connectionId: c.id) } }
         }
         .onAppear { text = model.inputText }
+    }
+    private var mainContent: some View {
+        VStack(spacing: 0) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { templateMenu; changedChip; Spacer(minLength: 0); modelMenu }
+                VStack(alignment: .leading, spacing: 0) { HStack { templateMenu; changedChip }; modelMenu }
+            }.padding(.horizontal, 16).padding(.bottom, 4)
+            TranslatorBlock(model: model, text: $text, openProviders: openProviders, openModels: { showModels = true })
+                .frame(minHeight: typeSize.isAccessibilitySize ? 840 : nil)
+        }
     }
     private var templateMenu: some View {
         Menu {

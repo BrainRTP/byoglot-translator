@@ -1,0 +1,29 @@
+{
+  "presets": {
+    "deepseek": {
+      "baseUrl": "https://api.deepseek.com",
+      "needsKey": true
+    },
+    "openrouter": {
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "needsKey": true
+    },
+    "ollama": {
+      "baseUrl": "http://localhost:11434/v1",
+      "needsKey": false
+    },
+    "lmstudio": {
+      "baseUrl": "http://localhost:1234/v1",
+      "needsKey": false
+    },
+    "custom": {
+      "baseUrl": "",
+      "needsKey": true
+    }
+  },
+  "favoriteModel": {
+    "providerID": "deepseek",
+    "id": "deepseek-flash"
+  },
+  "selectionDefaultEffort": "high"
+}

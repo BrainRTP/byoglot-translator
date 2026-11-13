@@ -114,11 +114,11 @@ public sealed class ProviderClient(Connection connection, string? secret, IHttpT
         {
             if (!double.TryParse(value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var seconds)) return null;
             var ms = Math.Round(seconds * 1000, MidpointRounding.AwayFromZero);
-            return double.IsFinite(ms) && ms < long.MaxValue ? (long)ms : null;
+            return (long)Math.Min(ms, 86_400_000);
         }
         if (DateTimeOffset.TryParseExact(value, "r", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date)
             && date.ToString("r", CultureInfo.InvariantCulture) == value)
-            return Math.Max(0, (long)(date - (now?.Invoke() ?? DateTimeOffset.UtcNow)).TotalMilliseconds);
+            return (long)Math.Clamp((date - (now?.Invoke() ?? DateTimeOffset.UtcNow)).TotalMilliseconds, 0, 86_400_000);
         return null;
     }
 
@@ -132,5 +132,5 @@ public sealed class ProviderClient(Connection connection, string? secret, IHttpT
         if (obj.TryGetProperty(key, out var node) && !valid(node)) throw Shape();
     }
     private static string[]? Strings(JsonElement node) => node.ValueKind == JsonValueKind.Undefined ? null : node.EnumerateArray().Select(n => n.GetString()!).ToArray();
-    private static int Number(JsonElement node) => node.ValueKind == JsonValueKind.Undefined ? 0 : (int)Math.Clamp(node.GetDouble(), int.MinValue, int.MaxValue);
+    private static double Number(JsonElement node) => node.ValueKind == JsonValueKind.Undefined ? 0 : node.GetDouble();
 }

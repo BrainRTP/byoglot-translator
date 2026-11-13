@@ -5,5 +5,6 @@
   "generateTimeoutMs": 180000,
   "maxProfileText": 20000,
   "maxSelection": 5000,
-  "maxContext": 1000
+  "maxContext": 1000,
+  "maxEditorText": 20000
 }

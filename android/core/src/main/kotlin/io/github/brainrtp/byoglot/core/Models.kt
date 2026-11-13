@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ModelRef(val providerID: String, val id: String, val variant: String? = null, val connectionId: String? = null)
 @Serializable
-data class ModelInfo(val providerID: String, val id: String, val name: String, val variants: List<String>, val contextLimit: Int, val outputLimit: Int)
+data class ModelInfo(val providerID: String, val id: String, val name: String, val variants: List<String>, val contextLimit: Double, val outputLimit: Double)
 @Serializable
 enum class ProviderPreset { deepseek, openrouter, ollama, lmstudio, custom }
 @Serializable

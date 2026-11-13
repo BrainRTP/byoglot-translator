@@ -70,15 +70,16 @@ public struct ProviderClient: Sendable {
             throw BackendError(kind: aborted ? .aborted : .offline)
         }
         guard (200..<300).contains(response.status) else { throw failure(response) }
-        guard (try? JSONDecoder().decode(JSONValue.self, from: response.body)) != nil else {
+        do {
+            return try providerJSON(response.body)
+        } catch {
             throw BackendError(kind: .incompatible, detail: "response is not JSON")
         }
-        return response.body
     }
 
     private func failure(_ response: HTTPResponse) -> BackendError {
         let status = response.status
-        let rawMessage = (try? JSONDecoder().decode(ErrorBody.self, from: response.body))?.error?.message
+        let rawMessage = (try? JSONDecoder().decode(ErrorBody.self, from: providerJSON(response.body)))?.error?.message
         let message: String? = rawMessage.map { message in
             guard let secret, !secret.isEmpty else { return message }
             return message.replacingOccurrences(of: secret, with: "[redacted]")
@@ -110,9 +111,9 @@ public struct ProviderClient: Sendable {
     }
 
     private func milliseconds(_ value: Double) -> Int? {
-        let rounded = value.rounded()
-        guard rounded.isFinite, rounded >= 0, rounded < Double(Int.max) else { return nil }
-        return Int(rounded)
+        let capped = min(value.rounded(), 86_400_000)
+        guard capped.isFinite, capped >= 0 else { return nil }
+        return Int(capped)
     }
 }
 
@@ -120,9 +121,9 @@ private struct ModelList: Decodable { let data: [RawModel] }
 private struct RawModel: Decodable {
     let id: String
     let name: String?
-    let context_window: Int?
-    let context_length: Int?
-    let max_output_tokens: Int?
+    let context_window: Double?
+    let context_length: Double?
+    let max_output_tokens: Double?
     let effort: Effort?
     let supported_parameters: [String]?
 
@@ -139,9 +140,9 @@ private struct RawModel: Decodable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
         name = try c.optional(String.self, forKey: .name)
-        context_window = try c.optional(Int.self, forKey: .context_window)
-        context_length = try c.optional(Int.self, forKey: .context_length)
-        max_output_tokens = try c.optional(Int.self, forKey: .max_output_tokens)
+        context_window = try c.optional(Double.self, forKey: .context_window)
+        context_length = try c.optional(Double.self, forKey: .context_length)
+        max_output_tokens = try c.optional(Double.self, forKey: .max_output_tokens)
         effort = try c.optional(Effort.self, forKey: .effort)
         supported_parameters = try c.optional([String].self, forKey: .supported_parameters)
     }

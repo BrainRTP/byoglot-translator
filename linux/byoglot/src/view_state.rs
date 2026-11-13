@@ -133,12 +133,12 @@ mod tests {
     #[test]
     fn opening_editor_text_accepts_its_own_limit_and_counts_utf16() {
         assert!(validate_editor_text(&"x".repeat(byoglot_core::QUICK_INPUT_LIMIT + 1)).is_ok());
-        let text = "😀".repeat(byoglot_core::EDITOR_INPUT_LIMIT / 2);
+        let text = "😀".repeat(byoglot_core::editor_input_limit() / 2);
         assert!(validate_editor_text(&text).is_ok());
         assert_eq!(
             validate_editor_text(&(text + "x")),
             Err(byoglot_core::RunnerError::TooLong {
-                limit: byoglot_core::EDITOR_INPUT_LIMIT
+                limit: byoglot_core::editor_input_limit()
             })
         );
     }
@@ -275,14 +275,14 @@ pub fn editor_input(
         target_lang: Some(target),
         context: String::new(),
         app_name: "ByoGlot".into(),
-        limit: byoglot_core::EDITOR_INPUT_LIMIT,
+        limit: byoglot_core::editor_input_limit(),
     }
 }
 
 pub fn validate_editor_text(text: &str) -> Result<(), byoglot_core::RunnerError> {
-    if text.encode_utf16().count() > byoglot_core::EDITOR_INPUT_LIMIT {
+    if text.encode_utf16().count() > byoglot_core::editor_input_limit() {
         Err(byoglot_core::RunnerError::TooLong {
-            limit: byoglot_core::EDITOR_INPUT_LIMIT,
+            limit: byoglot_core::editor_input_limit(),
         })
     } else {
         Ok(())

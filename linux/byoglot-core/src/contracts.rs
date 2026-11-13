@@ -70,6 +70,7 @@ pub struct Limits {
     pub max_profile_text: usize,
     pub max_selection: usize,
     pub max_context: usize,
+    pub max_editor_text: usize,
 }
 static LIMITS: LazyLock<Limits> =
     LazyLock::new(|| serde_json::from_str(include_str!("../../../contracts/limits.json")).unwrap());

@@ -50,14 +50,14 @@ class ExportTest {
         assertEquals(listOf(localConnection), merged.connections)
     }
     @Test fun `initial model selection prefers the favorite`() {
-        val favorite = ModelInfo("deepseek", "deepseek-flash", "Flash", listOf("none", "high"), 0, 0)
-        val fallback = ModelInfo("custom", "other", "Other", listOf("low"), 0, 0)
+        val favorite = ModelInfo("deepseek", "deepseek-flash", "Flash", listOf("none", "high"), 0.0, 0.0)
+        val fallback = ModelInfo("custom", "other", "Other", listOf("low"), 0.0, 0.0)
         val (page, selection) = SettingsLogic.pickInitialModels(listOf(fallback, favorite), fallback, "c1")
         assertEquals(ModelRef("deepseek", "deepseek-flash", "none", "c1"), page)
         assertEquals(ModelRef("deepseek", "deepseek-flash", "high", "c1"), selection)
     }
     @Test fun `initial model selection falls back to the default`() {
-        val fallback = ModelInfo("custom", "other", "Other", listOf("low"), 0, 0)
+        val fallback = ModelInfo("custom", "other", "Other", listOf("low"), 0.0, 0.0)
         val expected = ModelRef("custom", "other", "low", "c1")
         assertEquals(expected to expected, SettingsLogic.pickInitialModels(listOf(fallback), fallback, "c1"))
         assertEquals(null to null, SettingsLogic.pickInitialModels(emptyList(), null, "c1"))

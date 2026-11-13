@@ -225,7 +225,7 @@ fn retry_after(value: &str, now: SystemTime) -> Option<f64> {
         && pieces.next().is_none()
     {
         let milliseconds = (value.parse::<f64>().ok()? * 1000.0).round();
-        return milliseconds.is_finite().then_some(milliseconds);
+        return Some(milliseconds.min(86_400_000.0));
     }
     if value.len() != 29
         || value.get(3..5)? != ", "
@@ -261,7 +261,7 @@ fn retry_after(value: &str, now: SystemTime) -> Option<f64> {
         Ok(d) => d.as_millis() as i128,
         Err(e) => -(e.duration().as_millis() as i128),
     };
-    Some((i128::from(timestamp) - now).max(0) as f64)
+    Some((i128::from(timestamp) - now).clamp(0, 86_400_000) as f64)
 }
 pub(crate) fn digits(value: &str) -> Option<u32> {
     if value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {

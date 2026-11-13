@@ -124,8 +124,8 @@ public class ProviderContractTests
         var client = new ProviderClient(new("c", ProviderPreset.Custom, "", "http://localhost"), null, transport);
         var model = Assert.Single(await client.ListModelsAsync(CancellationToken.None));
         Assert.Equal("last", model.Id);
-        Assert.Equal(int.MaxValue, model.ContextLimit);
-        Assert.Equal(int.MaxValue, model.OutputLimit);
+        Assert.Equal(3000000000.0, model.ContextLimit);
+        Assert.Equal(3000000000.0, model.OutputLimit);
     }
 
     [Theory]

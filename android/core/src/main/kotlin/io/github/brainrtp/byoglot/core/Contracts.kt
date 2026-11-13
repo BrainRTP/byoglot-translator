@@ -8,7 +8,7 @@ internal val coreJson = Json { ignoreUnknownKeys = true; explicitNulls = false }
 @Serializable
 data class PresetInfo(val baseUrl: String, val needsKey: Boolean)
 @Serializable
-data class Limits(val maxBlocks: Int, val maxChars: Int, val concurrency: Int, val generateTimeoutMs: Long, val maxProfileText: Int, val maxSelection: Int, val maxContext: Int)
+data class Limits(val maxBlocks: Int, val maxChars: Int, val concurrency: Int, val generateTimeoutMs: Long, val maxProfileText: Int, val maxSelection: Int, val maxContext: Int, val maxEditorText: Int)
 
 object Contracts {
     const val GENERIC_PROFILE = "generic"

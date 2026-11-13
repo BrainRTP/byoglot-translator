@@ -16,6 +16,16 @@ actor RecordingTransport: HTTPTransport {
 }
 
 struct ProviderContractTests {
+    @Test func repeatedEscapedKeysAndNestedContainers() throws {
+        let raw = Data(#" {"items":[{"key":"first","k\u0065y":"last\"\\"},[],null,true,1e6],"empty":{}} "#.utf8)
+        let actual = try JSONDecoder().decode(JSONValue.self, from: providerJSON(raw))
+        let expected = JSONValue.object([
+            "items": .array([.object(["key": .string("last\"\\")]), .array([]), .null, .bool(true), .number(1e6)]),
+            "empty": .object([:]),
+        ])
+        #expect(actual == expected)
+    }
+
     struct Provider: Decodable, Sendable {
         let preset: ProviderPreset
         let name: String

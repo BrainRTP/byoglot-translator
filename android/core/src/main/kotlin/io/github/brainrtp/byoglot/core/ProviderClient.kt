@@ -39,8 +39,8 @@ class ProviderClient(
                     levels,
                     raw.optionalStrings("supported_parameters"),
                 ),
-                raw.optionalInt("context_window") ?: raw.optionalInt("context_length") ?: 0,
-                raw.optionalInt("max_output_tokens") ?: 0,
+                raw.optionalNumber("context_window") ?: raw.optionalNumber("context_length") ?: 0.0,
+                raw.optionalNumber("max_output_tokens") ?: 0.0,
             )
         }
     }
@@ -283,7 +283,7 @@ class ProviderClient(
         val value = header?.jsTrim()?.takeIf { it.isNotEmpty() } ?: return null
         if (value.matches(Regex("[0-9]+(?:\\.[0-9]+)?"))) {
             val ms = floor((value.toDoubleOrNull() ?: return null) * 1000 + 0.5)
-            return if (ms.isFinite() && ms < Long.MAX_VALUE.toDouble()) ms.toLong() else null
+            return ms.coerceAtMost(86_400_000.0).toLong()
         }
         if (
             !value.matches(
@@ -300,7 +300,8 @@ class ProviderClient(
                     .withZone(java.time.ZoneOffset.UTC)
             val date = ZonedDateTime.parse(value, formatter)
             if (formatter.format(date) != value) null
-            else (date.toInstant().toEpochMilli() - now()).coerceAtLeast(0)
+            else (date.toInstant().toEpochMilli().toDouble() - now().toDouble())
+                .coerceIn(0.0, 86_400_000.0).toLong()
         } catch (_: java.time.DateTimeException) {
             null
         }
@@ -330,11 +331,11 @@ class ProviderClient(
     private fun JsonObject.optionalStrings(key: String): List<String>? =
         get(key)?.jsonArray?.map { it.stringValue() }
 
-    private fun JsonObject.optionalInt(key: String): Int? =
+    private fun JsonObject.optionalNumber(key: String): Double? =
         get(key)?.let {
             require(it is JsonPrimitive && !it.isString)
             val number = it.doubleOrNull ?: throw IllegalArgumentException()
             require(number.isFinite())
-            number.toLong().coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
+            number
         }
 }

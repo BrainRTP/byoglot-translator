@@ -17,3 +17,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: apple/scripts/sync-resources.sh --check
       - run: swift test --package-path apple/ByoGlotKit
+  ios:
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - run: xcodebuild -version
+      - run: brew install xcodegen
+      - run: xcodegen generate
+        working-directory: apple
+      - run: xcodebuild -project ByoGlot.xcodeproj -scheme ByoGlotiOS -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+        working-directory: apple

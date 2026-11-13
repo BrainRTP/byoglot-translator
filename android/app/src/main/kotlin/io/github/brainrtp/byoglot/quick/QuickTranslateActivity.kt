@@ -22,11 +22,12 @@ class QuickTranslateActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         setResult(RESULT_CANCELED)
         setFinishOnTouchOutside(true)
-        val request = QuickIntent.parse(intent.action, intent.type, mapOf(
+        val parsed = QuickIntent.parse(intent.action, intent.type, mapOf(
             Intent.EXTRA_PROCESS_TEXT to intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT),
             Intent.EXTRA_PROCESS_TEXT_READONLY to intent.getBooleanExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, false),
             Intent.EXTRA_TEXT to intent.getCharSequenceExtra(Intent.EXTRA_TEXT),
         )) ?: run { finish(); return }
+        val request = parsed.copy(canReplace = parsed.canReplace && callingActivity != null)
         val container = (application as ByoglotApplication).container
         val vm = ViewModelProvider(this, object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -45,7 +46,9 @@ class QuickTranslateActivity : ComponentActivity() {
                     },
                     onReplace = { setResult(RESULT_OK, Intent().putExtra(Intent.EXTRA_PROCESS_TEXT, it)); finish() },
                     onOpen = { destination ->
-                        startActivity(Intent(this, MainActivity::class.java).putExtra(Intent.EXTRA_TEXT, request.text).putExtra("destination", destination))
+                        startActivity(Intent(this, MainActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                            .putExtra(Intent.EXTRA_TEXT, request.text).putExtra("destination", destination))
                         finish()
                     },
                 )

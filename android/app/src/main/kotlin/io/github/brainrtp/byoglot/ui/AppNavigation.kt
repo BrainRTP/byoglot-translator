@@ -43,10 +43,18 @@ fun AppNavigation(
 ) {
     val settings by vm.settings.collectAsState()
     val error by vm.error.collectAsState()
-    var destination by rememberSaveable { mutableStateOf(Destination.entries.find { it.name == initialDestination } ?: Destination.translate) }
+    val navigation by vm.navigation.collectAsState()
+    var destination by rememberSaveable { mutableStateOf(Destination.entries.find { it.name == if (initialDestination == "network") "connections" else initialDestination } ?: Destination.translate) }
     var form by rememberSaveable { mutableStateOf<String?>(null) }
     var connectionId by rememberSaveable { mutableStateOf<String?>(null) }
     var templateId by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(navigation?.id) {
+        navigation?.let { request ->
+            destination = Destination.entries.find { it.name == if (request.destination == "network") "connections" else request.destination } ?: Destination.translate
+            form = null
+            vm.navigationHandled(request.id)
+        }
+    }
     val fix: (String) -> Unit = { route -> if (route == "network") onNetworkSettings() else { destination = Destination.connections; form = null } }
     BackHandler(form != null) { form = null }
     BoxWithConstraints(Modifier.fillMaxSize()) {

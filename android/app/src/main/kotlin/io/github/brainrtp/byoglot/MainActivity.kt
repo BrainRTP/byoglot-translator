@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
+    private lateinit var model: MainViewModel
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -28,6 +29,7 @@ class MainActivity : ComponentActivity() {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T = MainViewModel(container.settings, container.secrets, container.transport) as T
         })[MainViewModel::class.java]
+        model = vm
         if (savedInstanceState == null) intent.getStringExtra(Intent.EXTRA_TEXT)?.let(vm::setText)
         val export = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
             if (uri != null) vm.action {
@@ -54,7 +56,7 @@ class MainActivity : ComponentActivity() {
                 catch (_: java.io.IOException) { notice(R.string.file_error) }
             }
         }
-        val networkSettings = { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$packageName".toUri())) }
+        val networkSettings = { openNetworkSettings() }
         if (savedInstanceState == null && intent.getStringExtra("destination") == "network") networkSettings()
         val version = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
         setContent {
@@ -75,5 +77,14 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.hasExtra(Intent.EXTRA_TEXT) || intent.hasExtra("destination")) {
+            model.receiveQuickRequest(intent.getStringExtra(Intent.EXTRA_TEXT), intent.getStringExtra("destination"))
+            if (intent.getStringExtra("destination") == "network") openNetworkSettings()
+        }
+    }
+    private fun openNetworkSettings() { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$packageName".toUri())) }
     private fun notice(message: Int) { Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
 }

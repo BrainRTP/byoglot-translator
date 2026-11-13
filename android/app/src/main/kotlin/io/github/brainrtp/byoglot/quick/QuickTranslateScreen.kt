@@ -34,6 +34,7 @@ fun QuickTranslateScreen(
                     }
                 }
                 when (state) {
+                    QuickUiState.Ready -> Button(onClick = onRetry) { Text(stringResource(R.string.translate)) }
                     QuickUiState.Loading -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(stringResource(R.string.translating)) }
                     is QuickUiState.Done -> {
                         SelectionContainer { Text(state.output.text) }

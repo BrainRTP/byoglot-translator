@@ -9,6 +9,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.Json
 
+data class MainNavigationRequest(val id: Long, val destination: String)
 data class TranslationState(val working: Boolean = false, val output: RunnerOutput? = null, val error: RunnerError? = null)
 class MainViewModel(
     private val repository: SettingsRepository, secrets: SecretStore, transport: HttpTransport,
@@ -29,6 +30,9 @@ class MainViewModel(
     val error = mutableError.asStateFlow()
     private val mutableBusy = MutableStateFlow(false)
     val busy = mutableBusy.asStateFlow()
+    private val mutableNavigation = MutableStateFlow<MainNavigationRequest?>(null)
+    val navigation = mutableNavigation.asStateFlow()
+    private var navigationIdentity = 0L
     private var job: Job? = null
     private var identity = 0L
     init { workScope.launch { refresh() } }
@@ -37,6 +41,12 @@ class MainViewModel(
         mutableSettings.value = state
         mutableKeys.value = state.connections.associate { it.id to editor.keyState(it.id) }
     }
+    fun receiveQuickRequest(text: String?, destination: String?) {
+        text?.let(::setText)
+        dismissError()
+        mutableNavigation.value = MainNavigationRequest(++navigationIdentity, destination ?: "translate")
+    }
+    fun navigationHandled(id: Long) { if (mutableNavigation.value?.id == id) mutableNavigation.value = null }
     fun setText(text: String) { if (text != mutableText.value) { cancel(); mutableText.value = text; mutableTranslation.value = TranslationState() } }
     fun translate(text: String = this.text.value, templateId: String? = null, targetLang: String? = null) {
         val id = ++identity

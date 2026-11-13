@@ -34,4 +34,18 @@ class MainViewModelTest {
         val vm = model(backgroundScope, runner = { val call = ++calls; if (call == 1) withContext(NonCancellable) { delay(100) }; RunnerOutput(if (call == 1) "old" else "new", "auto", "en", ModelRef("custom", "m")) })
         vm.translate("old"); runCurrent(); vm.translate("new"); runCurrent(); advanceTimeBy(101); runCurrent(); assertEquals("new", vm.translation.value.output?.text)
     }
+    @Test fun a_warm_quick_handoff_updates_text_and_consumes_the_latest_destination() = runTest {
+        var cancelled = false
+        val vm = model(backgroundScope, runner = { try { awaitCancellation() } finally { cancelled = true } })
+        vm.setText("previous"); vm.translate(); runCurrent()
+        vm.receiveQuickRequest("incoming", "connections"); runCurrent()
+        val first = vm.navigation.value!!
+        assertTrue(cancelled); assertEquals("incoming", vm.text.value); assertEquals("connections", first.destination)
+        vm.receiveQuickRequest("next", null)
+        val second = vm.navigation.value!!
+        vm.navigationHandled(first.id); assertEquals(second, vm.navigation.value)
+        assertEquals("translate", second.destination)
+        vm.navigationHandled(second.id); assertNull(vm.navigation.value)
+    }
+
 }

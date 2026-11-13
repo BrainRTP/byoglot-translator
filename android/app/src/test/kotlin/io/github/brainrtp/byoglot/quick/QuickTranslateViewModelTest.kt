@@ -15,6 +15,17 @@ class QuickTranslateViewModelTest {
         val vm = QuickTranslateViewModel({ calls++; output() }, request, backgroundScope)
         runCurrent(); assertEquals(1, calls); assertEquals(output(), (vm.state.value as QuickUiState.Done).output)
     }
+    @Test fun shared_text_waits_for_confirmation_even_when_choosing_a_template() = runTest {
+        for (action in listOf("android.intent.action.SEND", "android.intent.action.TRANSLATE")) {
+            val shared = QuickIntent.parse(action, "text/plain", mapOf("android.intent.extra.TEXT" to "source"))!!
+            val inputs = mutableListOf<RunnerInput>()
+            val vm = QuickTranslateViewModel({ inputs += it; output() }, shared, backgroundScope)
+            runCurrent(); vm.useTemplate("chosen"); runCurrent()
+            assertTrue(inputs.isEmpty()); assertEquals(QuickUiState.Ready, vm.state.value)
+            vm.retry(); runCurrent()
+            assertEquals("chosen", inputs.single().templateId); assertTrue(vm.state.value is QuickUiState.Done)
+        }
+    }
     @Test fun too_long_text_fails_without_calling_the_provider() = runTest {
         var calls = 0
         val transport = object : HttpTransport {

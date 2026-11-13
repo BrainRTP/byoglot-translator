@@ -6,7 +6,7 @@ import io.github.brainrtp.byoglot.core.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
-data class QuickRequest(val text: String, val readOnly: Boolean, val canReplace: Boolean) {
+data class QuickRequest(val text: String, val readOnly: Boolean, val canReplace: Boolean, val requiresConfirmation: Boolean = false) {
     override fun toString() = "QuickRequest(readOnly=$readOnly, canReplace=$canReplace)"
 }
 object QuickIntent {
@@ -17,10 +17,11 @@ object QuickIntent {
         val text = (extras[if (process) "android.intent.extra.PROCESS_TEXT" else "android.intent.extra.TEXT"] as? CharSequence)?.toString() ?: return null
         if (text.isBlank()) return null
         val readOnly = !process || extras["android.intent.extra.PROCESS_TEXT_READONLY"] as? Boolean == true
-        return QuickRequest(text, readOnly, !readOnly)
+        return QuickRequest(text, readOnly, !readOnly, requiresConfirmation = shared)
     }
 }
 sealed interface QuickUiState {
+    data object Ready : QuickUiState
     data object Loading : QuickUiState
     data class Done(val output: RunnerOutput) : QuickUiState
     data class Failed(val error: RunnerError) : QuickUiState
@@ -32,12 +33,12 @@ class QuickTranslateViewModel internal constructor(
 ) : ViewModel() {
     constructor(runner: TranslationRunner, request: QuickRequest, scope: CoroutineScope? = null) : this(runner::translate, request, scope)
     private val workScope = scope ?: viewModelScope
-    private val mutableState = MutableStateFlow<QuickUiState>(QuickUiState.Loading)
+    private val mutableState = MutableStateFlow<QuickUiState>(QuickUiState.Ready)
     val state: StateFlow<QuickUiState> = mutableState.asStateFlow()
     private var job: Job? = null
     private var identity = 0L
     private var templateId: String? = null
-    init { retry() }
+    init { if (!request.requiresConfirmation) retry() }
     fun retry() {
         val id = ++identity
         job?.cancel()
@@ -51,7 +52,7 @@ class QuickTranslateViewModel internal constructor(
             if (id == identity) mutableState.value = result
         }
     }
-    fun useTemplate(id: String) { templateId = id; retry() }
+    fun useTemplate(id: String) { templateId = id; if (state.value != QuickUiState.Ready) retry() }
     fun cancel() { identity++; job?.cancel() }
     override fun onCleared() { cancel() }
 }

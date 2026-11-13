@@ -21,7 +21,8 @@ public static class ClipboardAccess
             foreach (var name in new[] { "ExcludeClipboardContentFromMonitorProcessing", "CanIncludeInClipboardHistory" })
                 if (PInvoke.IsClipboardFormatAvailable(PInvoke.RegisterClipboardFormat(name))) names.Add(name);
             if (PInvoke.IsClipboardFormatAvailable(13)) names.Add("CF_UNICODETEXT");
-            return ClipboardText.ReadChanged(previous, current, names, limit, () =>
+            var oversized = false;
+            var read = ClipboardText.ReadChanged(previous, current, names, limit, () =>
             {
                 var data = PInvoke.GetClipboardData(13);
                 if (data.IsNull) return null;
@@ -33,10 +34,12 @@ public static class ClipboardAccess
                     var count = (int)Math.Min((nuint)(limit + 1), PInvoke.GlobalSize(global) / 2);
                     var length = 0;
                     while (length < count && pointer[length] != '\0') length++;
+                    oversized = length > limit;
                     return new string(pointer, 0, length);
                 }
                 finally { PInvoke.GlobalUnlock(global); }
             });
+            return oversized ? new ClipboardRead.TooLong(limit) : read;
         }
         finally { PInvoke.CloseClipboard(); }
     }

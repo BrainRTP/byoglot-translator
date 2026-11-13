@@ -28,7 +28,7 @@ public sealed class SelectionReader(Func<bool> fallbackAllowed, ClipboardListene
         var automation = await AutomationAsync();
         if (PInvoke.GetForegroundWindow() != foreground) return new CaptureResult.Nothing();
         if (automation.Private) return new CaptureResult.Clipboard(new ClipboardRead.Concealed());
-        if (automation.Text?.Trim().Length > InputLimits.Quick) return new CaptureResult.Clipboard(new ClipboardRead.TooLong(InputLimits.Quick));
+        if (automation.Text?.Length > InputLimits.Quick) return new CaptureResult.Clipboard(new ClipboardRead.TooLong(InputLimits.Quick));
         return await CapturePlan.RunAsync(new(false, automation.Text, fallbackAllowed(), () => CopyAndRead(foreground)));
     }
 
@@ -104,20 +104,28 @@ public sealed class SelectionReader(Func<bool> fallbackAllowed, ClipboardListene
         }
         finally
         {
-            if (copying)
+            try
             {
-                try
+                if (copying)
                 {
-                    for (var i = 0; i < 10; i++)
+                    try
                     {
-                        if (PInvoke.OleSetClipboard(previous!).Succeeded) break;
-                        await Task.Delay(10);
+                        var restored = false;
+                        for (var i = 0; i < 40; i++)
+                        {
+                            if (PInvoke.OleSetClipboard(previous!).Succeeded) { restored = true; break; }
+                            await Task.Delay(10);
+                        }
+                        if (!restored) throw new COMException("Clipboard restoration failed.");
                     }
+                    finally { clipboard.EndOwnWrites(); }
                 }
-                finally { clipboard.EndOwnWrites(); }
             }
-            if (previous is not null) Marshal.ReleaseComObject(previous);
-            copyGate.Release();
+            finally
+            {
+                try { if (previous is not null) Marshal.ReleaseComObject(previous); }
+                finally { copyGate.Release(); }
+            }
         }
     }
 

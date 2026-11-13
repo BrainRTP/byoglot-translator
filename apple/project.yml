@@ -1,0 +1,57 @@
+name: ByoGlot
+options:
+  minimumXcodeGenVersion: 2.46.0
+  deploymentTarget:
+    iOS: '27.1'
+packages:
+  ByoGlotKit:
+    path: ByoGlotKit
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    IPHONEOS_DEPLOYMENT_TARGET: '27.1'
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+targets:
+  ByoGlotiOS:
+    type: application
+    platform: iOS
+    deploymentTarget: '27.1'
+    sources:
+      - path: iOS
+        excludes: [Info.plist, ByoGlot.entitlements]
+    dependencies:
+      - package: ByoGlotKit
+        product: ByoGlotAppKit
+      - package: ByoGlotKit
+        product: ByoGlotCore
+      - package: ByoGlotKit
+        product: ByoGlotStore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.brainrtp.byoglot
+        PRODUCT_NAME: ByoGlot
+        TARGETED_DEVICE_FAMILY: '1,2'
+        CODE_SIGN_ENTITLEMENTS: iOS/ByoGlot.entitlements
+        INFOPLIST_FILE: $(DERIVED_FILE_DIR)/ByoGlot-Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+    preBuildScripts:
+      - name: Set version from repository
+        path: scripts/app-version.sh
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(SRCROOT)/iOS/Info.plist
+          - $(SRCROOT)/../package.json
+        outputFiles:
+          - $(DERIVED_FILE_DIR)/ByoGlot-Info.plist
+schemes:
+  ByoGlotiOS:
+    build:
+      targets:
+        ByoGlotiOS: all
+    run:
+      config: Debug
+    archive:
+      config: Release

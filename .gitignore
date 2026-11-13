@@ -23,3 +23,4 @@ android/local.properties
 windows/**/bin/
 windows/**/obj/
 linux/target/
+apple/*.xcodeproj/

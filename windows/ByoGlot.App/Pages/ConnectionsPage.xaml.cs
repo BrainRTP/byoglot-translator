@@ -38,12 +38,12 @@ public sealed partial class ConnectionsPage : Page
         var models = await AppServices.Current.Editor.ModelsAsync(connection.Id, CancellationToken.None);
         var page = new ComboBox { Header = Strings.Get("PageModel"), ItemsSource = models, DisplayMemberPath = "Name", SelectedItem = models.FirstOrDefault(m => m.Id == connection.PageModel?.Id) };
         var selection = new ComboBox { Header = Strings.Get("SelectionModel"), ItemsSource = models, DisplayMemberPath = "Name", SelectedItem = models.FirstOrDefault(m => m.Id == connection.SelectionModel?.Id) };
-        var effort = new ComboBox { Header = Strings.Get("Effort"), ItemsSource = (selection.SelectedItem as ModelInfo)?.Variants, SelectedItem = connection.SelectionModel?.Variant };
-        selection.SelectionChanged += (_, _) => { effort.ItemsSource = (selection.SelectedItem as ModelInfo)?.Variants; effort.SelectedIndex = 0; };
+        var effort = new ComboBox { Header = Strings.Get("Effort"), ItemsSource = PageSupport.EffortChoices((selection.SelectedItem as ModelInfo)?.Variants ?? []), DisplayMemberPath = "Name", SelectedValuePath = "Id", SelectedValue = connection.SelectionModel?.Variant };
+        selection.SelectionChanged += (_, _) => { effort.ItemsSource = PageSupport.EffortChoices((selection.SelectedItem as ModelInfo)?.Variants ?? []); effort.SelectedIndex = 0; };
         var content = new StackPanel { Spacing = 12 }; content.Children.Add(page); content.Children.Add(selection); content.Children.Add(effort);
         var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = Strings.Get("ChooseModels"), Content = content, PrimaryButtonText = Strings.Get("Save"), CloseButtonText = Strings.Get("Cancel") };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         ModelRef? Reference(ComboBox picker, string? variant) => picker.SelectedItem is ModelInfo m ? new(m.ProviderID, m.Id, variant, connection.Id) : null;
-        await AppServices.Current.Settings.UpdateAsync(s => s with { Connections = s.Connections.Select(c => c.Id == connection.Id ? c with { PageModel = Reference(page, null), SelectionModel = Reference(selection, effort.SelectedItem as string) } : c).ToArray() });
+        await AppServices.Current.Settings.UpdateAsync(s => s with { Connections = s.Connections.Select(c => c.Id == connection.Id ? c with { PageModel = Reference(page, null), SelectionModel = Reference(selection, effort.SelectedValue as string) } : c).ToArray() });
     }
 }

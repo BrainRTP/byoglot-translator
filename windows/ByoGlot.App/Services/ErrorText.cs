@@ -26,7 +26,7 @@ public static class ErrorText
         RunnerError.ConsentNeeded consent => Strings.Format(ResourceKey(error), consent.Origin),
         RunnerError.TooLong length => Strings.Format(ResourceKey(error), length.Limit),
         RunnerError.Backend backend when ResourceKey(error) == "Err_ProviderAuth" => Strings.Format(ResourceKey(error), backend.Error.Status ?? 0),
-        RunnerError.Backend backend when ResourceKey(error) == "Err_Provider" => Strings.Format(ResourceKey(error), backend.Error.Status?.ToString() ?? backend.Error.Kind.Wire()),
+        RunnerError.Backend backend when ResourceKey(error) == "Err_Provider" => Strings.Format(ResourceKey(error), backend.Error.Status?.ToString() ?? Strings.Get("ProviderFailure")),
         _ => Strings.Get(ResourceKey(error))
     };
 }

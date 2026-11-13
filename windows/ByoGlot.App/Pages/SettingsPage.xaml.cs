@@ -28,8 +28,9 @@ public sealed partial class SettingsPage : Page
         var language = new ToggleSwitch { Header = Strings.Get("LanguageStyle"), IsOn = settings.Globals.LanguagePromptEnabled };
         language.Toggled += (_, _) => _ = PageSupport.Guard(this, async () => { await AppServices.Current.Settings.UpdateAsync(s => s with { Globals = s.Globals with { LanguagePromptEnabled = language.IsOn } }); });
         Panel.Children.Add(language);
-        var profile = new ComboBox { Header = Strings.Get("Profile"), ItemsSource = new[] { "auto" }.Concat(Contracts.BuiltinProfiles.Keys), SelectedItem = settings.Globals.LanguageProfile };
-        profile.SelectionChanged += (_, _) => _ = PageSupport.Guard(this, async () => { if (profile.SelectedItem is string id) await AppServices.Current.Settings.UpdateAsync(s => s with { Globals = s.Globals with { LanguageProfile = id } }); });
+        var profiles = new[] { "auto" }.Concat(Contracts.BuiltinProfiles.Keys).Select(id => new PageSupport.Choice<string>(id, id is "auto" or "generic" or "ru" ? Strings.Get("Profile_" + id) : id)).ToArray();
+        var profile = new ComboBox { Header = Strings.Get("Profile"), ItemsSource = profiles, DisplayMemberPath = "Name", SelectedValuePath = "Id", SelectedValue = settings.Globals.LanguageProfile };
+        profile.SelectionChanged += (_, _) => _ = PageSupport.Guard(this, async () => { if (profile.SelectedValue is string id) await AppServices.Current.Settings.UpdateAsync(s => s with { Globals = s.Globals with { LanguageProfile = id } }); });
         Panel.Children.Add(profile);
         Panel.Children.Add(PageSupport.Button("Export", () => _ = PageSupport.Guard(this, Export)));
         Panel.Children.Add(PageSupport.Button("Import", () => _ = PageSupport.Guard(this, Import)));

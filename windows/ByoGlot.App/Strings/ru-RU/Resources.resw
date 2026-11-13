@@ -88,4 +88,17 @@
   <data name="Pin" xml:space="preserve"><value>Закрепить окно</value></data>
   <data name="Working" xml:space="preserve"><value>Переводим...</value></data>
   <data name="OpenEditor" xml:space="preserve"><value>Открыть в ByoGlot</value></data>
+  <data name="Preset_Deepseek" xml:space="preserve"><value>DeepSeek</value></data>
+  <data name="Preset_Openrouter" xml:space="preserve"><value>OpenRouter</value></data>
+  <data name="Preset_Ollama" xml:space="preserve"><value>Ollama</value></data>
+  <data name="Preset_Lmstudio" xml:space="preserve"><value>LM Studio</value></data>
+  <data name="Preset_Custom" xml:space="preserve"><value>Другой</value></data>
+  <data name="Profile_auto" xml:space="preserve"><value>Автоматически</value></data>
+  <data name="Profile_generic" xml:space="preserve"><value>Общий</value></data>
+  <data name="Profile_ru" xml:space="preserve"><value>Русский</value></data>
+  <data name="Effort_none" xml:space="preserve"><value>Нет</value></data>
+  <data name="Effort_low" xml:space="preserve"><value>Низкий</value></data>
+  <data name="Effort_medium" xml:space="preserve"><value>Средний</value></data>
+  <data name="Effort_high" xml:space="preserve"><value>Высокий</value></data>
+  <data name="ProviderFailure" xml:space="preserve"><value>неожиданный ответ</value></data>
 </root>

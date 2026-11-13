@@ -8,6 +8,9 @@ namespace ByoGlot.App.Pages;
 
 internal static class PageSupport
 {
+    public static string PresetName(ProviderPreset preset) => Strings.Get("Preset_" + preset);
+    public static object[] TemplateChoices(IEnumerable<Template> templates) => templates.Select(t => (object)new Choice<string>(t.Id, t.Builtin ? Strings.Get("BuiltinTemplate") : t.Name)).ToArray();
+    public static object[] EffortChoices(IEnumerable<string> variants) => variants.Select(id => (object)new Choice<string>(id, id is "none" or "low" or "medium" or "high" ? Strings.Get("Effort_" + id) : id)).ToArray();
     public static Button Button(string key, Action action)
     {
         var button = new Button { Content = Strings.Get(key) };
@@ -32,4 +35,5 @@ internal static class PageSupport
     }
     public static Task<ContentDialogResult> Message(FrameworkElement owner, string text) => new ContentDialog { XamlRoot = owner.XamlRoot, Title = "ByoGlot", Content = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap }, CloseButtonText = Strings.Get("Close") }.ShowAsync().AsTask();
     public sealed record Language(string Code, string Name);
+    public sealed record Choice<T>(T Id, string Name);
 }

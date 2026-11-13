@@ -10,10 +10,11 @@ public sealed partial class TemplateDialog : ContentDialog
     private readonly TextBox instructions = new() { AcceptsReturn = true, TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap, MinHeight = 150 };
     private readonly ComboBox target = PageSupport.Languages();
     private readonly Template? original;
-    public Template Value => new(original?.Id ?? Guid.NewGuid().ToString(), name.Text.Trim(), false, (original?.Settings ?? new()) with { PrePrompt = instructions.Text, TargetLang = target.SelectedValue as string });
+    private readonly bool duplicate;
+    public Template Value => new((duplicate ? null : original?.Id) ?? Guid.NewGuid().ToString(), name.Text.Trim(), false, (original?.Settings ?? new()) with { PrePrompt = instructions.Text, TargetLang = target.SelectedValue as string });
     public TemplateDialog(Template? original, bool duplicate = false)
     {
-        this.original = duplicate ? null : original;
+        this.original = original; this.duplicate = duplicate;
         InitializeComponent();
         Title = Strings.Get("Template"); PrimaryButtonText = Strings.Get("Save"); CloseButtonText = Strings.Get("Cancel");
         name.Header = Strings.Get("Name"); instructions.Header = Strings.Get("Instructions"); target.Header = Strings.Get("OptionalTarget");

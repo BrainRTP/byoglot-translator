@@ -52,7 +52,7 @@ public sealed partial class QuickWindow : Window
     {
         var settings = await AppServices.Current.Settings.ReadAsync();
         updating = true;
-        templates.ItemsSource = settings.Templates;
+        templates.ItemsSource = PageSupport.TemplateChoices(settings.Templates);
         templates.SelectedValue = settings.Templates.Any(t => t.Id == selected) ? selected : settings.Globals.DefaultTemplateId;
         updating = false;
         return templates.SelectedValue as string;

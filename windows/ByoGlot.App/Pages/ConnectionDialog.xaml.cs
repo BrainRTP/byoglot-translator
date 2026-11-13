@@ -7,7 +7,7 @@ namespace ByoGlot.App.Pages;
 public sealed partial class ConnectionDialog : ContentDialog
 {
     private readonly Connection? connection;
-    private readonly ComboBox preset = new() { ItemsSource = Enum.GetValues<ProviderPreset>() };
+    private readonly ComboBox preset = new() { DisplayMemberPath = "Name", SelectedValuePath = "Id" };
     private readonly TextBox name = new();
     private readonly TextBox url = new();
     private readonly PasswordBox key = new();
@@ -20,9 +20,10 @@ public sealed partial class ConnectionDialog : ContentDialog
         Title = Strings.Get(connection is null ? "AddConnection" : "EditConnection");
         PrimaryButtonText = Strings.Get("Save"); CloseButtonText = Strings.Get("Cancel");
         preset.Header = Strings.Get("Preset"); name.Header = Strings.Get("Name"); url.Header = Strings.Get("BaseUrl"); key.Header = Strings.Get("ApiKey");
-        preset.SelectedItem = connection?.Preset ?? ProviderPreset.Deepseek;
+        preset.ItemsSource = Enum.GetValues<ProviderPreset>().Select(p => new PageSupport.Choice<ProviderPreset>(p, PageSupport.PresetName(p))).ToArray();
+        preset.SelectedValue = connection?.Preset ?? ProviderPreset.Deepseek;
         name.Text = connection?.Name ?? "DeepSeek"; url.Text = connection?.BaseUrl ?? Contracts.Presets[ProviderPreset.Deepseek].BaseUrl;
-        preset.SelectionChanged += (_, _) => { if (preset.SelectedItem is ProviderPreset p) { url.Text = Contracts.Presets[p].BaseUrl; name.Text = p.ToString(); } };
+        preset.SelectionChanged += (_, _) => { if (preset.SelectedValue is ProviderPreset p) { url.Text = Contracts.Presets[p].BaseUrl; name.Text = PageSupport.PresetName(p); } };
         url.TextChanged += (_, _) => { consent.IsChecked = false; UpdateConsent(); };
         UpdateConsent();
         foreach (var element in new Microsoft.UI.Xaml.UIElement[] { preset, name, url, key, consent, error }) Panel.Children.Add(element);
@@ -40,7 +41,7 @@ public sealed partial class ConnectionDialog : ContentDialog
         IsPrimaryButtonEnabled = false;
         try
         {
-            var draft = new ConnectionDraft(connection?.Id, (ProviderPreset)preset.SelectedItem, name.Text, url.Text, key.Password);
+            var draft = new ConnectionDraft(connection?.Id, (ProviderPreset)preset.SelectedValue, name.Text, url.Text, key.Password);
             await AppServices.Current.Editor.SaveAsync(draft, consent.IsChecked == true, CancellationToken.None);
             key.Password = "";
         }

@@ -51,7 +51,7 @@ public sealed partial class TranslatePage : Page
         source.SelectedValue = settings.Globals.SourceLang; target.SelectedValue = settings.Globals.TargetLang;
         source.SelectionChanged += (_, _) => _ = PageSupport.Guard(this, async () => { if (source.SelectedValue is string code) await AppServices.Current.Settings.UpdateAsync(s => s with { Globals = s.Globals with { SourceLang = code } }); });
         target.SelectionChanged += (_, _) => _ = PageSupport.Guard(this, async () => { if (target.SelectedValue is string code) await AppServices.Current.Settings.UpdateAsync(s => s with { Globals = s.Globals with { TargetLang = code } }); });
-        var templates = new ComboBox { Header = Strings.Get("Template"), ItemsSource = settings.Templates, DisplayMemberPath = "Name", SelectedValuePath = "Id", SelectedValue = model.TemplateId ?? settings.Globals.DefaultTemplateId };
+        var templates = new ComboBox { Header = Strings.Get("Template"), ItemsSource = PageSupport.TemplateChoices(settings.Templates), DisplayMemberPath = "Name", SelectedValuePath = "Id", SelectedValue = model.TemplateId ?? settings.Globals.DefaultTemplateId };
         templates.SelectionChanged += (_, _) => model.TemplateId = templates.SelectedValue as string;
         Panel.Children.Insert(2, source); Panel.Children.Insert(3, target); Panel.Children.Insert(4, templates);
     }

@@ -528,6 +528,49 @@
           }
         }
       }
+    },
+    {
+      "name": "repeated JSON keys use the last value",
+      "input": {
+        "provider": {
+          "preset": "custom",
+          "name": "Local",
+          "baseUrl": "http://localhost:8080/v1",
+          "apiKey": ""
+        },
+        "model": {
+          "providerID": "custom",
+          "id": "m"
+        },
+        "prompt": "hello",
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": "{\"choices\":[],\"choices\":[{\"message\":{\"content\":\"first\",\"content\":\"last\"}}]}"
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "POST",
+          "url": "http://localhost:8080/v1/chat/completions",
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "m",
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello"
+              }
+            ],
+            "stream": false
+          }
+        },
+        "result": {
+          "content": "last"
+        }
+      }
     }
   ]
 }

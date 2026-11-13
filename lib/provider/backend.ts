@@ -7,18 +7,18 @@ import { chatSchema, errorBodySchema, modelListSchema } from "./schemas";
 
 const HTTP_DATE =
   /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/;
+const MAX_RETRY_AFTER_MS = 86_400_000;
 
 function retryAfterMs(header: string | null): number | undefined {
   const value = header?.trim();
   if (!value) return undefined;
   if (/^\d+(?:\.\d+)?$/.test(value)) {
-    const ms = Math.round(Number(value) * 1000);
-    return Number.isFinite(ms) ? ms : undefined;
+    return Math.min(MAX_RETRY_AFTER_MS, Math.round(Number(value) * 1000));
   }
   if (!HTTP_DATE.test(value)) return undefined;
   const date = Date.parse(value);
   if (!Number.isFinite(date) || new Date(date).toUTCString() !== value) return undefined;
-  return Math.max(0, date - Date.now());
+  return Math.min(MAX_RETRY_AFTER_MS, Math.max(0, date - Date.now()));
 }
 
 async function failureFromResponse(response: Response): Promise<BackendError> {

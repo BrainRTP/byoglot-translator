@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isFatal } from "../../../lib/opencode/errors";
 import type { BackendErrorKind } from "../../../lib/opencode/types";
 import { PRESETS } from "../../../lib/provider/presets";
-import { MAX_CONTEXT, MAX_SELECTION } from "../../../lib/selection/trigger";
+import { MAX_CONTEXT, MAX_EDITOR_TEXT, MAX_SELECTION } from "../../../lib/selection/trigger";
 import { builtinTemplate } from "../../../lib/settings/defaults";
 import { FAVORITE, SELECTION_DEFAULT_EFFORT } from "../../../lib/settings/effective";
 import { MAX_PROFILE_TEXT } from "../../../lib/settings/language-prompt";
@@ -45,6 +45,7 @@ describe("contract data", () => {
     maxProfileText: MAX_PROFILE_TEXT,
     maxSelection: MAX_SELECTION,
     maxContext: MAX_CONTEXT,
+    maxEditorText: MAX_EDITOR_TEXT,
   });
   checkData("builtin-template.json", builtinTemplate());
   checkData("errors.json", { kinds: Object.keys(allKinds), fatal: kinds.filter(isFatal) });

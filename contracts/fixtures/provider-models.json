@@ -457,6 +457,71 @@
         ],
         "defaultModel": null
       }
+    },
+    {
+      "name": "numeric metadata preserves floats fractions and large values",
+      "input": {
+        "provider": {
+          "preset": "custom",
+          "name": "Numeric",
+          "baseUrl": "https://models.example.com/v1",
+          "apiKey": ""
+        },
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": "{\"data\":[{\"id\":\"m\",\"context_length\":131072.0,\"max_output_tokens\":1e6},{\"id\":\"fractional\",\"context_window\":-1.5,\"max_output_tokens\":0.5},{\"id\":\"large\",\"context_window\":4294967296.0,\"max_output_tokens\":1e+23}]}"
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "GET",
+          "url": "https://models.example.com/v1/models",
+          "headers": {}
+        },
+        "models": [
+          {
+            "providerID": "custom",
+            "id": "m",
+            "name": "m",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 131072,
+            "outputLimit": 1000000
+          },
+          {
+            "providerID": "custom",
+            "id": "fractional",
+            "name": "fractional",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": -1.5,
+            "outputLimit": 0.5
+          },
+          {
+            "providerID": "custom",
+            "id": "large",
+            "name": "large",
+            "variants": [
+              "none"
+            ],
+            "contextLimit": 4294967296,
+            "outputLimit": 1e+23
+          }
+        ],
+        "defaultModel": {
+          "providerID": "custom",
+          "id": "m",
+          "name": "m",
+          "variants": [
+            "none"
+          ],
+          "contextLimit": 131072,
+          "outputLimit": 1000000
+        }
+      }
     }
   ]
 }

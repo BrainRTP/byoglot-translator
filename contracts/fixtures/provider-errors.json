@@ -363,6 +363,53 @@
         "kind": "rate_limit",
         "status": 429
       }
+    },
+    {
+      "name": "429 with a huge decimal Retry-After",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 429,
+          "headers": {
+            "Retry-After": "99999999999999999999"
+          },
+          "body": {}
+        }
+      },
+      "expected": {
+        "kind": "rate_limit",
+        "status": 429,
+        "retryAfterMs": 86400000
+      }
+    },
+    {
+      "name": "429 with an HTTP date beyond 24 hours",
+      "input": {
+        "provider": {
+          "preset": "deepseek",
+          "name": "DeepSeek",
+          "baseUrl": "https://api.deepseek.com",
+          "apiKey": "fixture-key"
+        },
+        "response": {
+          "status": 429,
+          "headers": {
+            "Retry-After": "Fri, 01 Jan 2100 00:00:00 GMT"
+          },
+          "body": {}
+        },
+        "now": "2026-01-01T00:00:00.000Z"
+      },
+      "expected": {
+        "kind": "rate_limit",
+        "status": 429,
+        "retryAfterMs": 86400000
+      }
     }
   ]
 }

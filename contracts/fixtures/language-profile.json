@@ -163,6 +163,44 @@
         "overrides": {}
       },
       "expected": "R"
+    },
+    {
+      "name": "override wrapped in BOM",
+      "input": {
+        "languagePromptEnabled": true,
+        "languageProfile": "generic",
+        "targetLang": "en",
+        "builtins": {
+          "generic": "R"
+        },
+        "overrides": {
+          "generic": {
+            "text": "\ufeffR\ufeff",
+            "base": "R",
+            "savedAt": 1
+          }
+        }
+      },
+      "expected": "R"
+    },
+    {
+      "name": "override wrapped in NEXT LINE",
+      "input": {
+        "languagePromptEnabled": true,
+        "languageProfile": "generic",
+        "targetLang": "en",
+        "builtins": {
+          "generic": "R"
+        },
+        "overrides": {
+          "generic": {
+            "text": "\u0085R\u0085",
+            "base": "R",
+            "savedAt": 1
+          }
+        }
+      },
+      "expected": "R"
     }
   ]
 }

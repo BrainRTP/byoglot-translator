@@ -79,17 +79,22 @@ class MainViewModel(
     suspend fun refresh() {
         val state = repository.read()
         val previous = mutableSettings.value
-        if (
+        val parametersChanged =
             previous != null &&
                 previous.copy(theme = state.theme, autoTranslate = state.autoTranslate) != state
-        ) {
+        if (parametersChanged) {
             cancel()
             mutableTranslation.value = TranslationState()
         }
         mutableSettings.value = state
         syncParameters(state)
         mutableKeys.value = state.connections.associate { it.id to editor.keyState(it.id) }
-        if (previous == null && state.autoTranslate && mutableText.value.isNotBlank()) schedule()
+        if (
+            (previous == null || parametersChanged || !previous.autoTranslate) &&
+                state.autoTranslate &&
+                mutableText.value.isNotBlank()
+        )
+            schedule()
     }
 
     fun receiveQuickRequest(text: String?, destination: String?) {
@@ -293,6 +298,7 @@ class MainViewModel(
             it.copy(globals = it.globals.copy(sourceLang = params.targetLang, targetLang = source))
         }
         if (ready) {
+            autoJob?.cancel()
             mutableText.value = old.output!!.text
             mutableTranslation.value =
                 TranslationState(

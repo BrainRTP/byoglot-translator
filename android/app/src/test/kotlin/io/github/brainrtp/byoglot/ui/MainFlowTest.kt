@@ -391,4 +391,43 @@ class MainFlowTest {
         assertEquals(false, vm.settings.value?.autoTranslate)
         assertEquals(0, calls)
     }
+
+    @Test
+    fun `changing the provider model resumes automatic translation without another edit`() =
+        runTest {
+            val connection =
+                Connection(
+                    "c",
+                    ProviderPreset.custom,
+                    "Custom",
+                    "https://provider.test",
+                    pageModel = model,
+                )
+            val settings =
+                AppSettings.initial("en")
+                    .copy(connections = listOf(connection), activeConnectionId = "c")
+            var calls = 0
+            val vm =
+                MainViewModel(
+                    InMemorySettingsRepository(settings),
+                    InMemorySecretStore(),
+                    transport,
+                    backgroundScope,
+                    { input ->
+                        calls++
+                        output(input)
+                    },
+                )
+            runCurrent()
+            vm.paste("source")
+            runCurrent()
+            assertEquals(1, calls)
+            vm.setModel("c", model.copy(id = "another"), true)
+            advanceTimeBy(799)
+            runCurrent()
+            assertEquals(1, calls)
+            advanceTimeBy(1)
+            runCurrent()
+            assertEquals(2, calls)
+        }
 }

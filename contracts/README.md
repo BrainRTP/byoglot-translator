@@ -25,6 +25,7 @@ The export format contains portable globals, templates, profile overrides, site 
 | `languages.json`                 | Language codes, English names and auto-source wording  | `LANGUAGE_CODES`, `LANGUAGE_NAMES`, `buildPagePrompt`                                       |
 | `presets.json`                   | Provider defaults, favorite model and selection effort | `PRESETS`, `FAVORITE`, `SELECTION_DEFAULT_EFFORT`                                           |
 | `limits.json`                    | Batch, selection, context, timeout and profile limits  | `DEFAULT_LIMITS`, `GENERATE_TIMEOUT_MS`, `MAX_PROFILE_TEXT`, `MAX_SELECTION`, `MAX_CONTEXT` |
+| `native-bridge-v1.json`          | Native bridge requests and replies, protocol version 1 | `nativeFetch`, `nativeSecrets` (Safari adapter, Task 3)                                     |
 | `builtin-template.json`          | Builtin template and pre-prompt                        | `builtinTemplate`                                                                           |
 | `errors.json`                    | Backend error kinds and fatal classification           | `BackendErrorKind`, `isFatal`                                                               |
 | `fixtures/prompt-page.json`      | Page translation prompts                               | `buildPagePrompt`                                                                           |

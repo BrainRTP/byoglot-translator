@@ -1,0 +1,15 @@
+#[cfg(feature = "gui")]
+pub mod connection_dialog;
+#[cfg(feature = "gui")]
+pub mod connections_page;
+pub mod error_text;
+#[cfg(feature = "gui")]
+pub mod main_window;
+#[cfg(feature = "gui")]
+pub mod preferences;
+#[cfg(feature = "gui")]
+pub mod template_dialog;
+#[cfg(feature = "gui")]
+pub mod templates_page;
+#[cfg(feature = "gui")]
+pub mod translate_page;

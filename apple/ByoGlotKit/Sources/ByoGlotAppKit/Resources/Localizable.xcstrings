@@ -3755,6 +3755,363 @@
           }
         }
       }
+    },
+    "anim.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Animation"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Анимация"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.group": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Translation appearance effect"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Эффект появления перевода"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.preview": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Превью"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.sample": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A short guide explains how to connect your key."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Краткое руководство объясняет, как подключить ключ."
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.replay": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replay"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Повторить"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.none": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No animation"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Без анимации"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.fade": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fade"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Плавное появление"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.scramble": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scramble"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Шифр"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.flap": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flap"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Табло"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.typewriter": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Typewriter"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Печатная машинка"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.pen": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pen"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перо"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.wave": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wave"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Волна"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.detail.none": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text changes instantly"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Текст меняется сразу"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.detail.fade": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "500 ms"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "500 мс"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.detail.scramble": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to 1800 ms"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "До 1800 мс"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.detail.flap": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to 1600 ms"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "До 1600 мс"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.detail.typewriter": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1520 ms"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1520 мс"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.detail.pen": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to 2100 ms"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "До 2100 мс"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.detail.wave": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to 1550 ms"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "До 1550 мс"
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.reducedMotion.ios": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reduce Motion is on. iOS Settings → Accessibility → Motion → Reduce Motion. Effects are off and translations appear instantly."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Включено «Уменьшение движения». Настройки iOS → Универсальный доступ → Движение → Уменьшение движения. Эффекты не играют, перевод появляется сразу."
+          }
+        }
+      },
+      "extractionState": "manual"
+    },
+    "anim.reducedMotion.macos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reduce motion is on. System Settings → Accessibility → Display → Reduce motion. Effects are off and translations appear instantly."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Включено уменьшение движения. Системные настройки → Универсальный доступ → Дисплей → Уменьшение движения. Эффекты не играют, перевод появляется сразу."
+          }
+        }
+      },
+      "extractionState": "manual"
     }
   },
   "version": "1.0"

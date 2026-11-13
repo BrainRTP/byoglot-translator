@@ -26,6 +26,9 @@ import Testing
             #expect(ResultAnimationTiming.revealProgress(effect, elapsed: duration, utf16Count: count) == 1)
         }
     }
+    #expect(ResultAnimationTiming.flapStep(elapsed: 1.6, position: 19_999, utf16Count: 20_000, steps: 10) == 10)
+    #expect(ResultAnimationTiming.scrambleSettleTime(utf16Count: 20_000, sample: 1) == 1.8)
+    #expect(ResultAnimationTiming.scrambleFrame(elapsed: 0.039) == 0)
     #expect(ResultAnimationTiming.duration(.pen, utf16Count: 10, advanceWidth: 10) == 0.9)
     #expect(ResultAnimationTiming.duration(.wave, utf16Count: 10, advanceWidth: 10) == 0.75)
     #expect(ResultAnimationTiming.revealProgress(.typewriter, elapsed: 0.1, utf16Count: 20) == 0)

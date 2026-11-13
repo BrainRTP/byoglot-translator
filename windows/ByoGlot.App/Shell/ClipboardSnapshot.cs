@@ -177,7 +177,7 @@ public sealed class ClipboardSnapshot : IDataObject, IClipboardSnapshot
         try
         {
             var id = typeof(IStream).GUID;
-            Marshal.ThrowExceptionForHR(Marshal.QueryInterface(unknown, ref id, out var pointer));
+            Marshal.ThrowExceptionForHR(Marshal.QueryInterface(unknown, in id, out var pointer));
             return pointer;
         }
         finally { Marshal.Release(unknown); }

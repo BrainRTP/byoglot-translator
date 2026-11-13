@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { browser } from "wxt/browser";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { createBackendProvider } from "../../../lib/background/connection";
 import {
@@ -504,6 +505,137 @@ describe("background handlers", () => {
 
     beforeEach(async () => {
       await seedOpencode(conn);
+    });
+
+    it("uses the editor languages, chosen template model and selection effort without saving text", async () => {
+      const { handlers, translateSelection } = setup();
+      const template: Template = {
+        ...ruTemplate,
+        settings: {
+          prePrompt: "Custom instructions",
+          targetLang: "ja",
+          selectionModel: { ...selectionModel, connectionId: OPENCODE_ID },
+        },
+      };
+      await templatesItem.setValue([template]);
+      await globalsItem.setValue({
+        ...DEFAULT_GLOBALS,
+        sourceLang: "en",
+        targetLang: "ja",
+        pinnedEffort: "high",
+        selectionModel: { ...selectionModel, variant: "high" },
+        languageProfile: "ru",
+      });
+      const globals = await globalsItem.getValue();
+      const view = await handlers.tabView({ tabId: 5 });
+      const stored = { ...view.settings, targetLang: "fr" };
+      await tabSettings(5).setValue(stored);
+      const res = await handlers.translateSelection(
+        {
+          text: "Private editor text",
+          context: "ignored",
+          hostname: "ignored.example",
+          templateId: template.id,
+          editor: { sourceLang: "de", targetLang: "ru" },
+          window: "pinned",
+        },
+        { url: browser.runtime.getURL("/translator.html"), tab: { id: 5 } },
+      );
+      expect(res).toMatchObject({ text: "privet", sourceLang: "de", targetLang: "ru" });
+      expect(translateSelection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: "Private editor text",
+          context: "",
+          appName: "ByoGlot Translator",
+          model: { ...selectionModel, connectionId: OPENCODE_ID },
+          settings: expect.objectContaining({
+            sourceLang: "de",
+            targetLang: "ru",
+            prePrompt: "Custom instructions",
+          }),
+          languagePrompt: BUILTIN_PROFILES.get("ru"),
+        }),
+        expect.any(AbortSignal),
+      );
+      expect(await globalsItem.getValue()).toEqual(globals);
+      expect(await tabSettings(5).getValue()).toEqual(stored);
+      expect(JSON.stringify(await browser.storage.local.get())).not.toContain(
+        "Private editor text",
+      );
+    });
+
+    it("applies the same language-profile fallback and disable switch to editor requests", async () => {
+      const { handlers, translateSelection } = setup();
+      await globalsItem.setValue({ ...DEFAULT_GLOBALS, selectionModel, languageProfile: "ru" });
+      const input = {
+        text: "Hello",
+        context: "",
+        hostname: "",
+        editor: { sourceLang: "auto", targetLang: NO_PROFILE_LANG },
+      };
+      const sender = { url: browser.runtime.getURL("/translator.html") };
+      await handlers.translateSelection(input, sender);
+      expect(translateSelection).toHaveBeenLastCalledWith(
+        expect.objectContaining({ languagePrompt: BUILTIN_PROFILES.get("generic") }),
+        expect.any(AbortSignal),
+      );
+      await globalsItem.setValue({
+        ...(await globalsItem.getValue()),
+        languagePromptEnabled: false,
+      });
+      await handlers.translateSelection(input, sender);
+      expect(translateSelection).toHaveBeenLastCalledWith(
+        expect.objectContaining({ languagePrompt: "" }),
+        expect.any(AbortSignal),
+      );
+    });
+
+    it("rejects invalid editor input before calling the service", async () => {
+      const { handlers, translateSelection } = setup();
+      for (const text of [" \n ", "a".repeat(20_001)]) {
+        expect(
+          await handlers.translateSelection(
+            { text, context: "", hostname: "", editor: { sourceLang: "auto", targetLang: "ru" } },
+            { url: browser.runtime.getURL("/translator.html") },
+          ),
+        ).toEqual({ error: "bad_response" });
+      }
+      expect(translateSelection).not.toHaveBeenCalled();
+    });
+
+    it("rejects editor overrides from a content script", async () => {
+      const { handlers } = setup();
+      await expect(
+        handlers.translateSelection(
+          {
+            text: "Hello",
+            context: "",
+            hostname: "",
+            editor: { sourceLang: "auto", targetLang: "ru" },
+          },
+          { url: "https://example.com", tab: { id: 5 } },
+        ),
+      ).rejects.toThrow("requires the translator page");
+    });
+
+    it("registers the editor cancellation identity before asynchronous settings resolution", async () => {
+      const { handlers, translateSelection } = setup();
+      await globalsItem.setValue({ ...DEFAULT_GLOBALS, selectionModel });
+      const sender = { url: browser.runtime.getURL("/translator.html"), tab: { id: 5 } };
+      const pending = handlers.translateSelection(
+        {
+          text: "Hello",
+          context: "",
+          hostname: "",
+          requestId: "editor-request",
+          editor: { sourceLang: "auto", targetLang: "ru" },
+        },
+        sender,
+      );
+      await handlers.cancelSelection("editor-request", sender);
+      await pending;
+      const [, signal] = translateSelection.mock.calls[0] as unknown as [unknown, AbortSignal];
+      expect(signal.aborted).toBe(true);
     });
 
     it("translates with the sender tab settings and the selection model", async () => {

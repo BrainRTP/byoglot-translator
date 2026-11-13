@@ -113,6 +113,7 @@ export interface ProtocolMap {
     templateId?: string;
     window?: "oneshot" | "pinned";
     requestId?: string;
+    editor?: { sourceLang: string; targetLang: string };
   }): SelectionResult;
   cancelSelection(requestId: string): void;
   pageBadge(state: PageState["state"]): void;

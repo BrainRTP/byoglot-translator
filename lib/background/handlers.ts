@@ -76,6 +76,7 @@ import type {
 } from "../settings/types";
 import { BUILTIN_PROFILES, PROFILE_IDS } from "../translate/profiles";
 import type { createTranslationService, PageJob, Segment } from "../translate/service";
+import { textProblem } from "../translator/input";
 
 export interface HandlerDeps {
   getBackend(): Promise<TranslationBackend>;
@@ -752,42 +753,52 @@ export function createHandlers(deps: HandlerDeps) {
       i: Parameters<ProtocolMap["translateSelection"]>[0],
       sender: Sender,
     ): Promise<SelectionResult> {
-      const kind = await activeKind();
+      const editor = i.editor;
+      if (editor) {
+        if (sender.url !== browser.runtime.getURL("/translator.html")) {
+          throw new Error("Editor translation requires the translator page");
+        }
+        if (textProblem(i.text)) return { error: "bad_response" };
+      }
+      let kind = editor ? undefined : await activeKind();
       const controller = new AbortController();
       if (i.requestId) selectionJobs.set(i.requestId, { controller, tabId: sender.tab?.id });
+      if (editor) kind = await activeKind();
       let used: ModelRef | undefined;
       try {
-        const hostname = hostnameOf(sender.tab?.url) || i.hostname;
+        const hostname = editor ? "" : hostnameOf(sender.tab?.url) || i.hostname;
         const required = await requireModel(
-          sender.tab?.id,
+          editor ? undefined : sender.tab?.id,
           hostname,
           "selectionModel",
           i.templateId,
         );
         const view = required.view;
         let model = required.model;
-        if (i.window === "pinned") {
+        if (!editor && i.window === "pinned") {
           const info = (await loadModels())?.find(
             (m) => m.providerID === model.providerID && m.id === model.id,
           );
           model = pinnedModel(model, info, (await globalsItem.getValue()).pinnedEffort);
         }
         used = model;
+        const settings = editor ? { ...view.settings, ...editor } : view.settings;
         const text = await deps.service.translateSelection(
           {
             text: i.text,
-            context: i.context,
-            settings: view.settings,
+            context: editor ? "" : i.context,
+            settings,
             model,
             hostname: i.hostname || hostname,
-            languagePrompt: await languagePromptFor(view.settings.targetLang),
+            languagePrompt: await languagePromptFor(settings.targetLang),
+            ...(editor && { appName: "ByoGlot Translator" }),
           },
           controller.signal,
         );
         return {
           text,
-          sourceLang: view.settings.sourceLang,
-          targetLang: view.settings.targetLang,
+          sourceLang: settings.sourceLang,
+          targetLang: settings.targetLang,
           model,
         };
       } catch (error) {

@@ -3,7 +3,7 @@ import { BackendError, isFatal, isTimeout } from "../opencode/errors";
 import type { ModelRef, TranslationBackend } from "../opencode/types";
 import type { EffectiveSettings } from "../settings/types";
 import { parsePageResponse } from "./parse";
-import { buildPagePrompt, buildSelectionPrompt } from "./prompt";
+import { buildPagePrompt, buildSelectionPrompt, buildTextPrompt } from "./prompt";
 import { createSemaphore } from "./semaphore";
 
 export type Segment = { id: string; text: string };
@@ -193,10 +193,11 @@ export function createTranslationService(deps: {
       model: ModelRef;
       hostname: string;
       languagePrompt: string;
+      appName?: string;
     },
     signal: AbortSignal,
   ): Promise<string> {
-    const prompt = buildSelectionPrompt({
+    const input = {
       prePrompt: i.settings.prePrompt,
       languagePrompt: i.languagePrompt,
       sourceLang: i.settings.sourceLang,
@@ -204,7 +205,11 @@ export function createTranslationService(deps: {
       text: i.text,
       context: i.context,
       hostname: i.hostname,
-    });
+    };
+    const prompt =
+      i.appName === undefined
+        ? buildSelectionPrompt(input)
+        : buildTextPrompt({ ...input, appName: i.appName, context: "" });
     return (await generate(prompt, i.model, signal)).trim();
   }
 

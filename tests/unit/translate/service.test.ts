@@ -675,6 +675,21 @@ describe("translateSelection", () => {
     languagePrompt: "",
   };
 
+  it("uses the plain-text prompt for editor requests without selection context", async () => {
+    const fake = fakeBackend(async () => "  Translation\n");
+    const out = await service(fake).translateSelection(
+      { ...input, appName: "ByoGlot Translator", languagePrompt: "Formal tone" },
+      new AbortController().signal,
+    );
+    expect(out).toBe("Translation");
+    expect(fake.prompts).toHaveLength(1);
+    expect(fake.prompts[0]).toContain("The text comes from the app ByoGlot Translator.");
+    expect(fake.prompts[0]).toContain("Formal tone");
+    expect(fake.prompts[0]).toContain("TEXT:\nHello");
+    expect(fake.prompts[0]).not.toContain("CONTEXT");
+    expect(fake.prompts[0]).not.toContain("example.com");
+  });
+
   it("returns the trimmed raw text and builds the selection prompt", async () => {
     const fake = fakeBackend(async () => "  Привет\n");
     const out = await service(fake).translateSelection(input, new AbortController().signal);

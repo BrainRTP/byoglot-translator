@@ -13,7 +13,11 @@ use std::{
     sync::Arc,
 };
 
-pub fn build(services: Arc<Services>, stack: &adw::ViewStack) -> gtk::ScrolledWindow {
+pub fn build(
+    services: Arc<Services>,
+    stack: &adw::ViewStack,
+    window: &adw::ApplicationWindow,
+) -> gtk::ScrolledWindow {
     let content = page_box();
     let error = banner();
     let weak_stack = stack.downgrade();
@@ -63,6 +67,21 @@ pub fn build(services: Arc<Services>, stack: &adw::ViewStack) -> gtk::ScrolledWi
         .vexpand(true)
         .tooltip_text(tr(Msg::InputLimit))
         .build();
+    let load = gtk::gio::SimpleAction::new("load-text", Some(glib::VariantTy::STRING));
+    let input_weak = input.downgrade();
+    let stack_weak = stack.downgrade();
+    load.connect_activate(move |_, value| {
+        if let (Some(input), Some(stack), Some(text)) = (
+            input_weak.upgrade(),
+            stack_weak.upgrade(),
+            value.and_then(|v| v.str()),
+        ) {
+            stack.set_visible_child_name("translate");
+            input.buffer().set_text(text);
+            input.grab_focus();
+        }
+    });
+    window.add_action(&load);
     let input_scroll = scroll(&input);
     input_scroll.set_min_content_height(180);
     input_scroll.add_css_class("card");

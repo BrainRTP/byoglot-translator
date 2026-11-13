@@ -5,9 +5,13 @@ use crate::{
 };
 use adw::prelude::*;
 use gtk::gio;
-use std::sync::Arc;
+use std::{rc::Rc, sync::Arc};
 
-pub fn build(app: &adw::Application, services: Arc<Services>) -> adw::ApplicationWindow {
+pub fn build(
+    app: &adw::Application,
+    services: Arc<Services>,
+    shortcuts: Rc<crate::shortcut::Registration>,
+) -> adw::ApplicationWindow {
     let window = adw::ApplicationWindow::builder()
         .application(app)
         .title("ByoGlot")
@@ -38,7 +42,7 @@ pub fn build(app: &adw::Application, services: Arc<Services>) -> adw::Applicatio
         .build();
     header.pack_end(&button);
     toolbar.add_top_bar(&header);
-    let translate = translate_page::build(services.clone(), &stack);
+    let translate = translate_page::build(services.clone(), &stack, &window);
     let connections = connections_page::build(services.clone(), &window);
     let templates = templates_page::build(services.clone(), &window);
     stack.add_titled_with_icon(
@@ -79,11 +83,12 @@ pub fn build(app: &adw::Application, services: Arc<Services>) -> adw::Applicatio
         }
     });
     window.set_content(Some(&toolbar));
+    let preferences_shortcuts = shortcuts.clone();
     let action = gio::SimpleAction::new("preferences", None);
     let weak = window.downgrade();
     action.connect_activate(move |_, _| {
         if let Some(window) = weak.upgrade() {
-            preferences::present(&window, services.clone());
+            preferences::present(&window, services.clone(), preferences_shortcuts.clone());
         }
     });
     window.add_action(&action);
@@ -96,7 +101,7 @@ pub fn build(app: &adw::Application, services: Arc<Services>) -> adw::Applicatio
                 .body(format!(
                     "{}\n\n{}",
                     tr(Msg::WindowShortcuts),
-                    tr(Msg::ShortcutLater)
+                    shortcuts.description.label()
                 ))
                 .build();
             dialog.add_response("close", tr(Msg::Close));

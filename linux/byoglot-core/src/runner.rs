@@ -48,13 +48,21 @@ impl std::fmt::Debug for RunnerInput {
             .finish_non_exhaustive()
     }
 }
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunnerOutput {
     pub text: String,
     pub source_lang: String,
     pub target_lang: String,
     pub model: ModelRef,
+}
+impl std::fmt::Debug for RunnerOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RunnerOutput")
+            .field("text", &"[redacted]")
+            .field("model", &self.model)
+            .finish_non_exhaustive()
+    }
 }
 pub struct TranslationRunner<S, K, T> {
     settings: S,

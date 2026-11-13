@@ -68,6 +68,8 @@ public struct RunnerOutput: Sendable, Equatable, CustomStringConvertible, Custom
     public var debugDescription: String { description }
 }
 
+public enum ResultDelivery: Sendable { case cache, whole, stream }
+
 public struct RunnerStreamOutput: Sendable, Equatable, CustomStringConvertible, CustomDebugStringConvertible {
     public var requestId: UUID
     public var output: RunnerOutput
@@ -75,6 +77,7 @@ public struct RunnerStreamOutput: Sendable, Equatable, CustomStringConvertible, 
     public var incomplete: Bool
     public var finishReason: String?
     public var usage: TokenUsage?
+    public var delivery: ResultDelivery = .stream
     public var description: String { "RunnerStreamOutput(requestId: \(requestId), complete: \(complete), incomplete: \(incomplete))" }
     public var debugDescription: String { description }
 }
@@ -139,7 +142,7 @@ public actor TranslationRunner {
                     if let value = lookup?.value, !input.reloadCache {
                         var output = await self.output(text: value.text, request: prepared.request, completed: true)
                         output.targetLang = value.targetLang
-                        continuation.yield(RunnerStreamOutput(requestId: input.requestId, output: output, complete: true, incomplete: false, finishReason: nil, usage: nil))
+                        continuation.yield(RunnerStreamOutput(requestId: input.requestId, output: output, complete: true, incomplete: false, finishReason: nil, usage: nil, delivery: .cache))
                         continuation.finish()
                         return
                     }
@@ -148,7 +151,7 @@ public actor TranslationRunner {
                     for try await chunk in translator.stream(prepared.request) {
                         try Task.checkCancellation()
                         let output = await self.output(text: chunk.text, request: prepared.request, completed: chunk.complete && !chunk.incomplete)
-                        let value = RunnerStreamOutput(requestId: input.requestId, output: output, complete: chunk.complete, incomplete: chunk.incomplete, finishReason: chunk.finishReason, usage: chunk.usage)
+                        let value = RunnerStreamOutput(requestId: input.requestId, output: output, complete: chunk.complete, incomplete: chunk.incomplete, finishReason: chunk.finishReason, usage: chunk.usage, delivery: chunk.delivery == .stream ? .stream : .whole)
                         final = value
                         continuation.yield(value)
                     }

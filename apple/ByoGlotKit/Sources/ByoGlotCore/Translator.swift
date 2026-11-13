@@ -86,19 +86,23 @@ public actor Translator {
         var text = ""
         var reason: String?
         var usage: TokenUsage?
+        var delivery = CompletionDelivery.whole
         if let streaming = backend as? any StreamingTextGenerating {
             for try await delta in streaming.stream(prompt: prompt, model: request.model) {
                 try Task.checkCancellation()
                 text.append(delta.text)
                 reason = delta.finishReason ?? reason
                 usage = delta.usage ?? usage
-                continuation.yield(TranslationChunk(text: text, finishReason: reason, usage: usage))
+                if delta.delivery == .stream {
+                    delivery = .stream
+                    continuation.yield(TranslationChunk(text: text, delivery: .stream, finishReason: reason, usage: usage))
+                }
             }
         } else { text = try await backend.generate(prompt: prompt, model: request.model) }
         try Task.checkCancellation()
         let trimmed = jsTrim(text)
         guard !trimmed.isEmpty else { throw BackendError(kind: .badResponse) }
-        continuation.yield(TranslationChunk(text: trimmed, complete: true, incomplete: reason == "length" || reason == "max_tokens", finishReason: reason, usage: usage))
+        continuation.yield(TranslationChunk(text: trimmed, delivery: delivery, complete: true, incomplete: reason == "length" || reason == "max_tokens", finishReason: reason, usage: usage))
     }
 
     public func clearCache() {
@@ -136,13 +140,15 @@ public actor Translator {
 
 public struct TranslationChunk: Sendable, Equatable, CustomStringConvertible, CustomDebugStringConvertible {
     public var text: String
+    public var delivery: CompletionDelivery
     public var complete: Bool
     public var incomplete: Bool
     public var finishReason: String?
     public var usage: TokenUsage?
 
-    public init(text: String, complete: Bool = false, incomplete: Bool = false, finishReason: String? = nil, usage: TokenUsage? = nil) {
+    public init(text: String, delivery: CompletionDelivery = .stream, complete: Bool = false, incomplete: Bool = false, finishReason: String? = nil, usage: TokenUsage? = nil) {
         self.text = text
+        self.delivery = delivery
         self.complete = complete
         self.incomplete = incomplete
         self.finishReason = finishReason

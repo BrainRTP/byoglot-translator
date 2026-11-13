@@ -411,11 +411,13 @@ private struct CacheWaitingTransport: HTTPTransport {
     try await waitForCacheModel { model.complete }
     #expect(model.result == "cached answer" && !model.running && !model.incomplete && model.error == nil)
     #expect(model.canSwap && model.detectedSourceLang == "en" && model.completionID != nil)
+    #expect(model.resultAnimation?.effect == .fade)
     #expect(await f.transport.requests.isEmpty)
     model.setNetworkAvailable(true)
     model.translateAgain()
     try await waitForCacheModel { model.complete }
     #expect(model.result == "translated")
+    #expect(model.resultAnimation == nil)
     #expect(await f.transport.requests.count == 1)
     #expect(await model.swap() == "translated")
     #expect(model.inputText == "translated" && model.result == "hello")

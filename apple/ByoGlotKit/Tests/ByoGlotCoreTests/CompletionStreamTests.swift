@@ -75,6 +75,8 @@ struct CompletionStreamTests {
         var chunks: [TranslationChunk] = []
         let input = TextRequest(text: "hello", context: "", appName: "", sourceLang: "auto", targetLang: "ru", prePrompt: "", languagePrompt: "", model: model)
         for try await chunk in translator.stream(input) { chunks.append(chunk) }
+        #expect(chunks.last?.delivery == (type == "text/event-stream" ? .stream : .whole))
+        #expect(chunks.count == (type == "text/event-stream" ? 2 : 1))
         #expect(chunks.last?.text == "hi")
         #expect(chunks.last?.complete == true)
         #expect(chunks.last?.incomplete == true)

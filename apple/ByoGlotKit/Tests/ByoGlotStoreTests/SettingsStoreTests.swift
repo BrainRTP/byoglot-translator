@@ -106,3 +106,22 @@ struct SettingsStoreTests {
     }
 
 }
+
+@Test func resultAnimationPersistsLocallyAndLegacySettingsDefaultToFade() async throws {
+    let directory = FileManager.default.temporaryDirectory.appending(path: "byoglot-animation-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = SettingsStore(directory: directory)
+    #expect(try await store.read().resultAnimation == .fade)
+    _ = try await store.update { $0.resultAnimation = .pen }
+    let stored = try await SettingsStore(directory: directory).read()
+    #expect(stored.resultAnimation == .pen)
+    let exported = SettingsLogic.export(stored, now: .now)
+    let exportObject = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(exported)) as? [String: Any])
+    #expect(exportObject["resultAnimation"] == nil)
+    #expect(SettingsLogic.merge(exported, into: stored).resultAnimation == .pen)
+    var legacy = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(stored)) as? [String: Any])
+    legacy["resultAnimation"] = nil
+    #expect(try JSONDecoder().decode(AppSettings.self, from: JSONSerialization.data(withJSONObject: legacy)).resultAnimation == .fade)
+    legacy["resultAnimation"] = "unknown"
+    #expect(try JSONDecoder().decode(AppSettings.self, from: JSONSerialization.data(withJSONObject: legacy)).resultAnimation == .fade)
+}

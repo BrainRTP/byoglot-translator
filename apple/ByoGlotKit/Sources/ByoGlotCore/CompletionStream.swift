@@ -12,13 +12,17 @@ public struct TokenUsage: Equatable, Sendable {
     }
 }
 
+public enum CompletionDelivery: String, Sendable { case whole, stream }
+
 public struct CompletionDelta: Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
     public var text: String
+    public var delivery: CompletionDelivery
     public var finishReason: String?
     public var usage: TokenUsage?
 
-    public init(text: String = "", finishReason: String? = nil, usage: TokenUsage? = nil) {
+    public init(text: String = "", delivery: CompletionDelivery = .stream, finishReason: String? = nil, usage: TokenUsage? = nil) {
         self.text = text
+        self.delivery = delivery
         self.finishReason = finishReason
         self.usage = usage
     }
@@ -156,7 +160,7 @@ func parseCompletion(_ data: Data, plain: Bool, errorEvent: Bool = false) throws
             usage = TokenUsage(promptTokens: number("prompt_tokens"), completionTokens: number("completion_tokens"), totalTokens: number("total_tokens"))
         }
         guard choice != nil || usage != nil else { throw BackendError(kind: .incompatible) }
-        return CompletionDelta(text: text, finishReason: reason, usage: usage)
+        return CompletionDelta(text: text, delivery: plain ? .whole : .stream, finishReason: reason, usage: usage)
     } catch let error as BackendError { throw error }
     catch { throw BackendError(kind: .incompatible) }
 }

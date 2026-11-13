@@ -14,10 +14,10 @@ private actor ModelStream {
         inputs.append(input)
         continuations[input.requestId] = continuation
     }
-    func emit(_ index: Int, text: String, complete: Bool = false, chunkId: UUID? = nil, detected: String? = nil) {
+    func emit(_ index: Int, text: String, complete: Bool = false, delivery: ResultDelivery = .stream, chunkId: UUID? = nil, detected: String? = nil) {
         let input = inputs[index]
         let output = RunnerOutput(text: text, sourceLang: input.sourceLang ?? "auto", targetLang: input.targetLang ?? "en", model: input.model ?? ModelRef(providerID: "custom", id: "model"), detectedSourceLang: detected)
-        continuations[input.requestId]?.yield(RunnerStreamOutput(requestId: chunkId ?? input.requestId, output: output, complete: complete, incomplete: false, finishReason: complete ? "stop" : nil, usage: nil))
+        continuations[input.requestId]?.yield(RunnerStreamOutput(requestId: chunkId ?? input.requestId, output: output, complete: complete, incomplete: false, finishReason: complete ? "stop" : nil, usage: nil, delivery: delivery))
     }
     func fail(_ index: Int) { continuations[inputs[index].requestId]?.finish(throwing: RunnerError.backend(BackendError(kind: .providerError, status: 503))) }
     var count: Int { inputs.count }
@@ -486,4 +486,34 @@ private actor ModelStream {
     #expect(await stream.inputs[0].targetLang == "de")
     #expect(await stream.count == 1)
     model.stop()
+}
+
+@MainActor @Test func wholeResultAnimationIsPublishedOnceAndCancelledWithoutChangingText() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    model.edit("Hello"); model.translate()
+    try await eventually { await stream.count == 1 }
+    await stream.emit(0, text: "whole result", complete: true, delivery: .whole)
+    try await eventually { model.complete }
+    let playback = try #require(model.resultAnimation)
+    #expect(playback.effect == .fade && model.result == "whole result")
+    await model.updateSettings { $0.resultAnimation = .wave; $0.theme = .dark }
+    #expect(model.resultAnimation == playback)
+    await stream.emit(0, text: "whole result", complete: true, delivery: .whole)
+    model.stop()
+    #expect(model.resultAnimation == nil && model.result == "whole result")
+    model.translate()
+    try await eventually { await stream.count == 2 }
+    await stream.emit(1, text: "one SSE chunk", complete: true, delivery: .stream)
+    try await eventually { model.complete }
+    #expect(model.resultAnimation == nil)
+    model.translate()
+    try await eventually { await stream.count == 3 }
+    await stream.emit(2, text: "cache result", complete: true, delivery: .cache)
+    try await eventually { model.complete }
+    #expect(model.resultAnimation?.effect == .wave)
+    model.sceneChanged(.inactive)
+    model.sceneChanged(.active)
+    #expect(model.resultAnimation == nil && model.result == "cache result")
+    model.edit("Edited")
+    #expect(model.resultAnimation == nil && model.result.isEmpty)
 }

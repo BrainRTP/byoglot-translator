@@ -187,3 +187,17 @@ private actor ModelStream {
     let offline = MainErrorPresentation(error: .backend(BackendError(kind: .offline)), provider: "Provider")
     #expect(offline.action == .retry && !offline.warning)
 }
+
+@MainActor @Test func markedTextPausesDebounceUntilCompositionCommits() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream, auto: true, delay: .milliseconds(20))
+    model.edit("before")
+    model.edit("composing", composing: true)
+    model.translate()
+    try await Task.sleep(for: .milliseconds(60))
+    #expect(await stream.count == 0)
+    #expect(!model.canTranslate)
+    model.edit("composing", composing: false)
+    try await eventually { await stream.count == 1 }
+    #expect(model.canTranslate)
+    model.stop()
+}

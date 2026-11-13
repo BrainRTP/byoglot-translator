@@ -5,13 +5,15 @@ import UIKit
 struct SourceTextEditor: UIViewRepresentable {
     @Binding var text: String
     let autoTranslate: Bool
-    let edit: (String) -> Void
+    let edit: (String, Bool) -> Void
+    let paste: (String) -> Void
     let submit: () -> Void
     let focus: (Bool) -> Void
     @Environment(\.dynamicTypeSize) private var typeSize
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> UITextView {
-        let view = UITextView()
+        let view = PastingTextView()
+        view.didPaste = { [weak coordinator = context.coordinator] text in coordinator?.parent.paste(text) }
         view.delegate = context.coordinator
         view.backgroundColor = .clear
         view.textContainerInset = UIEdgeInsets(top: 12, left: 9, bottom: 8, right: 9)
@@ -34,10 +36,19 @@ struct SourceTextEditor: UIViewRepresentable {
     }
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: SourceTextEditor
+        var composing = false
         init(_ parent: SourceTextEditor) { self.parent = parent }
         func textViewDidChange(_ textView: UITextView) {
             parent.text = textView.text
-            if textView.markedTextRange == nil { parent.edit(textView.text) }
+            composing = textView.markedTextRange != nil
+            parent.edit(textView.text, composing)
+        }
+        func textViewDidChangeSelection(_ textView: UITextView) {
+            if composing && textView.markedTextRange == nil {
+                composing = false
+                parent.text = textView.text
+                parent.edit(textView.text, false)
+            }
         }
         func textViewDidBeginEditing(_ textView: UITextView) { parent.focus(true) }
         func textViewDidEndEditing(_ textView: UITextView) { parent.focus(false) }
@@ -47,16 +58,25 @@ struct SourceTextEditor: UIViewRepresentable {
         }
     }
 }
+
+private final class PastingTextView: UITextView {
+    var didPaste: ((String) -> Void)?
+    override func paste(_ sender: Any?) {
+        super.paste(sender)
+        didPaste?(text)
+    }
+}
 #else
 struct SourceTextEditor: View {
     @Binding var text: String
     let autoTranslate: Bool
-    let edit: (String) -> Void
+    let edit: (String, Bool) -> Void
+    let paste: (String) -> Void
     let submit: () -> Void
     let focus: (Bool) -> Void
     var body: some View {
         TextEditor(text: $text).scrollContentBackground(.hidden).modifier(ByoTypography(17))
-            .onChange(of: text) { _, value in edit(value) }.onSubmit(submit)
+            .onChange(of: text) { _, value in edit(value, false) }.onSubmit(submit)
             .accessibilityLabel(AppStrings.text("main.source"))
     }
 }

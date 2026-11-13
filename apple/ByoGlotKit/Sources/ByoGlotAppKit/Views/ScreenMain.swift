@@ -170,7 +170,7 @@ public struct TranslatorBlock: View {
                     Text(AppStrings.text("main.placeholder")).modifier(ByoTypography(17)).foregroundStyle(ByoColor.muted)
                         .padding(.horizontal, 14).padding(.vertical, 12).allowsHitTesting(false).accessibilityHidden(true)
                 }
-                SourceTextEditor(text: $text, autoTranslate: model.settings.autoTranslate, edit: { model.edit($0) }, submit: model.keyboardTranslate, focus: { editing = $0 })
+                SourceTextEditor(text: $text, autoTranslate: model.settings.autoTranslate, edit: { model.edit($0, composing: $1) }, paste: { value in text = value; model.edit(value, pasted: true) }, submit: model.keyboardTranslate, focus: { editing = $0 })
             }
             HStack {
                 Text(AppStrings.format("main.counter", ["n": String(AppModel.inputCount(text))]))

@@ -30,6 +30,7 @@ public final class AppModel {
     @ObservationIgnored private let delay: Duration
     @ObservationIgnored private var pending: Task<Void, Never>?
     @ObservationIgnored private var request: Task<Void, Never>?
+    private var composing = false
     @ObservationIgnored private var requestId: UUID?
     private var manualModel: ModelRef?
     private var manualPrompt: String?
@@ -62,7 +63,7 @@ public final class AppModel {
     public nonisolated static func inputCount(_ text: String) -> Int { text.utf16.count }
     public var inputCount: Int { Self.inputCount(inputText) }
     public var overLimit: Bool { inputCount > editorInputLimit }
-    public var canTranslate: Bool { !jsTrim(inputText).isEmpty && !overLimit }
+    public var canTranslate: Bool { !composing && !jsTrim(inputText).isEmpty && !overLimit }
     public var providerName: String { model.flatMap { SettingsLogic.modelConnection($0, settings: settings)?.name } ?? "ByoGlot" }
 
     private struct Inputs: Equatable {
@@ -110,11 +111,18 @@ public final class AppModel {
         catch { storageError = .appGroupUnavailable }
     }
 
-    public func edit(_ text: String, pasted: Bool = false) {
-        guard text != inputText else { if pasted && settings.autoTranslate { translate() }; return }
+    public func edit(_ text: String, pasted: Bool = false, composing: Bool = false) {
+        let wasComposing = self.composing
+        self.composing = composing
+        guard text != inputText else {
+            if pasted && settings.autoTranslate { translate() }
+            else if wasComposing && !composing { schedule() }
+            return
+        }
         inputText = text
         detectedSourceLang = nil
         invalidate()
+        guard !composing else { return }
         if pasted && settings.autoTranslate { translate() } else { schedule() }
     }
 
@@ -131,6 +139,7 @@ public final class AppModel {
     public func keyboardTranslate() { if !settings.autoTranslate { translate() } }
 
     public func translate() {
+        guard !composing else { return }
         stop()
         error = nil
         errorAt = nil

@@ -23,7 +23,6 @@ jobs:
           global-json-file: windows/global.json
       - run: dotnet test windows/ByoGlot.Core.Tests
       - run: dotnet test windows/ByoGlot.App.Tests
-      - run: dotnet build windows/ByoGlot.App -c Release -p:Platform=x64 -p:AppxPackageSigningEnabled=false
       - name: Build unsigned x64 and ARM64 Store bundle
         run: >-
           dotnet build windows/ByoGlot.App -c Release -p:Platform=x64
@@ -36,3 +35,4 @@ jobs:
           name: windows-unsigned-msix
           path: artifacts/windows/**
           if-no-files-found: error
+          retention-days: 7

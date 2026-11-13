@@ -6,8 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
-  <!-- SDK 11.0.100 omits 28000; declare it before the SDK normalizes Windows targets. -->
+  <!-- SDK 11.0.100 omits 28000; stop overriding once the SDK declares it. -->
   <ItemGroup>
-    <WindowsSdkSupportedTargetPlatformVersion Include="10.0.28000.0" WindowsSdkPackageVersion="10.0.28000.87" MinimumNETVersion="11.0" />
+    <WindowsSdkSupportedTargetPlatformVersion Include="10.0.28000.0" WindowsSdkPackageVersion="10.0.28000.87" MinimumNETVersion="11.0" Condition="'@(WindowsSdkSupportedTargetPlatformVersion->WithMetadataValue('Identity', '10.0.28000.0'))@(WindowsSdkSupportedTargetPlatformVersion->WithMetadataValue('Identity', '10.0.28000.1'))' == ''" />
   </ItemGroup>
 </Project>

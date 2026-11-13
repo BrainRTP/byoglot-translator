@@ -4,10 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.brainrtp.byoglot.core.*
 import java.time.Instant
-import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 
 data class MainNavigationRequest(val id: Long, val destination: String)
@@ -26,8 +27,15 @@ data class MainParameters(
     val sourceLang: String = "auto",
     val targetLang: String = "en",
     val changed: Boolean = false,
+    val templateChanges: Boolean = false,
     val detectedSourceLang: String? = null,
+    val prePrompt: String = "",
+    val model: ModelRef? = null,
+    val missingModel: ModelRef? = null,
 ) {
+    override fun toString() =
+        "MainParameters(templateId=$templateId, promptLength=${prePrompt.length}, changed=$changed)"
+
     val canSwap: Boolean
         get() = sourceLang != "auto" || detectedSourceLang != null
 }
@@ -55,10 +63,15 @@ class MainViewModel(
     private val mutableParameters = MutableStateFlow(MainParameters())
     val parameters = mutableParameters.asStateFlow()
     private var manualTarget: String? = null
+    private var manualModel: ModelRef? = null
+    private var manualPrompt: String? = null
     private var networkAvailable = false
     private var autoJob: Job? = null
     private var detectionJob: Job? = null
     val editor = ConnectionEditor(repository, secrets, transport)
+    val catalogue = ModelCatalogue(editor, repository, networkOnline)
+    private val mutableRecentLanguages = MutableStateFlow<List<String>>(emptyList())
+    val recentLanguages = mutableRecentLanguages.asStateFlow()
     private val mutableSettings = MutableStateFlow<AppSettings?>(null)
     val settings = mutableSettings.asStateFlow()
     private val mutableTranslation = MutableStateFlow(TranslationState())
@@ -76,34 +89,40 @@ class MainViewModel(
     private var navigationIdentity = 0L
     private var job: Job? = null
     private var identity = 0L
+    private var lastRequestInputs: MainRequestInputs? = null
+    private val actionLock = Mutex()
+    private var pendingActions = 0
 
     init {
         workScope.launch { refresh() }
     }
 
+    private fun requestInputs(): MainRequestInputs? =
+        settings.value?.let { mainRequestInputs(text.value, parameters.value, it) }
+
+    private fun changedInputs(before: MainRequestInputs?, immediate: Boolean = false) {
+        if (before == requestInputs()) return
+        cancel()
+        mutableTranslation.value = TranslationState()
+        if (immediate) translateChoice() else schedule()
+    }
+
     suspend fun refresh() {
         val state = repository.read()
         val previous = mutableSettings.value
-        val parametersChanged =
-            previous != null &&
-                previous.copy(theme = state.theme, autoTranslate = state.autoTranslate) != state
-        if (parametersChanged) {
-            cancel()
-            mutableTranslation.value = TranslationState()
-        }
+        val before = requestInputs()
         mutableSettings.value = state
         syncParameters(state)
         mutableKeys.value = state.connections.associate { it.id to editor.keyState(it.id) }
-        if (
-            (previous == null || parametersChanged || !previous.autoTranslate) &&
-                state.autoTranslate &&
-                mutableText.value.isNotBlank()
-        )
-            schedule()
+        if (previous == null) schedule()
+        else if (before != requestInputs()) changedInputs(before)
+        else if (previous.autoTranslate != state.autoTranslate) {
+            autoJob?.cancel()
+            if (state.autoTranslate && requestInputs() != lastRequestInputs) schedule()
+        }
     }
 
-    fun receiveQuickRequest(text: String?, destination: String?) {
-        text?.let(::setText)
+    fun receiveQuickRequest(destination: String?) {
         dismissError()
         mutableNavigation.value =
             MainNavigationRequest(++navigationIdentity, destination ?: "translate")
@@ -117,15 +136,36 @@ class MainViewModel(
         val template =
             state.templates.find { it.id == state.globals.defaultTemplateId }
                 ?: Contracts.builtinTemplate
-        if (mutableParameters.value.templateId != template.id) manualTarget = null
+        if (mutableParameters.value.templateId != template.id) {
+            manualTarget = null
+            manualModel = null
+            manualPrompt = null
+        }
         val effective = SettingsLogic.effectiveMain(template, state)
+        val requested = manualModel ?: template.settings.pageModel
+        val missing = requested?.takeUnless { catalogue.available(it, state) }
+        val model =
+            catalogue.clamp(
+                if (missing != null) catalogue.fallback(state, true)
+                else manualModel ?: effective.model,
+            )
+        val templateChanges =
+            (manualTarget != null && manualTarget != template.settings.targetLang) ||
+                (manualModel != null &&
+                    manualModel !=
+                        template.settings.pageModel?.let { SettingsLogic.bindModel(it, state) })
         val target = manualTarget ?: effective.targetLang
+        val prompt = manualPrompt ?: effective.prePrompt
         mutableParameters.value =
             mutableParameters.value.copy(
                 templateId = template.id,
                 sourceLang = state.globals.sourceLang,
                 targetLang = target,
-                changed = target != effective.targetLang,
+                prePrompt = prompt,
+                model = model,
+                missingModel = missing,
+                changed = templateChanges || prompt != effective.prePrompt,
+                templateChanges = templateChanges,
                 detectedSourceLang =
                     if (state.globals.sourceLang == "auto")
                         mutableParameters.value.detectedSourceLang
@@ -133,10 +173,82 @@ class MainViewModel(
             )
     }
 
+    suspend fun refreshModels() {
+        catalogue.refresh()
+        val before = requestInputs()
+        settings.value?.let(::syncParameters)
+        changedInputs(before, immediate = true)
+    }
+
+    private fun rememberLanguage(code: String) {
+        if (code != "auto") mutableRecentLanguages.update { (listOf(code) + it).distinct().take(5) }
+    }
+
+    private fun translateChoice() {
+        if (text.value.isNotBlank() && requestInputs() != lastRequestInputs) translate()
+    }
+
+    fun setPrePrompt(value: String) {
+        if (value == parameters.value.prePrompt) return
+        val before = requestInputs()
+        manualPrompt = value
+        settings.value?.let(::syncParameters)
+        changedInputs(before)
+    }
+
+    fun chooseModel(model: ModelRef) {
+        val state = settings.value ?: return
+        val selected = catalogue.clamp(model) ?: return
+        if (selected == parameters.value.model || !catalogue.available(selected, state)) return
+        val before = requestInputs()
+        manualModel = selected
+        syncParameters(state)
+        changedInputs(before, immediate = true)
+    }
+
+    suspend fun resetParameters() {
+        val before = requestInputs()
+        manualTarget = null
+        manualModel = null
+        manualPrompt = null
+        settings.value?.let(::syncParameters)
+        changedInputs(before, immediate = true)
+    }
+
+    suspend fun storeCurrentTemplate(name: String? = null) {
+        val params = parameters.value
+        val state = repository.read()
+        val template =
+            state.templates.find { it.id == params.templateId } ?: Contracts.builtinTemplate
+        if (name == null && (template.builtin || !params.templateChanges)) return
+        val saved =
+            template.copy(
+                id = if (name == null) template.id else UUID.randomUUID().toString(),
+                name = name?.trim() ?: template.name,
+                builtin = false,
+                settings =
+                    template.settings.copy(
+                        targetLang = manualTarget ?: template.settings.targetLang,
+                        pageModel = manualModel ?: template.settings.pageModel,
+                    ),
+            )
+        // The parameter sheet's prompt is transient, even when saving other parameters.
+        manualModel = null
+        manualTarget = null
+        mutableParameters.value = params.copy(templateId = saved.id)
+        update {
+            it.copy(
+                templates = it.templates.filterNot { t -> t.id == saved.id } + saved,
+                globals = it.globals.copy(defaultTemplateId = saved.id),
+            )
+        }
+    }
+
     fun setText(text: String) {
         if (text == mutableText.value) return
         cancel()
         mutableText.value = text
+        lastRequestInputs = null
         mutableParameters.value = mutableParameters.value.copy(detectedSourceLang = null)
         mutableTranslation.value = TranslationState()
         schedule()
@@ -171,6 +283,7 @@ class MainViewModel(
         targetLang: String? = null,
     ) {
         autoJob?.cancel()
+        lastRequestInputs = settings.value?.let { mainRequestInputs(text, parameters.value, it) }
         val id = ++identity
         job?.cancel()
         detectionJob?.cancel()
@@ -184,11 +297,14 @@ class MainViewModel(
                 limit = EDITOR_INPUT_LIMIT,
                 sourceLang = params.sourceLang,
                 mainModel = true,
+                model = params.model,
+                prePrompt = params.prePrompt,
             )
         val validation =
             when {
                 text.isBlank() -> RunnerError.Empty
                 InputCounter.editor(text).overLimit -> RunnerError.TooLong(EDITOR_INPUT_LIMIT)
+                params.missingModel != null && params.model == null -> RunnerError.NoModel
                 !networkOnline() -> RunnerError.Backend(BackendException(ErrorKind.Offline))
                 else -> null
             }
@@ -254,7 +370,7 @@ class MainViewModel(
             detectionJob = workScope.launch {
                 val detected =
                     try {
-                        confidentSource(sourceLanguageDetector.detect(input.text))
+                        confidentSourceLanguage(sourceLanguageDetector.detect(input.text))
                     } catch (e: CancellationException) {
                         throw e
                     } catch (_: RuntimeException) {
@@ -270,16 +386,6 @@ class MainViewModel(
                 }
             }
         }
-    }
-
-    private fun confidentSource(candidates: List<LanguageHypothesis>): String? {
-        val top =
-            candidates
-                .filter { it.confidence.isFinite() && it.confidence in 0f..1f }
-                .maxByOrNull { it.confidence } ?: return null
-        if (top.confidence < SOURCE_LANGUAGE_CONFIDENCE) return null
-        val language = Locale.forLanguageTag(top.languageTag).language.lowercase(Locale.ROOT)
-        return language.takeIf { it in Contracts.languageCodes }
     }
 
     fun isNetworkOnline() = networkOnline()
@@ -314,38 +420,38 @@ class MainViewModel(
     }
 
     suspend fun update(change: (AppSettings) -> AppSettings) {
-        val before = repository.read()
-        val after = repository.update(change)
-        if (before.copy(theme = after.theme, autoTranslate = after.autoTranslate) != after) {
-            cancel()
-            mutableTranslation.value = TranslationState()
-        } else if (before.autoTranslate != after.autoTranslate) autoJob?.cancel()
+        repository.update(change)
         refresh()
     }
 
     suspend fun selectTemplate(id: String) {
-        cancel()
-        mutableTranslation.value = TranslationState()
+        if (id == parameters.value.templateId) return
+        val before = requestInputs()
         manualTarget = null
+        manualModel = null
+        manualPrompt = null
         update { it.copy(globals = it.globals.copy(defaultTemplateId = id)) }
-        schedule()
+        if (before != requestInputs()) translateChoice()
     }
 
     suspend fun setTargetLanguage(code: String) {
-        if (code !in Contracts.languageCodes) return
-        cancel()
-        mutableTranslation.value = TranslationState()
+        if (code !in Contracts.languageCodes || code == parameters.value.targetLang) return
         manualTarget = code
         update { it.copy(globals = it.globals.copy(targetLang = code)) }
-        schedule()
+        rememberLanguage(code)
+        translateChoice()
     }
 
     suspend fun setSourceLanguage(code: String) {
-        if (code != "auto" && code !in Contracts.languageCodes) return
-        cancel()
+        if (
+            (code != "auto" && code !in Contracts.languageCodes) ||
+                code == parameters.value.sourceLang
+        )
+            return
         mutableParameters.value = mutableParameters.value.copy(detectedSourceLang = null)
         update { it.copy(globals = it.globals.copy(sourceLang = code)) }
-        schedule()
+        rememberLanguage(code)
+        translateChoice()
     }
 
     suspend fun swap() {
@@ -382,6 +488,13 @@ class MainViewModel(
     }
 
     suspend fun setModel(connectionId: String, model: ModelRef, page: Boolean) {
+        val before = requestInputs()
+        val connection = settings.value?.connections?.find { it.id == connectionId } ?: return
+        if (
+            catalogue.clamp(if (page) connection.pageModel else connection.selectionModel) ==
+                catalogue.clamp(model)
+        )
+            return
         update { s ->
             s.copy(
                 connections =
@@ -392,35 +505,63 @@ class MainViewModel(
                     },
             )
         }
+        if (page && before != requestInputs()) translateChoice()
     }
 
-    suspend fun saveTemplate(id: String?, name: String, instructions: String, target: String?) {
+    suspend fun saveTemplate(template: Template) {
         update { s ->
-            val old = s.templates.find { it.id == id }
-            if (id == Contracts.builtinTemplate.id || old?.builtin == true) s
-            else {
-                val template =
-                    Template(
-                        id ?: UUID.randomUUID().toString(),
-                        name.trim(),
-                        false,
-                        (old?.settings ?: TemplateSettings()).copy(
-                            prePrompt = instructions,
-                            targetLang = target,
-                        ),
-                    )
-                s.copy(templates = s.templates.filterNot { it.id == template.id } + template)
-            }
+            if (
+                template.id == Contracts.builtinTemplate.id ||
+                    s.templates.any { it.id == template.id && it.builtin }
+            )
+                s
+            else
+                s.copy(
+                    templates =
+                        s.templates.filterNot { it.id == template.id } +
+                            template.copy(name = template.name.trim(), builtin = false),
+                )
         }
     }
 
     suspend fun duplicate(template: Template, name: String) {
-        saveTemplate(
-            null,
-            name,
-            template.settings.prePrompt.orEmpty(),
-            template.settings.targetLang,
-        )
+        saveTemplate(template.copy(id = UUID.randomUUID().toString(), name = name, builtin = false))
+    }
+
+    suspend fun setDefaultModel(model: ModelRef, main: Boolean) {
+        val state = settings.value ?: return
+        if (catalogue.clamp(SettingsLogic.defaultModel(state, main)) == catalogue.clamp(model))
+            return
+        val before = requestInputs()
+        if (main) manualModel = null
+        update { if (main) it.copy(mainModel = model) else it.copy(externalModel = model) }
+        if (main && before != requestInputs()) translateChoice()
+    }
+
+    suspend fun setFallbackModel(model: ModelRef) {
+        val selected = model.copy(variant = "none")
+        if (settings.value?.fallbackModel == selected) return
+        val before = requestInputs()
+        update { it.copy(fallbackModel = selected) }
+        if (before != requestInputs()) translateChoice()
+    }
+
+    suspend fun saveProfile(id: String, text: String) {
+        require(text.length <= Contracts.limits.maxProfileText)
+        val base = Contracts.builtinProfiles[id] ?: return
+        update { s ->
+            s.copy(
+                profileOverrides =
+                    if (text.jsTrim() == base.jsTrim()) s.profileOverrides - id
+                    else
+                        s.profileOverrides +
+                            (id to ProfileOverride(text, base, nowMs().toDouble())),
+            )
+        }
+    }
+
+    suspend fun resetProfile(id: String) {
+        update { it.copy(profileOverrides = it.profileOverrides - id) }
     }
 
     suspend fun deleteTemplate(id: String) {
@@ -447,13 +588,15 @@ class MainViewModel(
     }
 
     fun action(block: suspend () -> Unit) {
-        if (mutableBusy.value) return
+        pendingActions++
         mutableBusy.value = true
-        mutableError.value = null
         workScope.launch {
             try {
-                block()
-                refresh()
+                actionLock.withLock {
+                    mutableError.value = null
+                    block()
+                    refresh()
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: RunnerException) {
@@ -461,7 +604,8 @@ class MainViewModel(
             } catch (_: Exception) {
                 mutableError.value = RunnerError.Backend(BackendException(ErrorKind.ProviderError))
             } finally {
-                mutableBusy.value = false
+                pendingActions--
+                mutableBusy.value = pendingActions > 0
             }
         }
     }

@@ -181,7 +181,7 @@ class MainFlowTest {
         runCurrent()
         assertEquals("fr", calls.last().targetLang)
         assertTrue(vm.parameters.value.changed)
-        vm.selectTemplate("ru")
+        vm.resetParameters()
         assertEquals("ru", vm.parameters.value.targetLang)
         assertFalse(vm.parameters.value.changed)
     }
@@ -359,9 +359,9 @@ class MainFlowTest {
         advanceTimeBy(101)
         runCurrent()
         assertEquals("en", vm.parameters.value.targetLang)
-        assertNull(vm.translation.value.output)
+        assertEquals("en", vm.translation.value.output?.targetLang)
         assertFalse(vm.translation.value.working)
-        vm.selectTemplate("ru")
+        vm.resetParameters()
         assertEquals("ru", vm.parameters.value.targetLang)
     }
 
@@ -427,10 +427,9 @@ class MainFlowTest {
             runCurrent()
             assertEquals(1, calls)
             vm.setModel("c", model.copy(id = "another"), true)
-            advanceTimeBy(799)
             runCurrent()
-            assertEquals(1, calls)
-            advanceTimeBy(1)
+            assertEquals(2, calls)
+            advanceTimeBy(1000)
             runCurrent()
             assertEquals(2, calls)
         }

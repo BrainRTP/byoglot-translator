@@ -35,6 +35,8 @@ data class RunnerInput(
     val limit: Int,
     val sourceLang: String? = null,
     val mainModel: Boolean = false,
+    val model: ModelRef? = null,
+    val prePrompt: String? = null,
 ) {
     override fun toString(): String =
         "RunnerInput(textLength=${text.length}, contextLength=${context.length}, limit=$limit)"
@@ -107,9 +109,6 @@ class TranslationRunner(
         if (text.isEmpty()) throw RunnerException(RunnerError.Empty)
         if (text.length > input.limit) throw RunnerException(RunnerError.TooLong(input.limit))
         val state = settings.read()
-        val connection =
-            state.connections.find { it.id == state.activeConnectionId }
-                ?: throw RunnerException(RunnerError.NoConnection)
         val template =
             state.templates.find { it.id == input.templateId }
                 ?: state.templates.find { it.id == state.globals.defaultTemplateId }
@@ -118,7 +117,17 @@ class TranslationRunner(
             if (input.mainModel) SettingsLogic.effectiveMain(template, state)
             else SettingsLogic.effective(template, state)
         val target = input.targetLang ?: effective.targetLang
-        val model = effective.model ?: throw RunnerException(RunnerError.NoModel)
+        if (state.connections.isEmpty()) throw RunnerException(RunnerError.NoConnection)
+        val model =
+            input.model
+                ?: effective.model
+                ?: throw RunnerException(
+                    if (state.activeConnectionId == null) RunnerError.NoConnection
+                    else RunnerError.NoModel,
+                )
+        val connection =
+            SettingsLogic.modelConnection(model, state)
+                ?: throw RunnerException(RunnerError.NoConnection)
         val origin =
             originOf(connection.baseUrl)
                 ?: throw RunnerException(RunnerError.Backend(BackendException(ErrorKind.Offline)))
@@ -163,7 +172,7 @@ class TranslationRunner(
                 input.appName,
                 input.sourceLang ?: state.globals.sourceLang,
                 target,
-                effective.prePrompt,
+                input.prePrompt ?: effective.prePrompt,
                 language,
                 model,
             ),

@@ -28,7 +28,7 @@ class DataStoreSettingsRepository(context: Context) : SettingsRepository {
     companion object { private val stores = mutableMapOf<String, DataStore<AppSettings>>() }
 }
 
-private object SettingsSerializer : Serializer<AppSettings> {
+internal object SettingsSerializer : Serializer<AppSettings> {
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = true }
     override val defaultValue get() = AppSettings.initial(Locale.getDefault().language)
     override suspend fun readFrom(input: InputStream): AppSettings = try {

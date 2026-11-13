@@ -1,15 +1,25 @@
 package io.github.brainrtp.byoglot.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.brainrtp.byoglot.R
 import io.github.brainrtp.byoglot.core.*
@@ -47,8 +57,117 @@ fun ScreenSettingsSections(settings: AppSettings, version: String, onSection: (S
                         .find { it.id == settings.globals.defaultTemplateId }
                         ?.let { templateLabel(it) },
             )
+            ListRow(
+                stringResource(R.string.animation_title),
+                { onSection("animation") },
+                subtitle = animationLabel(settings.animation),
+            )
             ListRow(stringResource(R.string.cache_title), { onSection("cache") })
             ListRow(stringResource(R.string.about), { onSection("about") }, value = version)
+        }
+    }
+}
+
+@Composable
+internal fun animationLabel(choice: AnimationChoice): String = stringResource(
+    when (choice) {
+        AnimationChoice.none -> R.string.animation_none
+        AnimationChoice.fade -> R.string.animation_fade
+        AnimationChoice.scramble -> R.string.animation_scramble
+        AnimationChoice.flap -> R.string.animation_flap
+        AnimationChoice.typewriter -> R.string.animation_typewriter
+        AnimationChoice.pen -> R.string.animation_pen
+        AnimationChoice.wave -> R.string.animation_wave
+    },
+)
+
+@Composable
+fun ScreenAnimationSettings(vm: MainViewModel, settings: AppSettings) {
+    val c = ByoTheme.colors
+    val reducedMotion = rememberReducedMotion()
+    val choices = AnimationChoice.entries
+    val focus = remember { List(choices.size) { FocusRequester() } }
+    var selected by remember(settings.animation) { mutableStateOf(settings.animation) }
+    var preview by remember { mutableStateOf<ResultAnimationPlayback?>(null) }
+    val groupLabel = stringResource(R.string.animation_group)
+    fun select(choice: AnimationChoice) {
+        selected = choice
+        preview = ResultAnimationPlayback(choice)
+        vm.action { vm.update { it.copy(animation = choice) } }
+    }
+    ScreenColumn {
+        if (reducedMotion) Note(stringResource(R.string.animation_reduced_motion))
+        Text(stringResource(R.string.animation_tap_hint), style = ByoType.label, color = c.mu)
+        Column(
+            Modifier.selectableGroup().semantics { contentDescription = groupLabel },
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            choices.chunked(2).forEachIndexed { row, pair ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    pair.forEachIndexed { column, choice ->
+                        val index = row * 2 + column
+                        val checked = selected == choice
+                        Box(
+                            Modifier.weight(1f)
+                                .heightIn(min = 76.dp)
+                                .focusRequester(focus[index])
+                                .onPreviewKeyEvent { event ->
+                                    if (event.type != KeyEventType.KeyDown) false
+                                    else {
+                                        val next = when (event.key) {
+                                            Key.DirectionLeft -> index - 1
+                                            Key.DirectionRight -> index + 1
+                                            Key.DirectionUp -> index - 2
+                                            Key.DirectionDown -> index + 2
+                                            else -> return@onPreviewKeyEvent false
+                                        }.coerceIn(0, choices.lastIndex)
+                                        select(choices[next])
+                                        focus[next].requestFocus()
+                                        true
+                                    }
+                                }
+                                .byoFocusRing()
+                                .background(c.bg, RoundedCornerShape(ByoRadius.group))
+                                .border(if (checked) 2.dp else 1.dp, if (checked) c.ac else c.bd, RoundedCornerShape(ByoRadius.group))
+                                .selectable(checked, role = Role.RadioButton, onClick = { select(choice) })
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                        ) {
+                            Column(Modifier.padding(end = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(animationLabel(choice), style = ByoType.body, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    if (choice == AnimationChoice.none) stringResource(R.string.animation_instant)
+                                    else stringResource(R.string.animation_duration, ResultAnimation.durationMs(choice, 20000, Float.MAX_VALUE)),
+                                    style = ByoType.original,
+                                    color = c.mu,
+                                )
+                            }
+                            if (checked)
+                                Text("✓", Modifier.align(Alignment.TopEnd).clearAndSetSemantics {}, color = c.ac)
+                        }
+                    }
+                    if (pair.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+        ByoGroup {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.animation_preview), style = ByoType.label, color = c.mu)
+                SelectionContainer {
+                    ResultText(
+                        stringResource(R.string.animation_sample),
+                        working = false,
+                        complete = false,
+                        playback = preview,
+                        background = c.bg,
+                        reducedMotion = reducedMotion,
+                    )
+                }
+                ByoButton(
+                    stringResource(R.string.animation_replay),
+                    { preview = ResultAnimationPlayback(selected) },
+                    enabled = !reducedMotion,
+                )
+            }
         }
     }
 }

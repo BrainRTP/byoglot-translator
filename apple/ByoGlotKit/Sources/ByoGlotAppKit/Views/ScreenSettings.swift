@@ -1,26 +1,40 @@
 import ByoGlotCore
 import SwiftUI
 
+public enum SettingsDestination: String, Hashable, Codable {
+    case providers, language, prompt, models, templates, about
+}
+
 public struct ScreenSettings: View {
     @Bindable var model: AppModel
     public init(model: AppModel) { self.model = model }
     public var body: some View {
         SettingsPage(title: "settings.title") {
             ByoGroup {
-                destination("providers.title", subtitle: model.settings.connections.map(\.name).joined(separator: ", ")) { ScreenProviders(model: model) }
-                destination("settings.language", subtitle: AppStrings.language(model.targetLang)) { ScreenLanguageSettings(model: model) }
-                destination("settings.prompt", subtitle: AppStrings.profile(model.settings.globals.languageProfile)) { ScreenLanguagePrompt(model: model) }
-                destination("settings.models", subtitle: SettingsLogic.defaultModel(settings: model.settings, main: true)?.id) { ScreenModelSettings(model: model) }
-                destination("settings.templates", subtitle: templateLabel(model.template)) { ScreenTemplateSettings(model: model) }
-                destination("settings.about") { ScreenAbout(model: model) }
+                destination(.providers, title: "providers.title", subtitle: model.settings.connections.map(\.name).joined(separator: ", "))
+                destination(.language, title: "settings.language", subtitle: AppStrings.language(model.targetLang))
+                destination(.prompt, title: "settings.prompt", subtitle: AppStrings.profile(model.settings.globals.languageProfile))
+                destination(.models, title: "settings.models", subtitle: SettingsLogic.defaultModel(settings: model.settings, main: true)?.id)
+                destination(.templates, title: "settings.templates", subtitle: templateLabel(model.template))
+                destination(.about, title: "settings.about")
             }
         }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
         #endif
+        .navigationDestination(for: SettingsDestination.self) { destination in
+            switch destination {
+            case .providers: ScreenProviders(model: model)
+            case .language: ScreenLanguageSettings(model: model)
+            case .prompt: ScreenLanguagePrompt(model: model)
+            case .models: ScreenModelSettings(model: model)
+            case .templates: ScreenTemplateSettings(model: model)
+            case .about: ScreenAbout(model: model)
+            }
+        }
     }
-    private func destination<Content: View>(_ key: String, subtitle: String? = nil, @ViewBuilder content: () -> Content) -> some View {
-        NavigationLink(destination: content) { SettingsLinkLabel(title: key, subtitle: subtitle) }.buttonStyle(.plain)
+    private func destination(_ value: SettingsDestination, title: String, subtitle: String? = nil) -> some View {
+        NavigationLink(value: value) { SettingsLinkLabel(title: title, subtitle: subtitle) }.buttonStyle(.plain)
     }
 }
 
@@ -54,7 +68,7 @@ public struct ScreenLanguageSettings: View {
             SwitchRow(title: "settings.liveTranslate", value: Binding(get: { model.settings.autoTranslate }, set: { value in Task { await model.updateSettings { $0.autoTranslate = value } } }), help: "settings.liveHelp")
         }.sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } })) {
             if sheet == "target" {
-                ScreenLanguageSheet(selected: model.targetLang, recent: model.recentLanguages, choose: { code in Task { await model.chooseTarget(code); sheet = "" } }, close: { sheet = "" })
+                ScreenLanguageSheet(selected: model.targetLang, recent: model.recentLanguages, choose: { code in sheet = ""; Task { await model.chooseTarget(code) } }, close: { sheet = "" })
             } else {
                 ByoBottomSheet("settings.uiLang", close: { sheet = "" }) {
                     ByoGroup { ForEach(["system", "en", "ru"], id: \.self) { code in
@@ -73,31 +87,30 @@ public struct ScreenModelSettings: View {
     public init(model: AppModel) { self.model = model }
     public var body: some View {
         SettingsPage(title: "settings.models") {
-            pair(main: true)
-            pair(main: false)
+            mainPair
             PickerField(label: "models.fallback", value: model.settings.fallbackModel?.id ?? AppStrings.text("main.chooseModel"), mono: model.settings.fallbackModel != nil) { sheet = "fallback" }
             if model.settings.fallbackModel != nil { ByoButton("models.clearFallback", kind: .text) { Task { await model.updateSettings { $0.fallbackModel = nil } } } }
             Note(text: AppStrings.text("models.fallbackHelp"))
         }.task { for connection in model.settings.connections { await model.warmModels(connectionId: connection.id) } }
-            .sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } })) {
+            .sheet(isPresented: Binding(get: { ["main", "fallback"].contains(sheet) }, set: { if !$0 { sheet = "" } })) {
                 ScreenModelSheet(model: model, selected: selected, choose: { ref in Task { await model.setConfiguredModel(ref, slot: sheet) } }, close: { sheet = "" })
             }
     }
     private var selected: ModelRef? {
-        sheet == "fallback" ? model.settings.fallbackModel : SettingsLogic.defaultModel(settings: model.settings, main: sheet == "main")
+        sheet == "fallback" ? model.settings.fallbackModel : SettingsLogic.defaultModel(settings: model.settings, main: true)
     }
-    private func pair(main: Bool) -> some View {
-        let ref = model.clampedModel(SettingsLogic.defaultModel(settings: model.settings, main: main))
+    private var mainPair: some View {
+        let ref = model.clampedModel(SettingsLogic.defaultModel(settings: model.settings, main: true))
         return VStack(alignment: .leading, spacing: 12) {
-            SectionLabel(main ? "models.main" : "models.external")
-            if typeSize.isAccessibilitySize { VStack(spacing: 12) { pairFields(ref, main: main) } }
-            else { HStack(alignment: .top, spacing: 8) { pairFields(ref, main: main) } }
+            SectionLabel("models.main")
+            if typeSize.isAccessibilitySize { VStack(spacing: 12) { pairFields(ref) } }
+            else { HStack(alignment: .top, spacing: 8) { pairFields(ref) } }
             if (ref?.variant ?? "none") != "none" { Note(text: AppStrings.text("model.thinkingNote")) }
         }
     }
-    @ViewBuilder private func pairFields(_ ref: ModelRef?, main: Bool) -> some View {
-        PickerField(label: "model.title", value: ref?.id ?? AppStrings.text("main.chooseModel"), mono: ref != nil) { sheet = main ? "main" : "external" }
-        PickerField(label: "model.effort", value: AppStrings.effort(ref?.variant), mono: true) { sheet = main ? "main" : "external" }
+    @ViewBuilder private func pairFields(_ ref: ModelRef?) -> some View {
+        PickerField(label: "model.title", value: ref?.id ?? AppStrings.text("main.chooseModel"), mono: ref != nil) { sheet = "main" }
+        PickerField(label: "model.effort", value: AppStrings.effort(ref?.variant), mono: true) { sheet = "main" }
             .frame(maxWidth: typeSize.isAccessibilitySize ? .infinity : 110)
     }
 
@@ -146,8 +159,14 @@ public struct ScreenLanguagePrompt: View {
             } else { ByoButton("prompt.reset", kind: .text) { resetting = true }.disabled(saved == base && !dirty) }
         }
         #if os(iOS)
-        .navigationBarBackButtonHidden()
-        .toolbar { ToolbarItem(placement: .topBarLeading) { Button { if dirty { pendingProfile = nil; discarding = true } else { dismiss() } } label: { Label(AppStrings.text("settings.title"), systemImage: "chevron.left") } } }
+        .navigationBarBackButtonHidden(dirty)
+        .toolbar {
+            if dirty {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { pendingProfile = nil; discarding = true } label: { Label(AppStrings.text("settings.title"), systemImage: "chevron.left") }
+                }
+            }
+        }
         #endif
         .onAppear { if draftID != id { draftID = id; draft = saved } }
         .sheet(isPresented: $profiles) {

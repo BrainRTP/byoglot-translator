@@ -11,6 +11,7 @@ public struct ScreenMain: View {
     let openTemplates: (() -> Void)?
     @State private var text = ""
     @SceneStorage("main.sheet") private var sheet = ""
+    @State private var afterSheet: (() -> Void)?
     @Environment(\.dynamicTypeSize) private var typeSize
     public init(model: AppModel, openProviders: @escaping () -> Void, openSettings: (() -> Void)? = nil, openTemplates: (() -> Void)? = nil) {
         self.model = model; self.openProviders = openProviders; self.openSettings = openSettings ?? openProviders; self.openTemplates = openTemplates
@@ -23,12 +24,16 @@ public struct ScreenMain: View {
         .background(ByoColor.background).foregroundStyle(ByoColor.text)
         .navigationTitle(AppStrings.text("main.title"))
         .toolbar { ToolbarItem(placement: .primaryAction) { ByoIconButton(title: "settings.title", symbol: "slider.horizontal.3", action: openSettings) } }
-        .sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } })) {
+        .sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } }), onDismiss: {
+            let action = afterSheet
+            afterSheet = nil
+            action?()
+        }) {
             switch sheet {
-            case "params": ScreenParamsSheet(model: model, close: { sheet = "" }, providers: openProviders, manageTemplates: openTemplates)
-            case "source": ScreenLanguageSheet(source: true, selected: model.sourceLang, recent: model.recentLanguages, detected: model.detectedSourceLang, choose: { code in Task { await model.chooseSource(code); sheet = "" } }, close: { sheet = "" })
-            case "target": ScreenLanguageSheet(selected: model.targetLang, recent: model.recentLanguages, choose: { code in Task { await model.chooseTarget(code); sheet = "" } }, close: { sheet = "" })
-            default: ScreenModelSheet(model: model, selected: model.model, choose: model.chooseModel, close: { sheet = "" }, providers: { sheet = ""; openProviders() })
+            case "params": ScreenParamsSheet(model: model, close: { sheet = "" }, providers: { leaveSheet(openProviders) }, manageTemplates: openTemplates.map { action in { leaveSheet(action) } })
+            case "source": ScreenLanguageSheet(source: true, selected: model.sourceLang, recent: model.recentLanguages, detected: model.detectedSourceLang, choose: { code in sheet = ""; Task { await model.chooseSource(code) } }, close: { sheet = "" })
+            case "target": ScreenLanguageSheet(selected: model.targetLang, recent: model.recentLanguages, choose: { code in sheet = ""; Task { await model.chooseTarget(code) } }, close: { sheet = "" })
+            default: ScreenModelSheet(model: model, selected: model.model, choose: model.chooseModel, close: { sheet = "" }, providers: { leaveSheet(openProviders) })
             }
         }
         .onAppear { text = model.inputText }
@@ -56,6 +61,8 @@ public struct ScreenMain: View {
                 .modifier(ByoTypography(13, mono: true)).foregroundStyle(ByoColor.muted).frame(minHeight: 44).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityLabel(AppStrings.text("model.title")).modifier(ByoFocusRing())
     }
+    private func leaveSheet(_ action: @escaping () -> Void) { afterSheet = action; sheet = "" }
+
 }
 
 public struct LangBar: View {

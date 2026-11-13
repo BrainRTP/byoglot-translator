@@ -10,6 +10,7 @@ public struct ScreenLanguageSheet: View {
     let choose: (String) -> Void
     let close: () -> Void
     @SceneStorage("language.search") private var query = ""
+    @State private var choosing = false
     public init(source: Bool = false, selected: String, recent: [String] = [], detected: String? = nil, inherit: Bool = false, choose: @escaping (String) -> Void, close: @escaping () -> Void) {
         self.source = source; self.selected = selected; self.recent = recent; self.detected = detected; self.inherit = inherit; self.choose = choose; self.close = close
     }
@@ -24,7 +25,7 @@ public struct ScreenLanguageSheet: View {
                 ByoTextField("lang.search", text: $query)
                 if inherit { row("", title: AppStrings.text("template.inherit")) }
                 if source && query.isEmpty {
-                    ListRow(AppStrings.text("lang.auto"), subtitle: detected.map { AppStrings.text("main.auto") + " " + AppStrings.language($0) }, selected: selected == "auto", disclosure: false) { choose("auto") }
+                    ListRow(AppStrings.text("lang.auto"), subtitle: detected.map { AppStrings.text("main.auto") + " " + AppStrings.language($0) }, selected: selected == "auto", disclosure: false) { select("auto") }
                 }
                 if query.isEmpty && !recent.isEmpty {
                     SectionLabel("lang.recent")
@@ -37,8 +38,14 @@ public struct ScreenLanguageSheet: View {
         }.onDisappear { query = "" }
     }
     private func row(_ code: String, title: String? = nil) -> some View {
-        ListRow(title ?? AppStrings.language(code), selected: selected == code, disclosure: false) { choose(code) }
+        ListRow(title ?? AppStrings.language(code), selected: selected == code, disclosure: false) { select(code) }
     }
+    private func select(_ code: String) {
+        guard !choosing else { return }
+        choosing = true
+        choose(code)
+    }
+
 }
 
 public struct ScreenModelSheet: View {
@@ -102,7 +109,7 @@ public struct ScreenTemplateSheet: View {
             VStack(alignment: .leading, spacing: 16) {
             ByoGroup {
                 ForEach(templates) { value in
-                    ListRow(templateLabel(value), subtitle: value.builtin ? AppStrings.text("template.builtin") : value.settings.pageModel?.id, selected: value.id == selected, disclosure: false) { choose(value) }
+                    ListRow(templateLabel(value), subtitle: templateIsBuiltin(value) ? AppStrings.text("template.builtin") : value.settings.pageModel?.id, selected: value.id == selected, disclosure: false) { choose(value) }
                 }
             }
             if let manage { ByoButton("template.manage", kind: .text, action: manage) }
@@ -111,7 +118,9 @@ public struct ScreenTemplateSheet: View {
     }
 }
 
-func templateLabel(_ value: Template) -> String { value.builtin ? AppStrings.text("main.builtinTemplate") : value.name }
+func templateIsBuiltin(_ value: Template) -> Bool { value.builtin || value.id == Contracts.builtinTemplate.id }
+
+func templateLabel(_ value: Template) -> String { templateIsBuiltin(value) ? AppStrings.text("main.builtinTemplate") : value.name }
 
 public struct ScreenParamsSheet: View {
     @Bindable var model: AppModel
@@ -123,18 +132,25 @@ public struct ScreenParamsSheet: View {
     @SceneStorage("params.saving") private var saving = false
     @SceneStorage("params.name") private var name = ""
     @State private var confirming = false
+    @State private var promptDraft = ""
+    @State private var promptFocused = false
+    @State private var promptReady = false
+    @State private var pendingDestination = ""
     @Environment(\.dynamicTypeSize) private var typeSize
     public init(model: AppModel, close: @escaping () -> Void, providers: @escaping () -> Void, manageTemplates: (() -> Void)? = nil) { self.model = model; self.close = close; self.providers = providers; self.manageTemplates = manageTemplates }
     public var body: some View {
-        ByoBottomSheet("params.title", close: close) {
+        ByoBottomSheet("params.title", close: finish) {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 12) {
                     PickerField(label: "main.template", value: templateLabel(model.template)) { sheet = "templates" }
-                    if model.changed { Chip(title: "main.changed"); changedActions }
-                    ByoButton("template.prePrompt", kind: .text) { expanded.toggle() }
+                    if model.changed || (promptReady && promptDraft != model.prePrompt) { Chip(title: "main.changed"); changedActions }
+                    ByoButton("template.prePrompt", kind: .text) { if expanded { commitPrompt() }; expanded.toggle() }
                         .accessibilityValue(AppStrings.text(expanded ? "common.expanded" : "common.collapsed"))
                     if expanded {
-                        DraftEditor(label: "template.prePrompt", text: Binding(get: { model.prePrompt }, set: model.setPrePrompt))
+                        DraftEditor(label: "template.prePrompt", text: $promptDraft, focusChanged: { focused in
+                            promptFocused = focused
+                            if !focused { commitPrompt() }
+                        })
                         Text(AppStrings.text("params.promptNote")).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
                     }
                 }.padding(12).background(ByoColor.surface, in: RoundedRectangle(cornerRadius: 8))
@@ -145,11 +161,32 @@ public struct ScreenParamsSheet: View {
                     Banner(title: AppStrings.text("model.missing"), message: AppStrings.format("model.fallback", ["model": missing.id, "fallback": model.model?.id ?? AppStrings.text("main.chooseModel")]), warning: true, actionTitle: "err.otherModel") { sheet = "model" }
                 }
             }
-        }.sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } })) {
+        }
+        .onAppear { promptDraft = model.prePrompt; promptReady = true }
+        .onChange(of: model.prePrompt) { _, value in if promptReady && !promptFocused { promptDraft = value } }
+        .onDisappear {
+            commitPrompt()
+            promptReady = false
+            promptDraft = ""
+            expanded = false
+            saving = false
+            name = ""
+            confirming = false
+            sheet = ""
+        }
+        .sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } }), onDismiss: {
+            let destination = pendingDestination
+            pendingDestination = ""
+            if destination == "templates" { finish(); manageTemplates?() }
+            else if destination == "providers" { finish(); providers() }
+        }) {
             if sheet == "templates" {
-                ScreenTemplateSheet(templates: model.settings.templates, selected: model.template.id, choose: { value in Task { await model.chooseTemplate(value); sheet = "" } }, close: { sheet = "" }, manage: manageTemplates.map { action in { sheet = ""; close(); action() } })
+                ScreenTemplateSheet(templates: model.settings.templates, selected: model.template.id, choose: { value in
+                    sheet = ""
+                    Task { await model.chooseTemplate(value); promptDraft = model.prePrompt }
+                }, close: { sheet = "" }, manage: manageTemplates.map { _ in { pendingDestination = "templates"; sheet = "" } })
             } else {
-                ScreenModelSheet(model: model, selected: model.model, choose: model.chooseModel, close: { sheet = "" }, providers: { sheet = ""; close(); providers() })
+                ScreenModelSheet(model: model, selected: model.model, choose: model.chooseModel, close: { sheet = "" }, providers: { pendingDestination = "providers"; sheet = "" })
             }
         }
     }
@@ -159,15 +196,21 @@ public struct ScreenParamsSheet: View {
             .frame(maxWidth: typeSize.isAccessibilitySize ? .infinity : 110)
     }
     @ViewBuilder private var changedActions: some View {
-        if !model.template.builtin && model.templateChanges {
+        if !templateIsBuiltin(model.template) && model.templateChanges {
             if confirming {
                 InlineConfirm(text: AppStrings.format("template.updateConfirm", ["name": templateLabel(model.template)]), confirm: { Task { if await model.storeCurrentTemplate() { confirming = false } } }, cancel: { confirming = false })
             } else { ByoButton("template.update") { confirming = true } }
         }
         if saving {
             ByoTextField("template.name", text: $name)
-            ByoButton("common.save") { Task { if await model.storeCurrentTemplate(name: name) { saving = false; name = "" } } }.disabled(jsTrim(name).isEmpty)
+            ByoButton("common.save") { let savedName = name; Task { if await model.storeCurrentTemplate(name: savedName) { saving = false; name = "" } } }.disabled(jsTrim(name).isEmpty)
         } else { ByoButton("template.saveNew") { saving = true } }
-        ByoButton("template.reset", kind: .text, action: model.resetParameters)
+        ByoButton("template.reset", kind: .text) { model.resetParameters(); promptDraft = model.prePrompt }
     }
+    private func commitPrompt() {
+        guard promptReady, promptDraft != model.prePrompt else { return }
+        model.setPrePrompt(promptDraft)
+    }
+    private func finish() { commitPrompt(); close() }
+
 }

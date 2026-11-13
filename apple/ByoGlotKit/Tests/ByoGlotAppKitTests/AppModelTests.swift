@@ -1,6 +1,7 @@
 @testable import ByoGlotAppKit
 import ByoGlotCore
 import Foundation
+import Darwin
 import Testing
 
 private actor ModelStream {
@@ -422,4 +423,67 @@ private actor ModelStream {
     #expect(saved.settings.prePrompt == "Stored instructions")
     #expect(saved.settings.selectionModel?.id == "external")
     #expect(saved.settings.pageModel == nil)
+}
+
+@MainActor @Test(arguments: [true, false]) func importCannotReplaceBuiltinAndCustomEntriesBecomeEditable(_ importedBuiltin: Bool) async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    let expected = Contracts.builtinTemplate
+    var file = try ExportFile.decode(await model.exportData())
+    var poisoned = expected
+    poisoned.builtin = importedBuiltin
+    poisoned.settings.prePrompt = "Imported instructions"
+    file.templates = [poisoned, Template(id: "custom-import", name: "Imported", builtin: true, settings: TemplateSettings())]
+    #expect(await model.applyImport(file))
+    #expect(model.settings.templates.first { $0.id == expected.id } == expected)
+    let imported = try #require(model.settings.templates.first { $0.id == "custom-import" })
+    #expect(!imported.builtin)
+    #expect(await model.deleteTemplate(imported.id))
+    _ = try await f.settings.update { state in
+        let index = state.templates.firstIndex { $0.id == expected.id }!
+        state.templates[index].builtin = false
+    }
+    await model.refresh()
+    var forged = expected
+    forged.builtin = false
+    forged.name = "Changed"
+    #expect(!(await model.saveTemplate(forged)))
+    #expect(!(await model.deleteTemplate(expected.id)))
+}
+
+@MainActor @Test func editorSaveAfterParameterUpdatePreservesTheNewTargetAndOtherUntouchedFields() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    let base = Template(id: "editor", name: "Original", builtin: false, settings: TemplateSettings(prePrompt: "Keep code", targetLang: "de"))
+    #expect(await model.saveTemplate(base))
+    var draft = TemplateDraft(template: base)
+    draft.value.name = "Renamed"
+    await model.chooseTemplate(base)
+    await model.chooseTarget("fr")
+    #expect(await model.storeCurrentTemplate())
+    #expect(await model.saveTemplate(draft.value, base: draft.base))
+    let saved = try #require(model.settings.templates.first { $0.id == base.id })
+    #expect(saved.name == "Renamed" && saved.settings.targetLang == "fr")
+    #expect(saved.settings.prePrompt == "Keep code" && saved.settings.pageModel == nil)
+    draft.rebase(on: saved)
+    #expect(draft.value.settings.targetLang == "fr" && draft.value.name == "Renamed")
+    #expect(draft.base == saved)
+}
+
+@MainActor @Test func overlappingTargetChoicesOnlySendTheLatestRequest() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    model.edit("Hello")
+    let descriptor = open(f.directory.appending(path: "settings.lock").path, O_RDWR)
+    #expect(descriptor >= 0)
+    defer { close(descriptor) }
+    #expect(flock(descriptor, LOCK_EX) == 0)
+    let first = Task { await model.chooseTarget("fr") }
+    try await eventually { model.targetLang == "fr" }
+    let second = Task { await model.chooseTarget("de") }
+    try await eventually { model.targetLang == "de" }
+    #expect(flock(descriptor, LOCK_UN) == 0)
+    await first.value
+    await second.value
+    try await eventually { await stream.count == 1 }
+    #expect(await stream.inputs[0].targetLang == "de")
+    #expect(await stream.count == 1)
+    model.stop()
 }

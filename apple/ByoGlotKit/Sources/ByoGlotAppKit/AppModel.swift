@@ -44,6 +44,7 @@ public final class AppModel {
     @ObservationIgnored private var request: Task<Void, Never>?
     private var composing = false
     @ObservationIgnored private var requestId: UUID?
+    @ObservationIgnored private var choiceRevision = 0
     private var manualTarget: String?
     private var manualModel: ModelRef?
     private var manualPrompt: String?
@@ -268,6 +269,7 @@ public final class AppModel {
     }
 
     private func invalidate() {
+        choiceRevision += 1
         cancelTasks()
         result = ""
         complete = false
@@ -292,7 +294,9 @@ public final class AppModel {
         sourceLang = code
         detectedSourceLang = nil
         invalidate()
+        let revision = choiceRevision
         await updateSettings { $0.globals.sourceLang = code }
+        guard revision == choiceRevision else { return }
         if canTranslate { translate() }
     }
 
@@ -301,7 +305,9 @@ public final class AppModel {
         manualTarget = code
         rememberLanguage(code)
         invalidate()
+        let revision = choiceRevision
         await updateSettings { $0.globals.targetLang = code }
+        guard revision == choiceRevision else { return }
         if canTranslate { translate() }
     }
 
@@ -313,7 +319,9 @@ public final class AppModel {
         manualPrompt = nil
         let changed = before != inputs
         if changed { invalidate() }
+        let revision = choiceRevision
         await updateSettings { $0.globals.defaultTemplateId = value.id }
+        guard revision == choiceRevision else { return }
         if changed && canTranslate { translate() }
     }
 
@@ -361,7 +369,7 @@ public final class AppModel {
 
     @discardableResult
     public func storeCurrentTemplate(name: String? = nil) async -> Bool {
-        guard name != nil || (!template.builtin && templateChanges) else { return false }
+        guard name != nil || (template.id != Contracts.builtinTemplate.id && !template.builtin && templateChanges) else { return false }
         if let name, jsTrim(name).isEmpty { return false }
         var saved = template
         if let name { saved.id = UUID().uuidString; saved.name = jsTrim(name); saved.builtin = false }
@@ -388,18 +396,25 @@ public final class AppModel {
     }
 
     @discardableResult
-    public func saveTemplate(_ value: Template) async -> Bool {
-        guard !value.builtin, !jsTrim(value.name).isEmpty,
+    public func saveTemplate(_ value: Template, base: Template? = nil) async -> Bool {
+        guard value.id != Contracts.builtinTemplate.id, !value.builtin, !jsTrim(value.name).isEmpty,
+              base == nil || base?.id == value.id,
               settings.templates.first(where: { $0.id == value.id })?.builtin != true else { return false }
-        return await updateSettings { state in
-            if let index = state.templates.firstIndex(where: { $0.id == value.id }) { state.templates[index] = value }
-            else { state.templates.append(value) }
-        }
+        var draft = TemplateDraft(template: base)
+        draft.value = value
+        let changes = draft
+        guard await updateSettings({ state in
+            if let index = state.templates.firstIndex(where: { $0.id == value.id }) {
+                guard !state.templates[index].builtin else { return }
+                state.templates[index] = changes.applyingChanges(to: state.templates[index])
+            } else if base == nil { state.templates.append(value) }
+        }) else { return false }
+        return settings.templates.contains { $0.id == value.id && !$0.builtin }
     }
 
     @discardableResult
     public func deleteTemplate(_ id: String) async -> Bool {
-        guard let value = settings.templates.first(where: { $0.id == id }), !value.builtin else { return false }
+        guard id != Contracts.builtinTemplate.id, let value = settings.templates.first(where: { $0.id == id }), !value.builtin else { return false }
         let selected = template.id == id
         guard await updateSettings({ state in
             state.templates.removeAll { $0.id == id }
@@ -442,7 +457,18 @@ public final class AppModel {
         return try encoder.encode(file)
     }
 
+    public nonisolated static func sanitizedImport(_ file: ExportFile) -> ExportFile {
+        var result = file
+        result.templates = file.templates.filter { $0.id != Contracts.builtinTemplate.id }.map { template in
+            var custom = template
+            custom.builtin = false
+            return custom
+        }
+        return result
+    }
+
     public func applyImport(_ file: ExportFile) async -> Bool {
+        let file = Self.sanitizedImport(file)
         let before = inputs
         do {
             settings = try await store.update { state in state = SettingsLogic.merge(file, into: state) }

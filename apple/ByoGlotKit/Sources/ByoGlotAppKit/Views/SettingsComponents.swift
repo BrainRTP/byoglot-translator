@@ -83,6 +83,8 @@ struct DraftEditor: View {
     let label: String
     @Binding var text: String
     @ScaledMetric private var editorHeight: CGFloat = 180
+    var focusChanged: (Bool) -> Void = { _ in }
+    @FocusState private var focused: Bool
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             SectionLabel(label)
@@ -90,6 +92,7 @@ struct DraftEditor: View {
                 .frame(height: editorHeight).padding(8).background(ByoColor.background)
                 .overlay { RoundedRectangle(cornerRadius: 6).stroke(ByoColor.strongBorder) }
                 .accessibilityLabel(AppStrings.text(label)).modifier(ByoFocusRing())
+                .focused($focused).onChange(of: focused) { _, value in focusChanged(value) }
         }
     }
 }

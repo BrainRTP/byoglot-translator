@@ -13,6 +13,7 @@ public struct SettingsDocument: FileDocument {
 public struct ScreenAbout: View {
     @Bindable var model: AppModel
     @State private var importing = false
+    @State private var reading = false
     @State private var exporting = false
     @State private var document: SettingsDocument?
     @State private var review: ExportFile?
@@ -29,7 +30,7 @@ public struct ScreenAbout: View {
                 do { document = SettingsDocument(data: try await model.exportData()); exporting = true; failure = nil }
                 catch { failure = AppStrings.text("about.fileError") }
             } }
-            ByoButton("about.import") { importing = true; success = false; failure = nil }
+            ByoButton("about.import", busy: reading) { importing = true; success = false; failure = nil }
             if let failure { Banner(title: AppStrings.text("about.fileError"), message: failure, actionTitle: "common.close") { self.failure = nil } }
             if success { Note(text: AppStrings.text("about.imported")) }
             Link(AppStrings.text("about.privacy"), destination: URL(string: "https://github.com/BrainRTP/byoglot-translator/blob/main/PRIVACY.md")!).frame(minHeight: 44)
@@ -38,10 +39,14 @@ public struct ScreenAbout: View {
             switch result {
             case .success(let urls):
                 guard let url = urls.first else { return }
-                let access = url.startAccessingSecurityScopedResource()
-                defer { if access { url.stopAccessingSecurityScopedResource() } }
-                do { review = try ExportFile.decode(Data(contentsOf: url)); failure = nil }
-                catch { failure = AppStrings.text("about.invalidFile") }
+                reading = true
+                Task {
+                    defer { reading = false }
+                    do { review = AppModel.sanitizedImport(try await SettingsImportReader.read(url)); failure = nil }
+                    catch SettingsImportError.tooLarge { failure = AppStrings.text("about.tooLarge") }
+                    catch SettingsImportError.invalidFile { failure = AppStrings.text("about.invalidFile") }
+                    catch { failure = AppStrings.text("about.fileError") }
+                }
             case .failure(let error): if (error as NSError).code != NSUserCancelledError { failure = AppStrings.text("about.fileError") }
             }
         }
@@ -73,7 +78,7 @@ public struct ScreenAbout: View {
         let profiles = file.profileOverrides.keys.sorted().map(AppStrings.profile)
         let newConnections = file.connections.filter { imported in !model.settings.connections.contains { $0.id == imported.id } }.map(\.name)
         return VStack(alignment: .leading, spacing: 12) {
-            Text(AppStrings.format("about.globals", ["source": file.globals.sourceLang == "auto" ? AppStrings.text("lang.auto") : AppStrings.language(file.globals.sourceLang), "target": AppStrings.language(file.globals.targetLang), "profile": AppStrings.profile(file.globals.languageProfile), "enabled": AppStrings.text(file.globals.languagePromptEnabled ? "common.on" : "common.off"), "template": file.templates.first(where: { $0.id == file.globals.defaultTemplateId }).map(templateLabel) ?? file.globals.defaultTemplateId])).modifier(ByoTypography())
+            Text(AppStrings.format("about.globals", ["source": file.globals.sourceLang == "auto" ? AppStrings.text("lang.auto") : AppStrings.language(file.globals.sourceLang), "target": AppStrings.language(file.globals.targetLang), "profile": AppStrings.profile(file.globals.languageProfile), "enabled": AppStrings.text(file.globals.languagePromptEnabled ? "common.on" : "common.off"), "template": (file.globals.defaultTemplateId == Contracts.builtinTemplate.id ? templateLabel(Contracts.builtinTemplate) : file.templates.first(where: { $0.id == file.globals.defaultTemplateId }).map(templateLabel) ?? file.globals.defaultTemplateId)])).modifier(ByoTypography())
             detail("about.replacedTemplates", values: replaced)
             detail("about.addedTemplates", values: added)
             detail("about.replacedProfiles", values: profiles)
@@ -86,7 +91,7 @@ public struct ScreenAbout: View {
     private func detail(_ title: String, values: [String]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             SectionLabel(title)
-            Text(values.isEmpty ? AppStrings.text("effort.none") : values.joined(separator: ", ")).modifier(ByoTypography())
+            Text(values.isEmpty ? AppStrings.text("about.nothing") : values.joined(separator: ", ")).modifier(ByoTypography())
         }
     }
 }

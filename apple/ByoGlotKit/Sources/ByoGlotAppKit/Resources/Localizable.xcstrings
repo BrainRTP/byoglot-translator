@@ -3592,6 +3592,38 @@
           }
         }
       }
+    },
+    "about.nothing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No items"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нет элементов"
+          }
+        }
+      }
+    },
+    "about.tooLarge": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The settings file must be no larger than 1 MB. Nothing was changed."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Файл настроек должен быть не больше 1 МБ. Настройки не изменены."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

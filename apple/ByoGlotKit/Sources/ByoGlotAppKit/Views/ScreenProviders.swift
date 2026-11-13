@@ -45,6 +45,9 @@ public struct ScreenProviders: View {
             }.padding(16)
         }.background(ByoColor.background).foregroundStyle(ByoColor.text)
             .navigationTitle(AppStrings.text("providers.title"))
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
             .navigationDestination(item: $selected) { route in ProviderKeyScreen(model: model, route: route) }
             .task { await model.refresh() }
     }
@@ -161,14 +164,15 @@ private struct ProviderKeyScreen: View {
                     .modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
                 if list.isEmpty { Text(AppStrings.text("providers.noModels")) }
                 else {
-                    Picker(AppStrings.text("providers.defaultModel"), selection: Binding<String>(get: { connection.pageModel?.id ?? "" }, set: { id in
-                        if let info = list.first(where: { $0.id == id }), id != connection.pageModel?.id {
-                            Task { await model.setDefaultModel(connectionId: connection.id, model: ModelRef(providerID: info.providerID, id: info.id, variant: "none", connectionId: connection.id)) }
+                    SectionLabel("providers.defaultModel")
+                    ByoGroup {
+                        ForEach(list, id: \.id) { info in
+                            ListRow(info.id, subtitle: AppStrings.text(info.variants.contains(where: { $0 != "none" }) ? "model.thinking" : "model.noThinking"), selected: connection.pageModel?.id == info.id && connection.pageModel?.providerID == info.providerID, disclosure: false, mono: true) {
+                                guard connection.pageModel?.id != info.id || connection.pageModel?.providerID != info.providerID else { return }
+                                Task { await model.setDefaultModel(connectionId: connection.id, model: ModelRef(providerID: info.providerID, id: info.id, variant: "none", connectionId: connection.id)) }
+                            }
                         }
-                    })) {
-                        Text(AppStrings.text("main.chooseModel")).tag("")
-                        ForEach(list, id: \.id) { Text($0.name).tag($0.id) }
-                    }.frame(minHeight: 48)
+                    }
                 }
             }
             if let error = model.catalogueErrors[connection.id] {

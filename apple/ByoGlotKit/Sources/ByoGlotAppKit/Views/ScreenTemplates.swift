@@ -1,9 +1,16 @@
 import ByoGlotCore
 import SwiftUI
 
+private struct TemplateEditorRoute: Hashable {
+    var id = UUID()
+    let templateID: String?
+}
+
 public struct ScreenTemplateSettings: View {
     @Bindable var model: AppModel
     @SceneStorage("templates.search") private var query = ""
+    @SceneStorage("template.editor.draft") private var storedDraft = ""
+    @State private var editing: TemplateEditorRoute?
     public init(model: AppModel) { self.model = model }
     public var body: some View {
         SettingsPage(title: "settings.templates") {
@@ -11,17 +18,17 @@ public struct ScreenTemplateSettings: View {
             ForEach([true, false], id: \.self) { builtin in
                 SectionLabel(builtin ? "template.builtins" : "template.own")
                 ByoGroup {
-                    ForEach(model.settings.templates.filter { $0.builtin == builtin && (query.isEmpty || templateLabel($0).localizedCaseInsensitiveContains(query)) }) { template in
-                        NavigationLink { ScreenTemplateEditor(model: model, original: template) } label: {
+                    ForEach(model.settings.templates.filter { templateIsBuiltin($0) == builtin && (query.isEmpty || templateLabel($0).localizedCaseInsensitiveContains(query)) }) { template in
+                        Button { editing = TemplateEditorRoute(templateID: template.id) } label: {
                             TemplateLinkLabel(template: template, isDefault: template.id == model.settings.globals.defaultTemplateId)
                         }.buttonStyle(.plain)
                     }
                 }
             }
-            NavigationLink { ScreenTemplateEditor(model: model) } label: {
-                Text(AppStrings.text("template.new")).modifier(ByoTypography(16, weight: .semibold)).frame(minHeight: 48).padding(.horizontal, 18)
-                    .overlay { RoundedRectangle(cornerRadius: 6).stroke(ByoColor.strongBorder) }
-            }.buttonStyle(.plain).modifier(ByoFocusRing())
+            ByoButton("template.new") { storedDraft = ""; editing = TemplateEditorRoute(templateID: nil) }
+        }.navigationDestination(item: $editing) { route in
+            ScreenTemplateEditor(model: model, original: route.templateID.flatMap { id in model.settings.templates.first { $0.id == id } })
+
         }
     }
 }
@@ -45,34 +52,38 @@ public struct ScreenTemplateEditor: View {
     @Bindable var model: AppModel
     let original: Template?
     @Environment(\.dismiss) private var dismiss
-    @SceneStorage("template.editor.id") private var draftID = ""
-    @SceneStorage("template.editor.name") private var name = ""
-    @SceneStorage("template.editor.prompt") private var prompt = ""
-    @SceneStorage("template.editor.target") private var target = ""
-    @SceneStorage("template.editor.model") private var modelJSON = ""
-    @SceneStorage("template.editor.modelEdited") private var modelEdited = false
+    @SceneStorage("template.editor.draft") private var storedDraft = ""
     @SceneStorage("template.editor.sheet") private var sheet = ""
+    @State private var draft: TemplateDraft
     @State private var deleting = false
     @State private var busy = false
-    public init(model: AppModel, original: Template? = nil) { self.model = model; self.original = original }
-    private var readOnly: Bool { original?.builtin == true }
-    private var ref: ModelRef? { modelJSON.data(using: .utf8).flatMap { try? JSONDecoder().decode(ModelRef.self, from: $0) } }
+    @State private var leaving = false
+    public init(model: AppModel, original: Template? = nil) {
+        self.model = model; self.original = original
+        _draft = State(initialValue: TemplateDraft(template: original))
+    }
+    private var latest: Template? { original.flatMap { value in model.settings.templates.first { $0.id == value.id } } }
+    private var readOnly: Bool { original?.id == Contracts.builtinTemplate.id || latest?.builtin == true || original?.builtin == true }
+    private var name: Binding<String> { Binding(get: { draft.value.name }, set: { draft.value.name = $0 }) }
+    private var prompt: Binding<String> { Binding(get: { draft.value.settings.prePrompt ?? "" }, set: { draft.value.settings.prePrompt = jsTrim($0).isEmpty ? nil : $0 }) }
+    private var target: String { draft.value.settings.targetLang ?? "" }
+    private var ref: ModelRef? { draft.value.settings.pageModel }
     public var body: some View {
-        SettingsPage(title: original.map(templateLabel) ?? AppStrings.text("template.new")) {
+        SettingsPage(title: draft.base.map(templateLabel) ?? AppStrings.text("template.new")) {
             if readOnly { Chip(title: "template.builtin"); Note(text: AppStrings.text("template.readOnly")) }
-            else { ByoTextField("template.name", text: $name) }
-            DraftEditor(label: "template.prePrompt", text: $prompt).disabled(readOnly)
+            else { ByoTextField("template.name", text: name) }
+            DraftEditor(label: "template.prePrompt", text: prompt).disabled(readOnly)
             Text(AppStrings.text("template.inheritHelp")).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
             PickerField(label: "lang.dstTitle", value: target.isEmpty ? AppStrings.text("template.inherit") : AppStrings.language(target), inherited: target.isEmpty) { sheet = "language" }.disabled(readOnly)
             PickerField(label: "model.title", value: ref?.id ?? AppStrings.text("template.inherit"), mono: ref != nil, inherited: ref == nil) { sheet = "model" }.disabled(readOnly)
             if let ref {
                 EffortSegment(model: model, ref: ref, choose: setModel).disabled(readOnly)
-                if !readOnly { ByoButton("template.inherit", kind: .text) { modelJSON = ""; modelEdited = true } }
+                if !readOnly { ByoButton("template.inherit", kind: .text) { setModel(nil) } }
             }
             if !readOnly {
-                ByoButton("common.save", kind: .primary, busy: busy) { save() }.disabled(jsTrim(name).isEmpty)
+                ByoButton("common.save", kind: .primary, busy: busy) { save() }.disabled(jsTrim(draft.value.name).isEmpty)
             }
-            if let original {
+            if let original = latest ?? original {
                 ByoButton("template.duplicate", busy: busy) { Task {
                     busy = true
                     var copy = original
@@ -90,39 +101,35 @@ public struct ScreenTemplateEditor: View {
                 }
             }
         }.onAppear { loadDraft() }
+            .onChange(of: latest) { _, value in if let value { draft.rebase(on: value) } }
+            .onChange(of: draft) { _, value in if !leaving { storedDraft = (try? JSONEncoder().encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? "" } }
             .sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } })) {
                 if sheet == "language" {
-                    ScreenLanguageSheet(selected: target, inherit: true, choose: { target = $0; sheet = "" }, close: { sheet = "" })
-                } else { ScreenModelSheet(model: model, selected: ref, choose: setModel, close: { sheet = "" }) }
+                    ScreenLanguageSheet(selected: target, inherit: true, choose: { draft.value.settings.targetLang = $0.isEmpty ? nil : $0; sheet = "" }, close: { sheet = "" })
+                } else { ScreenModelSheet(model: model, selected: ref, choose: { setModel($0) }, close: { sheet = "" }) }
             }
     }
-    private func setModel(_ value: ModelRef) {
-        modelJSON = (try? JSONEncoder().encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
-        modelEdited = true
+    private func setModel(_ value: ModelRef?) {
+        draft.value.settings.pageModel = value
+        draft.value.settings.selectionModel = value
     }
-    private func clearDraft() { draftID = ""; name = ""; prompt = ""; target = ""; modelJSON = ""; sheet = ""; modelEdited = false }
+    private func clearDraft() { leaving = true; storedDraft = ""; sheet = "" }
     private func loadDraft() {
-        let id = original?.id ?? "new"
-        guard draftID != id else { return }
-        draftID = id
-        name = original?.name ?? ""
-        prompt = original?.settings.prePrompt ?? ""
-        target = original?.settings.targetLang ?? ""
-        modelJSON = original?.settings.pageModel.flatMap { try? JSONEncoder().encode($0) }.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-        modelEdited = false
-        sheet = ""
+        leaving = false
+        if let data = storedDraft.data(using: .utf8), let saved = try? JSONDecoder().decode(TemplateDraft.self, from: data),
+           saved.base?.id == original?.id {
+            draft = saved
+        } else { draft = TemplateDraft(template: latest ?? original) }
+        if let latest { draft.rebase(on: latest) }
     }
     private func save() {
-        var value = original ?? Template(id: UUID().uuidString, name: "", builtin: false, settings: TemplateSettings())
-        value.name = jsTrim(name)
-        value.settings.prePrompt = jsTrim(prompt).isEmpty ? nil : prompt
-        value.settings.targetLang = target.isEmpty ? nil : target
-        value.settings.pageModel = ref
-        if modelEdited { value.settings.selectionModel = ref }
+        var value = draft.value
+        value.name = jsTrim(value.name)
         let saved = value
+        let base = draft.base
         Task {
             busy = true
-            if await model.saveTemplate(saved) { clearDraft(); dismiss() }
+            if await model.saveTemplate(saved, base: base) { clearDraft(); dismiss() }
             busy = false
         }
     }

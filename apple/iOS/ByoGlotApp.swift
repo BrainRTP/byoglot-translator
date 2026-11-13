@@ -34,6 +34,7 @@ struct ByoGlotApp: App {
 private struct RootView: View {
     @Bindable var model: AppModel
     @SceneStorage("root.tab") private var tab = "translate"
+    @State private var settingsPath: [SettingsDestination] = []
     @State private var network = NetworkObserver()
     @State private var privacyCover = PrivacyCover()
     @Environment(\.scenePhase) private var phase
@@ -48,16 +49,10 @@ private struct RootView: View {
             else {
                 TabView(selection: $tab) {
                     Tab(AppStrings.text("main.title"), systemImage: "character.bubble", value: "translate") {
-                        NavigationStack { ScreenMain(model: model, openProviders: { tab = "providers" }, openSettings: { tab = "settings" }, openTemplates: { tab = "templates" }) }
-                    }
-                    Tab(AppStrings.text("providers.title"), systemImage: "key", value: "providers") {
-                        NavigationStack { ScreenProviders(model: model) }
-                    }
-                    Tab(AppStrings.text("settings.templates"), systemImage: "doc.text", value: "templates") {
-                        NavigationStack { ScreenTemplateSettings(model: model) }
+                        NavigationStack { ScreenMain(model: model, openProviders: { showSettings(.providers) }, openSettings: { tab = "settings"; settingsPath = [] }, openTemplates: { showSettings(.templates) }) }
                     }
                     Tab(AppStrings.text("settings.title"), systemImage: "slider.horizontal.3", value: "settings") {
-                        NavigationStack { ScreenSettings(model: model) }
+                        NavigationStack(path: $settingsPath) { ScreenSettings(model: model) }
                     }
                 }.tabViewStyle(.sidebarAdaptable)
             }
@@ -65,7 +60,9 @@ private struct RootView: View {
             .background(PrivacySceneAttachment(cover: privacyCover).frame(width: 0, height: 0))
             .task {
                 await model.refresh()
-                if model.loaded && model.settings.connections.isEmpty { tab = "providers" }
+                if model.loaded && model.settings.connections.isEmpty { showSettings(.providers) }
+                else if tab == "providers" { showSettings(.providers) }
+                else if tab == "templates" { showSettings(.templates) }
                 network.start(model: model)
             }
             .onChange(of: phase) { _, value in
@@ -79,6 +76,11 @@ private struct RootView: View {
                 }
             }
     }
+    private func showSettings(_ destination: SettingsDestination) {
+        tab = "settings"
+        settingsPath = [destination]
+    }
+
 }
 
 @MainActor private final class NetworkObserver {

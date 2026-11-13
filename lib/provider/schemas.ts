@@ -13,7 +13,12 @@ export const modelRawSchema = z.looseObject({
 export const modelListSchema = z.looseObject({ data: z.array(modelRawSchema) });
 
 export const chatSchema = z.looseObject({
-  choices: z.array(z.looseObject({ message: z.looseObject({ content: z.string().nullish() }) })),
+  choices: z.array(
+    z.looseObject({
+      message: z.looseObject({ content: z.string().nullish() }),
+      finish_reason: z.unknown().optional(),
+    }),
+  ),
 });
 
 export const errorBodySchema = z.looseObject({

@@ -69,8 +69,14 @@ export type ProfileOp =
 export type RuleOp = { type: "upsert"; rule: SiteRule } | { type: "delete"; id: string };
 
 export type SelectionResult =
-  | { text: string; sourceLang: string; targetLang: string; model: ModelRef }
-  | { error: BackendErrorKind; retryAfterMs?: number; backend?: ConnectionKind; source?: string };
+  | { text: string; sourceLang: string; targetLang: string; model: ModelRef; truncated?: boolean }
+  | {
+      error: BackendErrorKind;
+      retryAfterMs?: number;
+      backend?: ConnectionKind;
+      source?: string;
+      timeout?: boolean;
+    };
 
 export type PageState = {
   state: "idle" | "translating" | "translated" | "error";

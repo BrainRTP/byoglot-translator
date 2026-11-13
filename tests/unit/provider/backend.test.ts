@@ -123,6 +123,17 @@ describe("defaultModel and info", () => {
 });
 
 describe("generate", () => {
+  it("reports output-limit truncation to the editor while preserving the legacy string result", async () => {
+    const { backend } = backendWith(async () =>
+      json({ choices: [{ message: { content: "Partial" }, finish_reason: "length" }] }),
+    );
+    expect(await backend.generateWithMetadata?.("hi", model)).toEqual({
+      text: "Partial",
+      truncated: true,
+    });
+    expect(await backend.generate("hi", model)).toBe("Partial");
+  });
+
   it("posts the chat request and returns the content", async () => {
     const { backend, fetchImpl } = backendWith(async () => json(fixture("deepseek-chat.json")));
     const text = await backend.generate("hi", model);

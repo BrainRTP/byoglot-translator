@@ -83,7 +83,10 @@ export interface HandlerDeps {
   createBackend(rec: ConnectionRecord): TranslationBackend;
   pair(link: string): Promise<Connection>;
   removeOrigin(origin: string): Promise<void>;
-  service: Pick<ReturnType<typeof createTranslationService>, "translateSelection">;
+  service: Pick<
+    ReturnType<typeof createTranslationService>,
+    "translateSelection" | "translateText"
+  >;
   cache: TranslationCache;
 }
 
@@ -158,7 +161,10 @@ const BADGE_ERROR_COLOR = "#d93025";
 
 export function createHandlers(deps: HandlerDeps) {
   let modelsCache: { at: number; models: ModelInfo[] } | null = null;
-  const selectionJobs = new Map<string, { controller: AbortController; tabId?: number }>();
+  const selectionJobs = new Map<
+    string,
+    { controller: AbortController; tabId?: number; editor?: boolean }
+  >();
 
   let pending: Promise<ModelInfo[]> | null = null;
   let modelsEpoch = 0;
@@ -758,11 +764,12 @@ export function createHandlers(deps: HandlerDeps) {
         if (sender.url !== browser.runtime.getURL("/translator.html")) {
           throw new Error("Editor translation requires the translator page");
         }
-        if (textProblem(i.text)) return { error: "bad_response" };
+        if (textProblem(i.text)) throw new Error("Invalid translator input");
       }
       let kind = editor ? undefined : await activeKind();
       const controller = new AbortController();
-      if (i.requestId) selectionJobs.set(i.requestId, { controller, tabId: sender.tab?.id });
+      if (i.requestId)
+        selectionJobs.set(i.requestId, { controller, tabId: sender.tab?.id, editor: !!editor });
       if (editor) kind = await activeKind();
       let used: ModelRef | undefined;
       try {
@@ -783,23 +790,23 @@ export function createHandlers(deps: HandlerDeps) {
         }
         used = model;
         const settings = editor ? { ...view.settings, ...editor } : view.settings;
-        const text = await deps.service.translateSelection(
-          {
-            text: i.text,
-            context: editor ? "" : i.context,
-            settings,
-            model,
-            hostname: i.hostname || hostname,
-            languagePrompt: await languagePromptFor(settings.targetLang),
-            ...(editor && { appName: "ByoGlot Translator" }),
-          },
-          controller.signal,
-        );
+        const input = {
+          text: i.text,
+          context: i.context,
+          settings,
+          model,
+          hostname: i.hostname || hostname,
+          languagePrompt: await languagePromptFor(settings.targetLang),
+        };
+        const result = editor
+          ? await deps.service.translateText(input, controller.signal)
+          : { text: await deps.service.translateSelection(input, controller.signal) };
         return {
-          text,
+          text: result.text,
           sourceLang: settings.sourceLang,
           targetLang: settings.targetLang,
           model,
+          ...(editor && { truncated: "truncated" in result ? result.truncated : undefined }),
         };
       } catch (error) {
         const e = toBackendError(error);
@@ -808,6 +815,7 @@ export function createHandlers(deps: HandlerDeps) {
           error: e.kind,
           retryAfterMs: e.retryAfterMs,
           backend: kind,
+          ...(editor && e.detail === "timeout" && { timeout: true }),
           ...(source !== undefined && { source }),
         };
       } finally {
@@ -855,6 +863,12 @@ export function createHandlers(deps: HandlerDeps) {
     },
 
     async tabRemoved(tabId: number): Promise<void> {
+      for (const [id, job] of selectionJobs) {
+        if (job.editor && job.tabId === tabId) {
+          job.controller.abort();
+          selectionJobs.delete(id);
+        }
+      }
       await Promise.all([tabSettings(tabId).removeValue(), tabHostItem(tabId).removeValue()]);
     },
 

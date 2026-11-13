@@ -677,11 +677,11 @@ describe("translateSelection", () => {
 
   it("uses the plain-text prompt for editor requests without selection context", async () => {
     const fake = fakeBackend(async () => "  Translation\n");
-    const out = await service(fake).translateSelection(
-      { ...input, appName: "ByoGlot Translator", languagePrompt: "Formal tone" },
+    const out = await service(fake).translateText(
+      { ...input, languagePrompt: "Formal tone" },
       new AbortController().signal,
     );
-    expect(out).toBe("Translation");
+    expect(out).toEqual({ text: "Translation" });
     expect(fake.prompts).toHaveLength(1);
     expect(fake.prompts[0]).toContain("The text comes from the app ByoGlot Translator.");
     expect(fake.prompts[0]).toContain("Formal tone");
@@ -764,5 +764,37 @@ describe("translateSelection", () => {
     await until(() => fake.prompts.length === 2);
     gates[1]?.resolve("");
     expect(await sel).toBe("sel");
+  });
+});
+
+describe("translateText", () => {
+  const input = { text: "x".repeat(20_000), settings, model, languagePrompt: "" };
+
+  it("keeps one request and carries completion metadata from the backend", async () => {
+    const fake = fakeBackend();
+    const generateWithMetadata = vi.fn(async () => ({ text: "  Partial  ", truncated: true }));
+    fake.backend.generateWithMetadata = generateWithMetadata;
+    const result = await service(fake).translateText(input, new AbortController().signal);
+    expect(result).toEqual({ text: "Partial", truncated: true });
+    expect(generateWithMetadata).toHaveBeenCalledTimes(1);
+    expect(generateWithMetadata.mock.calls[0]).toBeDefined();
+    expect(fake.prompts).toHaveLength(0);
+  });
+
+  it("preserves the 180-second timeout and identifies it for the editor", async () => {
+    const timeout = AbortSignal.abort(new DOMException("timed out", "TimeoutError"));
+    const spy = vi.spyOn(AbortSignal, "timeout").mockReturnValue(timeout);
+    try {
+      const fake = fakeBackend(async (_prompt, signal) => {
+        throw fromFetchFailure(signal?.reason, signal);
+      });
+      await expect(
+        service(fake).translateText(input, new AbortController().signal),
+      ).rejects.toMatchObject({ kind: "offline", detail: "timeout" });
+      expect(spy).toHaveBeenCalledWith(180_000);
+      expect(fake.prompts).toHaveLength(1);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

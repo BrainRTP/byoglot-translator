@@ -15,6 +15,7 @@ data class AppSettings(
     val activeConnectionId: String? = null,
     val consentedOrigins: List<String> = emptyList(),
     val theme: ThemeChoice = ThemeChoice.system,
+    val animation: AnimationChoice = AnimationChoice.fade,
     val autoTranslate: Boolean = true,
     val mainModel: ModelRef? = null,
     val externalModel: ModelRef? = null,
@@ -56,4 +57,15 @@ enum class ThemeChoice {
     system,
     light,
     dark,
+}
+
+@Serializable
+enum class AnimationChoice {
+    none,
+    fade,
+    scramble,
+    flap,
+    typewriter,
+    pen,
+    wave,
 }

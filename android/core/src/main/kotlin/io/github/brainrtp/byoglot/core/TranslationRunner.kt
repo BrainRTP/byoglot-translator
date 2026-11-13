@@ -104,7 +104,7 @@ class TranslationRunner(
             translator.stream(request).collect { chunk ->
                 val output = RunnerStreamOutput(
                     RunnerOutput(chunk.text, request.sourceLang, request.targetLang, request.model),
-                    chunk.complete, chunk.incomplete,
+                    chunk.complete, chunk.incomplete, chunk.streamed,
                 )
                 finished = output
                 emit(output)
@@ -195,4 +195,5 @@ data class RunnerStreamOutput(
     val output: RunnerOutput,
     val complete: Boolean,
     val incomplete: Boolean = false,
+    val streamed: Boolean = !complete,
 )

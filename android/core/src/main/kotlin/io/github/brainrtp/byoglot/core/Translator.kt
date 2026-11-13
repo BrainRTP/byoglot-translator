@@ -72,13 +72,16 @@ class Translator(
             val text = StringBuilder()
             var reason: String? = null
             var usage: TokenUsage? = null
+            var streamed = false
             if (client is StreamingTextGenerator) {
                 client.stream(prompt, request.model).collect { delta ->
                     currentCoroutineContext().ensureActive()
                     text.append(delta.text)
                     reason = delta.finishReason ?: reason
                     usage = delta.usage ?: usage
-                    emit(TranslationChunk(text.toString(), finishReason = reason, usage = usage))
+                    streamed = streamed || delta.streamed
+                    if (streamed)
+                        emit(TranslationChunk(text.toString(), finishReason = reason, usage = usage))
                 }
             } else text.append(client.generate(prompt, request.model))
             currentCoroutineContext().ensureActive()
@@ -90,6 +93,7 @@ class Translator(
                     incomplete = reason != null && reason != "stop" && reason != "end_turn",
                     finishReason = reason,
                     usage = usage,
+                    streamed = streamed,
                 ),
             )
         }
@@ -109,6 +113,7 @@ data class TranslationChunk(
     val incomplete: Boolean = false,
     val finishReason: String? = null,
     val usage: TokenUsage? = null,
+    val streamed: Boolean = !complete,
 ) {
     override fun toString() =
         "TranslationChunk(textLength=${text.length}, complete=$complete, incomplete=$incomplete)"

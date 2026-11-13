@@ -179,7 +179,7 @@ class ProviderClient(
                     streaming = true,
                 )
             if (sse == true) parser.end().forEach { emit(it) }
-            else emit(parseCompletion(pending.toString(Charsets.UTF_8.name()), true))
+            else emit(parseCompletion(pending.toString(Charsets.UTF_8.name()), true).copy(streamed = false))
         } catch (e: TransportException) {
             if (e.reason == TransportException.Reason.LocalNetworkDenied) throw e
             throw BackendException(

@@ -1,11 +1,11 @@
 use crate::{
-    i18n::{Msg, language_name, tr},
+    i18n::{Msg, language_name, tr, tr_with},
     services::Services,
     ui::main_window::{banner, combo, page_box, scroll},
     view_state::{RequestState, editor_input, template_target, validate_editor_text},
 };
 use adw::prelude::*;
-use byoglot_core::{SettingsRepository, Template, contracts};
+use byoglot_core::{SettingsRepository, Template, contracts, editor_input_limit};
 use gtk::glib;
 use std::{
     cell::{Cell, RefCell},
@@ -65,7 +65,7 @@ pub fn build(
         .right_margin(12)
         .height_request(180)
         .vexpand(true)
-        .tooltip_text(tr(Msg::InputLimit))
+        .tooltip_text(tr_with(Msg::InputLimit, &editor_input_limit().to_string()))
         .build();
     let load = gtk::gio::SimpleAction::new("load-text", Some(glib::VariantTy::STRING));
     let input_weak = input.downgrade();

@@ -91,8 +91,8 @@ impl<T: HttpTransport> ProviderClient<T> {
             }
             return Err(error);
         }
-        let value: Value = serde_json::from_slice(&response.body)
-            .map_err(|_| incompatible("response is not JSON"))?;
+        let value =
+            response_json(&response.body).map_err(|_| incompatible("response is not JSON"))?;
         serde_json::from_value(value).map_err(|_| incompatible("unexpected response shape"))
     }
     pub async fn list_models(&self) -> Result<Vec<ModelInfo>, BackendError> {
@@ -186,8 +186,11 @@ struct Choice {
 struct Message {
     content: Option<String>,
 }
+fn response_json(body: &[u8]) -> Result<Value, serde_json::Error> {
+    serde_json::from_slice(body.strip_prefix(b"\xef\xbb\xbf").unwrap_or(body))
+}
 fn failure(response: HttpResponse, now: SystemTime) -> BackendError {
-    let message = serde_json::from_slice::<Value>(&response.body)
+    let message = response_json(&response.body)
         .ok()
         .and_then(|v| v.get("error")?.get("message")?.as_str().map(str::to_owned));
     let status = response.status;

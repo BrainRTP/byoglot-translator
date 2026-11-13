@@ -80,7 +80,7 @@ public sealed class ProviderClient(Connection connection, string? secret, IHttpT
         if (response.Status is < 200 or >= 300) throw Failure(response);
         try
         {
-            using var document = JsonDocument.Parse(response.Body);
+            using var document = ResponseJson(response.Body);
             return document.RootElement.Clone();
         }
         catch (JsonException) { throw new BackendException(ErrorKind.Incompatible, detail: "response is not JSON"); }
@@ -91,7 +91,7 @@ public sealed class ProviderClient(Connection connection, string? secret, IHttpT
         string? detail = null;
         try
         {
-            using var document = JsonDocument.Parse(response.Body);
+            using var document = ResponseJson(response.Body);
             var message = Field(Field(document.RootElement, "error"), "message");
             if (IsString(message)) detail = message.GetString();
         }
@@ -104,6 +104,13 @@ public sealed class ProviderClient(Connection connection, string? secret, IHttpT
             429 => new(ErrorKind.RateLimit, response.Status, RetryAfter(response.Headers.GetValueOrDefault("retry-after")), detail),
             _ => new(ErrorKind.ProviderError, response.Status, detail: detail ?? $"HTTP {response.Status}")
         };
+    }
+
+    private static JsonDocument ResponseJson(byte[] body)
+    {
+        ReadOnlyMemory<byte> json = body;
+        if (json.Span.StartsWith("\uFEFF"u8)) json = json[3..];
+        return JsonDocument.Parse(json);
     }
 
     private long? RetryAfter(string? header)

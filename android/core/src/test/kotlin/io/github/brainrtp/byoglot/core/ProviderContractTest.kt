@@ -27,6 +27,19 @@ internal fun backendShape(error: BackendException): JsonObject = buildJsonObject
 internal fun JsonObject.string(key: String): String = getValue(key).jsonPrimitive.content
 
 class ProviderContractTest {
+    private fun normalizeNumbers(value: JsonElement): JsonElement = when (value) {
+        is JsonObject -> JsonObject(value.mapValues { normalizeNumbers(it.value) })
+        is JsonArray -> JsonArray(value.map(::normalizeNumbers))
+        is JsonPrimitive -> if (value.isString) value else value.doubleOrNull?.let { JsonPrimitive(it) } ?: value
+    }
+
+    @Test fun `numeric normalization keeps exact object keys and primitive types`() {
+        fun normalized(raw: String) = normalizeNumbers(coreJson.parseToJsonElement(raw))
+        assertEquals(normalized("""[{"limit":1e3}]"""), normalized("""[{"limit":1000.0}]"""))
+        assertNotEquals(normalized("""[{"limit":1,"effort":"high"}]"""), normalized("""[{"limit":1.0}]"""))
+        assertNotEquals(normalized("""[{"limit":"1"}]"""), normalized("""[{"limit":1}]"""))
+    }
+
     private fun client(i: JsonObject): Pair<ProviderClient, RecordingTransport> {
         val p = i.getValue("provider").jsonObject
         val r = i.getValue("response").jsonObject
@@ -50,8 +63,8 @@ class ProviderContractTest {
     @TestFactory fun models() = ContractsFolder.fixture<JsonObject, JsonObject>("provider-models", version = 1).map { c ->
         dynamicTest(c.name) { runBlocking {
             val (client, transport) = client(c.input)
-            assertEquals(coreJson.decodeFromJsonElement<List<ModelInfo>>(c.expected.getValue("models")), client.listModels())
-            assertEquals(coreJson.decodeFromJsonElement<ModelInfo?>(c.expected.getValue("defaultModel")), client.defaultModel())
+            assertEquals(normalizeNumbers(c.expected.getValue("models")), normalizeNumbers(coreJson.encodeToJsonElement(client.listModels())))
+            assertEquals(normalizeNumbers(c.expected.getValue("defaultModel")), normalizeNumbers(coreJson.encodeToJsonElement(client.defaultModel())))
             transport.requests.forEach { request(c.expected.getValue("request").jsonObject, it) }
             assertEquals(listOf(30000L, 30000L), transport.timeouts)
         } }

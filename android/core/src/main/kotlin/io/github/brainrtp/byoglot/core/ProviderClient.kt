@@ -213,7 +213,7 @@ class ProviderClient(
     }
 
     private fun parseJson(raw: String): JsonElement =
-        coreJson.parseToJsonElement(raw).also(::validateLiterals)
+        coreJson.parseToJsonElement(raw.removePrefix("\uFEFF")).also(::validateLiterals)
 
     private fun validateLiterals(value: JsonElement) {
         when (value) {
@@ -237,8 +237,7 @@ class ProviderClient(
         val detail =
             try {
                 val error =
-                    coreJson
-                        .parseToJsonElement(response.body.toString(Charsets.UTF_8))
+                    parseJson(response.body.toString(Charsets.UTF_8))
                         .jsonObject["error"]
                         ?.jsonObject
                 error?.optionalString("message")?.let {

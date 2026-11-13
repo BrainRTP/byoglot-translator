@@ -3,13 +3,21 @@ import Foundation
 func providerJSON(_ data: Data) throws -> Data {
     _ = try JSONDecoder().decode(JSONValue.self, from: data)
     var parser = ProviderJSONParser(bytes: Array(data))
-    return Data(try parser.value())
+    return Data(try parser.document())
 }
 
 private struct ProviderJSONParser {
     let bytes: [UInt8]
     var index = 0
     enum Invalid: Error { case json }
+
+    mutating func document() throws -> [UInt8] {
+        if bytes.starts(with: [0xef, 0xbb, 0xbf]) { index = 3 }
+        let result = try value()
+        whitespace()
+        guard index == bytes.count else { throw Invalid.json }
+        return result
+    }
 
     mutating func value() throws -> [UInt8] {
         whitespace()

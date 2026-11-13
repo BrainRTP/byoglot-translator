@@ -16,6 +16,10 @@ actor RecordingTransport: HTTPTransport {
 }
 
 struct ProviderContractTests {
+    @Test func rejectsTrailingJSONValue() {
+        #expect(throws: (any Error).self) { try providerJSON(Data(#"{"choices":[]}true"#.utf8)) }
+    }
+
     @Test func repeatedEscapedKeysAndNestedContainers() throws {
         let raw = Data(#" {"items":[{"key":"first","k\u0065y":"last\"\\"},[],null,true,1e6],"empty":{}} "#.utf8)
         let actual = try JSONDecoder().decode(JSONValue.self, from: providerJSON(raw))

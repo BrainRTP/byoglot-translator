@@ -226,7 +226,7 @@ pub fn present(window: &adw::ApplicationWindow, services: Arc<Services>) {
                         }
                         actual
                     }
-                    Err(()) => {
+                    Err(_) => {
                         error.set_title(tr(Msg::PortalUnavailable));
                         error.set_revealed(true);
                         !enabled

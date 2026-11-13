@@ -99,10 +99,11 @@ impl Services {
         self: &Arc<Self>,
         enabled: bool,
         reason: &'static str,
-    ) -> Result<bool, ()> {
+    ) -> Result<bool, RunnerError> {
         let services = self.clone();
         self.runtime
             .spawn(async move {
+                let _guard = services.mutation.lock().await;
                 let response = ashpd::desktop::background::Background::request()
                     .reason(reason)
                     .auto_start(enabled)
@@ -110,21 +111,21 @@ impl Services {
                     .dbus_activatable(false)
                     .send()
                     .await
-                    .map_err(|_| ())?
+                    .map_err(|_| failed())?
                     .response()
-                    .map_err(|_| ())?;
+                    .map_err(|_| failed())?;
                 let actual = response.auto_start();
                 if let Some(parent) = services.startup_path.parent() {
-                    std::fs::create_dir_all(parent).map_err(|_| ())?;
+                    std::fs::create_dir_all(parent).map_err(|_| failed())?;
                 }
                 let temporary = services.startup_path.with_extension("json.tmp");
                 std::fs::write(&temporary, if actual { "true" } else { "false" })
-                    .map_err(|_| ())?;
-                std::fs::rename(temporary, &services.startup_path).map_err(|_| ())?;
+                    .map_err(|_| failed())?;
+                std::fs::rename(temporary, &services.startup_path).map_err(|_| failed())?;
                 Ok(actual)
             })
             .await
-            .map_err(|_| ())?
+            .map_err(|_| failed())?
     }
 
     pub async fn save_connection(
@@ -230,12 +231,47 @@ impl Services {
         self.settings.try_update(change).map_err(|_| failed())
     }
 
+    pub async fn wait_for_writes(&self) {
+        let _guard = self.mutation.lock().await;
+    }
+
     pub async fn remove_connection(self: &Arc<Self>, id: String) -> Result<(), RunnerError> {
         let services = self.clone();
         self.runtime
             .spawn(async move {
                 let _guard = services.mutation.lock().await;
-                services.editor.remove(&id).await
+                let before = services.settings.read().await;
+                let previous = before.connections.iter().find(|c| c.id == id);
+                let origin = previous.and_then(|c| origin_of(&c.base_url));
+                let key = if let Some(origin) = &origin {
+                    services
+                        .secrets
+                        .get(&id, origin)
+                        .await
+                        .map_err(|_| failed())?
+                } else {
+                    None
+                };
+                let staged = Arc::new(MemorySettingsRepository::new(before));
+                let editor = ConnectionEditor::new(
+                    staged.clone(),
+                    MemorySecretStore::new(),
+                    services.transport.clone(),
+                );
+                editor.remove(&id).await?;
+                let after = staged.read().await;
+                services.secrets.delete(&id).await.map_err(|_| failed())?;
+                if services.settings.try_update(|_| after).is_err() {
+                    if let (Some(origin), Some(key)) = (origin, key) {
+                        services
+                            .secrets
+                            .set(&key, &id, &origin)
+                            .await
+                            .map_err(|_| failed())?;
+                    }
+                    return Err(failed());
+                }
+                Ok(())
             })
             .await
             .map_err(|_| failed())?
@@ -353,6 +389,42 @@ mod tests {
             Some("old-key")
         );
         server.join().unwrap();
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[tokio::test]
+    async fn failed_deletion_preserves_the_connection_and_key() {
+        let directory = std::env::temp_dir().join(format!("byoglot-delete-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("settings.json");
+        let service = services(path.clone());
+        let mut settings = AppSettings::initial(None);
+        settings.connections.push(Connection {
+            id: "c".into(),
+            preset: byoglot_core::ProviderPreset::Custom,
+            name: "Local".into(),
+            base_url: "http://localhost/v1".into(),
+            page_model: None,
+            selection_model: None,
+        });
+        service.settings.try_update(|_| settings).unwrap();
+        service
+            .secrets
+            .set("old-key", "c", "http://localhost")
+            .await
+            .unwrap();
+        std::fs::create_dir(path.with_extension("json.tmp")).unwrap();
+        assert!(service.remove_connection("c".into()).await.is_err());
+        assert_eq!(service.settings.read().await.connections.len(), 1);
+        assert_eq!(
+            service
+                .secrets
+                .get("c", "http://localhost")
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("old-key")
+        );
         std::fs::remove_dir_all(directory).unwrap();
     }
 }

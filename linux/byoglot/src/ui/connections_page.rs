@@ -169,6 +169,7 @@ fn refresh(
                 let list = weak_list.clone();
                 glib::spawn_future_local(async move {
                     if super::main_window::confirm_delete(&window, Msg::DeleteConnection).await {
+                        let _hold = window.application().map(|app| app.hold());
                         match service.remove_connection(id).await {
                             Ok(()) => {
                                 if let Some(list) = list.upgrade() {

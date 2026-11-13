@@ -19,6 +19,8 @@ pub fn run() -> glib::ExitCode {
     let app = adw::Application::builder().application_id(APP_ID).build();
     let background = Rc::new(Cell::new(std::env::args().any(|arg| arg == "--background")));
     let hold = Rc::new(RefCell::new(None));
+    let services = Rc::new(RefCell::new(None::<std::sync::Arc<Services>>));
+    let quit_services = services.clone();
     let held = hold.clone();
     let startup_background = background.clone();
     app.connect_startup(move |app| {
@@ -27,14 +29,20 @@ pub fn run() -> glib::ExitCode {
         }
         let quit = gio::SimpleAction::new("quit", None);
         let weak = app.downgrade();
+        let services = quit_services.clone();
         quit.connect_activate(move |_, _| {
             if let Some(app) = weak.upgrade() {
-                app.quit();
+                let services = services.borrow().clone();
+                glib::spawn_future_local(async move {
+                    if let Some(services) = services {
+                        services.wait_for_writes().await;
+                    }
+                    app.quit();
+                });
             }
         });
         app.add_action(&quit);
     });
-    let services = Rc::new(RefCell::new(None::<std::sync::Arc<Services>>));
     let initializing = Rc::new(Cell::new(false));
     let handle = runtime.handle().clone();
     app.connect_activate(move |app| {

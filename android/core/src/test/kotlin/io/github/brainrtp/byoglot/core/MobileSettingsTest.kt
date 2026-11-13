@@ -9,12 +9,20 @@ class MobileSettingsTest {
     fun `old settings default to system theme and automatic translation`() {
         val old =
             coreJson.encodeToJsonElement(AppSettings.initial("ru")).jsonObject.filterKeys {
-                it !in listOf("theme", "autoTranslate")
+                it !in listOf("theme", "autoTranslate", "mainModel", "externalModel")
             }
         val restored = coreJson.decodeFromJsonElement<AppSettings>(JsonObject(old))
         assertEquals(ThemeChoice.system, restored.theme)
         assertTrue(restored.autoTranslate)
-        val custom = restored.copy(theme = ThemeChoice.dark, autoTranslate = false)
+        assertNull(restored.mainModel)
+        assertNull(restored.externalModel)
+        val custom =
+            restored.copy(
+                theme = ThemeChoice.dark,
+                autoTranslate = false,
+                mainModel = ModelRef("custom", "main", "none", "c"),
+                externalModel = ModelRef("custom", "external", "low", "c"),
+            )
         assertEquals(
             custom,
             coreJson.decodeFromString<AppSettings>(coreJson.encodeToString(custom)),

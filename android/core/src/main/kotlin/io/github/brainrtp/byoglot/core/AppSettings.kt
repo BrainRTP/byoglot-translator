@@ -16,6 +16,8 @@ data class AppSettings(
     val consentedOrigins: List<String> = emptyList(),
     val theme: ThemeChoice = ThemeChoice.system,
     val autoTranslate: Boolean = true,
+    val mainModel: ModelRef? = null,
+    val externalModel: ModelRef? = null,
 ) {
     companion object {
         fun initial(preferredLanguage: String?): AppSettings {

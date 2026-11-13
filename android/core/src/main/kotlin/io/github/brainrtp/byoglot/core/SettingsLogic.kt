@@ -43,30 +43,45 @@ object SettingsLogic {
         )
     }
 
-    fun effective(template: Template, settings: AppSettings): Effective {
-        val connection = settings.connections.find { it.id == settings.activeConnectionId }
-        val own =
-            template.settings.selectionModel?.takeIf {
-                connection != null && it.connectionId == connection.id
-            }
+    fun effective(template: Template, settings: AppSettings): Effective =
+        effectiveFor(template, settings, main = false)
+
+    fun effectiveMain(template: Template, settings: AppSettings): Effective =
+        effectiveFor(template, settings, main = true)
+
+    private fun effectiveFor(template: Template, settings: AppSettings, main: Boolean): Effective {
+        val own = if (main) template.settings.pageModel else template.settings.selectionModel
         return Effective(
-            template.settings.prePrompt ?: "",
+            template.settings.prePrompt.orEmpty(),
             template.settings.targetLang ?: settings.globals.targetLang,
-            own ?: connection?.selectionModel,
+            own?.let { bindModel(it, settings) } ?: defaultModel(settings, main),
         )
     }
 
-    fun effectiveMain(template: Template, settings: AppSettings): Effective {
-        val connection = settings.connections.find { it.id == settings.activeConnectionId }
-        val own =
-            template.settings.pageModel?.takeIf {
-                connection != null && it.connectionId == connection.id
+    fun modelConnection(model: ModelRef, settings: AppSettings): Connection? =
+        settings.connections.find { connection ->
+            if (model.connectionId != null) connection.id == model.connectionId
+            else
+                connection.id == settings.activeConnectionId &&
+                    connection.preset.name == model.providerID
+        }
+
+    fun bindModel(model: ModelRef, settings: AppSettings): ModelRef? =
+        modelConnection(model, settings)?.let { model.copy(connectionId = it.id) }
+
+    fun defaultModel(settings: AppSettings, main: Boolean): ModelRef? {
+        val selected = if (main) settings.mainModel else settings.externalModel
+        if (selected != null)
+            bindModel(selected, settings)?.let {
+                return it
             }
-        return Effective(
-            template.settings.prePrompt ?: "",
-            template.settings.targetLang ?: settings.globals.targetLang,
-            own ?: connection?.pageModel ?: connection?.selectionModel,
-        )
+        val active = settings.connections.find { it.id == settings.activeConnectionId }
+        return listOfNotNull(active).firstNotNullOfOrNull { connection ->
+            val model =
+                if (main) connection.pageModel ?: connection.selectionModel
+                else connection.selectionModel
+            model?.copy(connectionId = connection.id)
+        }
     }
 
     fun pickInitialModels(

@@ -71,11 +71,8 @@ class ConnectionEditor(
                 draft.name.trim().ifBlank { draft.preset.name },
                 draft.baseUrl.trimEnd('/'),
             )
-        val models = backend { ProviderClient(connection, secret, transport).listModels() }
-        val default =
-            if (connection.preset == ProviderPreset.deepseek)
-                models.find { it.id == Contracts.favoriteModel.id }
-            else models.firstOrNull()
+        val (models, default) =
+            backend { ProviderClient(connection, secret, transport).modelsWithDefault() }
         val (page, selection) = SettingsLogic.pickInitialModels(models, default, connection.id)
         val saved =
             connection.copy(

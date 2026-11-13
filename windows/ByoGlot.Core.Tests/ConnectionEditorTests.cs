@@ -37,6 +37,21 @@ public class ConnectionEditorTests
         Assert.Single(await editor.ModelsAsync(connection.Id, CancellationToken.None));
     }
 
+    [Theory]
+    [InlineData(ProviderPreset.Openai, null)]
+    [InlineData(ProviderPreset.Mistral, "chat")]
+    public async Task SaveUsesProviderDefaultAndKeepsModelChoices(ProviderPreset preset, string? expected)
+    {
+        var repository = new InMemorySettingsRepository(AppSettings.Initial("en"));
+        var transport = new RecordingTransport(RecordingTransport.JsonResponse("""{"data":[{"id":"embed","capabilities":{"completion_chat":false}},{"id":"chat","capabilities":{"completion_chat":true}}]}"""));
+        var editor = new ConnectionEditor(repository, new InMemorySecretStore(), transport);
+        var saved = await editor.SaveAsync(Draft(preset: preset), true, CancellationToken.None);
+        Assert.Equal(expected, saved.PageModel?.Id);
+        Assert.Equal(expected, saved.SelectionModel?.Id);
+        Assert.Equal(saved.Id, (await repository.ReadAsync()).ActiveConnectionId);
+        Assert.Equal(2, (await editor.ModelsAsync(saved.Id, CancellationToken.None)).Count);
+    }
+
     [Fact]
     public async Task SaveWithoutConsentFails()
     {

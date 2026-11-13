@@ -13,20 +13,32 @@ public struct ProviderClient: Sendable {
         self.now = now
     }
 
-    public func listModels() async throws(BackendError) -> [ModelInfo] {
+    private func rawModels() async throws(BackendError) -> [RawModel] {
         let response = try await call(path: "/models", timeout: .seconds(30))
-        do {
-            return try JSONDecoder().decode(ModelList.self, from: response).data.map { raw in
-                ModelInfo(providerID: connection.preset.rawValue, id: raw.id, name: raw.name ?? raw.id,
-                          variants: ProviderEffort.variants(preset: connection.preset, supportedLevels: raw.effort?.supported_levels, supportedParameters: raw.supported_parameters),
-                          contextLimit: raw.context_window ?? raw.context_length ?? 0, outputLimit: raw.max_output_tokens ?? 0)
-            }
-        } catch { throw BackendError(kind: .incompatible, detail: "unexpected response shape") }
+        do { return try JSONDecoder().decode(ModelList.self, from: response).data }
+        catch { throw BackendError(kind: .incompatible, detail: "unexpected response shape") }
+    }
+
+    private func modelInfo(_ raw: RawModel) -> ModelInfo {
+        ModelInfo(providerID: connection.preset.rawValue, id: raw.id, name: raw.name ?? raw.id,
+                  variants: ProviderEffort.variants(preset: connection.preset, supportedLevels: raw.effort?.supported_levels, supportedParameters: raw.supported_parameters),
+                  contextLimit: raw.context_window ?? raw.context_length ?? 0, outputLimit: raw.max_output_tokens ?? 0)
+    }
+
+    public func listModels() async throws(BackendError) -> [ModelInfo] {
+        try await rawModels().map(modelInfo)
     }
 
     public func defaultModel() async throws(BackendError) -> ModelInfo? {
-        let models = try await listModels()
-        return connection.preset == .deepseek ? models.first { $0.id == "deepseek-flash" } : models.first
+        let models = try await rawModels()
+        let raw: RawModel?
+        switch connection.preset {
+        case .openai: raw = nil
+        case .mistral: raw = models.first { $0.capabilities?.completion_chat != false }
+        case .deepseek: raw = models.first { $0.id == "deepseek-flash" }
+        default: raw = models.first
+        }
+        return raw.map(modelInfo)
     }
 
     public func generate(prompt: String, model: ModelRef) async throws(BackendError) -> String {
@@ -121,6 +133,8 @@ private struct ModelList: Decodable { let data: [RawModel] }
 private struct RawModel: Decodable {
     let id: String
     let name: String?
+    let capabilities: Capabilities?
+    struct Capabilities: Decodable { let completion_chat: Bool? }
     let context_window: Double?
     let context_length: Double?
     let max_output_tokens: Double?
@@ -135,11 +149,12 @@ private struct RawModel: Decodable {
             supported_levels = try c.optional([String].self, forKey: .supported_levels)
         }
     }
-    enum CodingKeys: CodingKey { case id, name, context_window, context_length, max_output_tokens, effort, supported_parameters }
+    enum CodingKeys: CodingKey { case id, name, capabilities, context_window, context_length, max_output_tokens, effort, supported_parameters }
     init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
-        name = try c.optional(String.self, forKey: .name)
+        name = try c.decodeIfPresent(String.self, forKey: .name)
+        capabilities = try c.optional(Capabilities.self, forKey: .capabilities)
         context_window = try c.optional(Double.self, forKey: .context_window)
         context_length = try c.optional(Double.self, forKey: .context_length)
         max_output_tokens = try c.optional(Double.self, forKey: .max_output_tokens)
@@ -151,7 +166,30 @@ private struct Chat: Decodable {
     let choices: [Choice]
     struct Choice: Decodable {
         let message: Message
-        struct Message: Decodable { let content: String? }
+        struct Message: Decodable {
+            let content: String?
+            enum CodingKeys: CodingKey { case content }
+            init(from decoder: any Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                content = try c.decodeIfPresent(Content.self, forKey: .content)?.text
+            }
+        }
+    }
+}
+private struct Content: Decodable {
+    let text: String
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if let value = try? c.decode(String.self) { text = value }
+        else { text = try c.decode([Chunk].self).map(\.text).joined() }
+    }
+    struct Chunk: Decodable {
+        let text: String
+        enum CodingKeys: CodingKey { case type, text }
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            text = try c.decode(String.self, forKey: .type) == "text" ? c.decode(String.self, forKey: .text) : ""
+        }
     }
 }
 private struct ErrorBody: Decodable {

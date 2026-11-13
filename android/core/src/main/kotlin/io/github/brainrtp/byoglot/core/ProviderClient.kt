@@ -25,15 +25,21 @@ class ProviderClient(
 ) : StreamingTextGenerator {
     private val base = connection.baseUrl.trimEnd('/')
 
-    suspend fun listModels(): List<ModelInfo> = shape {
-        call("/models", 30000).jsonObject.getValue("data").jsonArray.map { element ->
+    suspend fun listModels(): List<ModelInfo> = modelsWithDefault().first
+
+    suspend fun modelsWithDefault(): Pair<List<ModelInfo>, ModelInfo?> = shape {
+        val rawModels = call("/models", 30000).jsonObject.getValue("data").jsonArray
+        val models = rawModels.map { element ->
             val raw = element.jsonObject
             val id = raw.requiredString("id")
             val levels = raw["effort"]?.jsonObject?.optionalStrings("supported_levels")
+            raw["capabilities"]?.jsonObject?.get("completion_chat")?.let {
+                require(it is JsonPrimitive && !it.isString && it.booleanOrNull != null)
+            }
             ModelInfo(
                 connection.preset.name,
                 id,
-                raw.optionalString("name") ?: id,
+                raw["name"]?.takeUnless { it == JsonNull }?.stringValue() ?: id,
                 ProviderEffort.variants(
                     connection.preset,
                     levels,
@@ -43,14 +49,20 @@ class ProviderClient(
                 raw.optionalNumber("max_output_tokens") ?: 0.0,
             )
         }
+        val defaultIndex = rawModels.indexOfFirst { element ->
+            val raw = element.jsonObject
+            when (connection.preset) {
+                ProviderPreset.openai -> false
+                ProviderPreset.mistral ->
+                    raw["capabilities"]?.jsonObject?.get("completion_chat")?.jsonPrimitive?.boolean != false
+                ProviderPreset.deepseek -> raw.requiredString("id") == Contracts.favoriteModel.id
+                else -> true
+            }
+        }
+        models to models.getOrNull(defaultIndex)
     }
 
-    suspend fun defaultModel(): ModelInfo? {
-        val models = listModels()
-        return if (connection.preset == ProviderPreset.deepseek)
-            models.find { it.id == Contracts.favoriteModel.id }
-        else models.firstOrNull()
-    }
+    suspend fun defaultModel(): ModelInfo? = modelsWithDefault().second
 
     override suspend fun generate(prompt: String, model: ModelRef): String {
         val body = buildJsonObject {
@@ -73,9 +85,7 @@ class ProviderClient(
                 .jsonArray
                 .map {
                     val message = it.jsonObject.getValue("message").jsonObject
-                    message["content"].let { value ->
-                        if (value == null || value == JsonNull) null else value.stringValue()
-                    }
+                    completionText(message["content"])
                 }
         }
         return choices.firstOrNull()?.takeIf { it.isNotEmpty() }

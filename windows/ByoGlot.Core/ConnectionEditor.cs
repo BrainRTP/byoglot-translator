@@ -45,8 +45,7 @@ public sealed class ConnectionEditor(ISettingsRepository settings, ISecretStore 
         }
         var connection = new Connection(id, draft.Preset, JsText.Trim(draft.Name), Origins.NormalizeBaseUrl(draft.BaseUrl)!);
         var client = new ProviderClient(connection, key, transport);
-        var models = await ListModelsAsync(client, ct);
-        var defaultModel = connection.Preset == ProviderPreset.Deepseek ? models.FirstOrDefault(m => m.Id == "deepseek-flash") : models.FirstOrDefault();
+        var (models, defaultModel) = await ModelsWithDefaultAsync(client, ct);
         var initial = SettingsLogic.PickInitialModels(models, defaultModel, id);
         connection = connection with { PageModel = initial.Page, SelectionModel = initial.Selection };
         ct.ThrowIfCancellationRequested();
@@ -98,6 +97,12 @@ public sealed class ConnectionEditor(ISettingsRepository settings, ISecretStore 
         catch (OriginMismatchException) { throw new RunnerException(new RunnerError.KeyMissing()); }
         if (ProviderEffort.NeedsKey(connection.Preset, connection.BaseUrl) && string.IsNullOrEmpty(key)) throw new RunnerException(new RunnerError.KeyMissing());
         return await ListModelsAsync(new ProviderClient(connection, key, transport), ct);
+    }
+
+    private static async Task<(IReadOnlyList<ModelInfo> Models, ModelInfo? Default)> ModelsWithDefaultAsync(ProviderClient client, CancellationToken ct)
+    {
+        try { return await client.ModelsWithDefaultAsync(ct); }
+        catch (BackendException e) when (e.Kind == ErrorKind.Aborted && ct.IsCancellationRequested) { throw new OperationCanceledException(ct); }
     }
 
     private static async Task<IReadOnlyList<ModelInfo>> ListModelsAsync(ProviderClient client, CancellationToken ct)

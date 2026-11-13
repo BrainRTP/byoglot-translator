@@ -89,6 +89,7 @@ class MainViewModel(
         mutableSettings.value = state
         syncParameters(state)
         mutableKeys.value = state.connections.associate { it.id to editor.keyState(it.id) }
+        if (previous == null && state.autoTranslate && mutableText.value.isNotBlank()) schedule()
     }
 
     fun receiveQuickRequest(text: String?, destination: String?) {
@@ -106,6 +107,7 @@ class MainViewModel(
         val template =
             state.templates.find { it.id == state.globals.defaultTemplateId }
                 ?: Contracts.builtinTemplate
+        if (mutableParameters.value.templateId != template.id) manualTarget = null
         val effective = SettingsLogic.effectiveMain(template, state)
         val target = manualTarget ?: effective.targetLang
         mutableParameters.value =
@@ -127,13 +129,13 @@ class MainViewModel(
 
     fun paste(text: String) {
         setText(text)
-        if (mutableSettings.value?.autoTranslate != false) translate()
+        if (mutableSettings.value?.autoTranslate == true) translate()
     }
 
     private fun schedule() {
         autoJob?.cancel()
         if (
-            mutableSettings.value?.autoTranslate != false &&
+            mutableSettings.value?.autoTranslate == true &&
                 mutableText.value.isNotBlank() &&
                 !InputCounter.editor(mutableText.value).overLimit
         ) {
@@ -255,6 +257,8 @@ class MainViewModel(
     }
 
     suspend fun selectTemplate(id: String) {
+        cancel()
+        mutableTranslation.value = TranslationState()
         manualTarget = null
         update { it.copy(globals = it.globals.copy(defaultTemplateId = id)) }
         schedule()
@@ -262,6 +266,8 @@ class MainViewModel(
 
     suspend fun setTargetLanguage(code: String) {
         if (code !in Contracts.languageCodes) return
+        cancel()
+        mutableTranslation.value = TranslationState()
         manualTarget = code
         update { it.copy(globals = it.globals.copy(targetLang = code)) }
         schedule()
@@ -280,6 +286,8 @@ class MainViewModel(
         val oldText = text.value
         val old = translation.value
         val ready = old.complete && !old.incomplete && old.error == null && old.output != null
+        cancel()
+        mutableTranslation.value = TranslationState()
         manualTarget = source
         update {
             it.copy(globals = it.globals.copy(sourceLang = params.targetLang, targetLang = source))

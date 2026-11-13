@@ -325,4 +325,70 @@ class MainFlowTest {
         assertNull(vm.translation.value.output)
         assertFalse(vm.translation.value.working)
     }
+
+    @Test
+    fun `manual target change cancels even when its stored global value is unchanged`() = runTest {
+        val template = Template("ru", "Russian", false, TemplateSettings(targetLang = "ru"))
+        val settings =
+            AppSettings.initial("en")
+                .copy(
+                    autoTranslate = false,
+                    templates = listOf(template),
+                    globals = AppSettings.initial("en").globals.copy(defaultTemplateId = "ru"),
+                )
+        val vm =
+            MainViewModel(
+                InMemorySettingsRepository(settings),
+                InMemorySecretStore(),
+                transport,
+                backgroundScope,
+                { input ->
+                    withContext(NonCancellable) { delay(100) }
+                    output(input)
+                },
+            )
+        runCurrent()
+        vm.setText("source")
+        vm.translate()
+        runCurrent()
+        vm.setTargetLanguage("en")
+        advanceTimeBy(101)
+        runCurrent()
+        assertEquals("en", vm.parameters.value.targetLang)
+        assertNull(vm.translation.value.output)
+        assertFalse(vm.translation.value.working)
+        vm.selectTemplate("ru")
+        assertEquals("ru", vm.parameters.value.targetLang)
+    }
+
+    @Test
+    fun `typing before settings load cannot bypass the stored manual mode`() = runTest {
+        val stored =
+            InMemorySettingsRepository(AppSettings.initial("en").copy(autoTranslate = false))
+        val slow =
+            object : SettingsRepository by stored {
+                override suspend fun read(): AppSettings {
+                    delay(1000)
+                    return stored.read()
+                }
+            }
+        var calls = 0
+        val vm =
+            MainViewModel(
+                slow,
+                InMemorySecretStore(),
+                transport,
+                backgroundScope,
+                { input ->
+                    calls++
+                    output(input)
+                },
+            )
+        vm.setText("source")
+        runCurrent()
+        advanceTimeBy(1100)
+        runCurrent()
+        assertEquals(false, vm.settings.value?.autoTranslate)
+        assertEquals(0, calls)
+    }
 }

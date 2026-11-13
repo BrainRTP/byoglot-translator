@@ -1,14 +1,11 @@
 use crate::{
     i18n::{Msg, language_name, tr},
     services::Services,
-    ui::{
-        error_text::connection_fix,
-        main_window::{banner, combo, page_box, scroll, show_error},
-    },
-    view_state::RequestState,
+    ui::main_window::{banner, combo, page_box, scroll},
+    view_state::{RequestState, editor_input, template_target},
 };
 use adw::prelude::*;
-use byoglot_core::{EDITOR_INPUT_LIMIT, RunnerInput, SettingsRepository, contracts};
+use byoglot_core::{SettingsRepository, Template, contracts};
 use gtk::glib;
 use std::{
     cell::{Cell, RefCell},
@@ -19,7 +16,6 @@ use std::{
 pub fn build(services: Arc<Services>, stack: &adw::ViewStack) -> gtk::ScrolledWindow {
     let content = page_box();
     let error = banner();
-    error.set_button_label(Some(tr(Msg::FixConnection)));
     let weak_stack = stack.downgrade();
     error.connect_button_clicked(move |_| {
         if let Some(stack) = weak_stack.upgrade() {
@@ -116,14 +112,13 @@ pub fn build(services: Arc<Services>, stack: &adw::ViewStack) -> gtk::ScrolledWi
         }
     });
     let source_codes = Rc::new(source_codes);
-    let target_codes = Rc::new(target_codes);
-    let templates = Rc::new(RefCell::new(Vec::<String>::new()));
+    let target_codes = Rc::new(RefCell::new(target_codes));
+    let templates = Rc::new(RefCell::new(Vec::<Template>::new()));
     let loading = Rc::new(Cell::new(true));
     let template_row = template.downgrade();
-    for (row, codes, is_source) in [
-        (source.clone(), source_codes.clone(), true),
-        (target.clone(), target_codes.clone(), false),
-    ] {
+    for (row, is_source) in [(source.clone(), true), (target.clone(), false)] {
+        let source_codes = source_codes.clone();
+        let target_codes = target_codes.clone();
         let services = services.clone();
         let loading = loading.clone();
         let error = error.clone();
@@ -131,7 +126,12 @@ pub fn build(services: Arc<Services>, stack: &adw::ViewStack) -> gtk::ScrolledWi
             if loading.get() {
                 return;
             }
-            let Some(code) = codes.get(row.selected() as usize).cloned() else {
+            let code = if is_source {
+                source_codes.get(row.selected() as usize).cloned()
+            } else {
+                target_codes.borrow().get(row.selected() as usize).cloned()
+            };
+            let Some(code) = code else {
                 return;
             };
             let services = services.clone();
@@ -157,13 +157,29 @@ pub fn build(services: Arc<Services>, stack: &adw::ViewStack) -> gtk::ScrolledWi
     let service = services.clone();
     let guard = loading.clone();
     let error_template = error.clone();
+    let target_template = target.clone();
+    let target_languages = target_codes.clone();
     template.connect_selected_notify(move |row| {
         if guard.get() {
             return;
         }
-        let Some(id) = ids.borrow().get(row.selected() as usize).cloned() else {
+        let Some(template) = ids.borrow().get(row.selected() as usize).cloned() else {
             return;
         };
+        let current = target_languages
+            .borrow()
+            .get(target_template.selected() as usize)
+            .cloned()
+            .unwrap_or_else(|| "en".into());
+        let language = template_target(&template, &current);
+        if let Some(index) = target_languages
+            .borrow()
+            .iter()
+            .position(|code| *code == language)
+        {
+            target_template.set_selected(index as u32);
+        }
+        let id = template.id;
         let service = service.clone();
         let error = error_template.clone();
         glib::spawn_future_local(async move {
@@ -207,12 +223,13 @@ pub fn build(services: Arc<Services>, stack: &adw::ViewStack) -> gtk::ScrolledWi
             .text(&buffer.start_iter(), &buffer.end_iter(), false)
             .to_string();
         let source = source_ids[source_run.selected() as usize].clone();
-        let target = target_ids[target_run.selected() as usize].clone();
+        let target = target_ids.borrow()[target_run.selected() as usize].clone();
+        let request_target = target.clone();
         let request = request_state.borrow_mut().begin();
         let template_id = templates_run
             .borrow()
             .get(template.selected() as usize)
-            .cloned();
+            .map(|t| t.id.clone());
         let services = services_run.clone();
         let state = request_state.clone();
         let task = running.clone();
@@ -235,14 +252,7 @@ pub fn build(services: Arc<Services>, stack: &adw::ViewStack) -> gtk::ScrolledWi
             {
                 Ok(_) => {
                     services
-                        .translate(RunnerInput {
-                            text,
-                            context: String::new(),
-                            app_name: "ByoGlot".into(),
-                            template_id,
-                            target_lang: None,
-                            limit: EDITOR_INPUT_LIMIT,
-                        })
+                        .translate(editor_input(text, template_id, request_target))
                         .await
                 }
                 Err(problem) => Err(problem),
@@ -259,8 +269,6 @@ pub fn build(services: Arc<Services>, stack: &adw::ViewStack) -> gtk::ScrolledWi
                     copy.set_visible(true);
                 }
                 Err(problem) => {
-                    error
-                        .set_button_label(connection_fix(&problem).then(|| tr(Msg::FixConnection)));
                     show_error(&error, &problem);
                 }
             }
@@ -296,8 +304,26 @@ pub fn build(services: Arc<Services>, stack: &adw::ViewStack) -> gtk::ScrolledWi
                 );
             }
             if let Some(target) = target.upgrade() {
+                for code in std::iter::once(&settings.globals.target_lang).chain(
+                    settings
+                        .templates
+                        .iter()
+                        .filter_map(|t| t.settings.target_lang.as_ref()),
+                ) {
+                    if !target_codes.borrow().contains(code) {
+                        target_codes.borrow_mut().push(code.clone());
+                    }
+                }
+                let names: Vec<_> = target_codes
+                    .borrow()
+                    .iter()
+                    .map(|code| language_name(code))
+                    .collect();
+                let labels: Vec<_> = names.iter().map(String::as_str).collect();
+                target.set_model(Some(&gtk::StringList::new(&labels)));
                 target.set_selected(
                     target_codes
+                        .borrow()
                         .iter()
                         .position(|s| *s == settings.globals.target_lang)
                         .unwrap_or(0) as u32,
@@ -323,10 +349,16 @@ pub fn build(services: Arc<Services>, stack: &adw::ViewStack) -> gtk::ScrolledWi
                         .position(|t| t.id == settings.globals.default_template_id)
                         .unwrap_or(0) as u32,
                 );
-                *templates.borrow_mut() = settings.templates.into_iter().map(|t| t.id).collect();
+                *templates.borrow_mut() = settings.templates;
             }
             loading.set(false);
         });
     });
     root
+}
+
+fn show_error(banner: &adw::Banner, error: &byoglot_core::RunnerError) {
+    banner
+        .set_button_label(super::error_text::connection_fix(error).then(|| tr(Msg::FixConnection)));
+    super::main_window::show_error(banner, error);
 }

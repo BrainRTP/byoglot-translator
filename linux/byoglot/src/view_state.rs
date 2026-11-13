@@ -131,6 +131,26 @@ pub fn delete_template(settings: &mut AppSettings, id: &str) -> bool {
 mod tests {
     use super::*;
     #[test]
+    fn template_updates_the_picker_and_manual_target_wins_for_requests() {
+        let mut template = byoglot_core::contracts::builtin_template().clone();
+        template.settings.target_lang = Some("fr".into());
+        let picker = template_target(&template, "en");
+        assert_eq!(picker, "fr");
+        assert_eq!(
+            editor_input("Hello".into(), Some(template.id.clone()), picker)
+                .target_lang
+                .as_deref(),
+            Some("fr")
+        );
+        let manual = "de".to_string();
+        assert_eq!(
+            editor_input("Hello".into(), Some(template.id), manual)
+                .target_lang
+                .as_deref(),
+            Some("de")
+        );
+    }
+    #[test]
     fn late_results_never_replace_a_newer_request() {
         let mut state = RequestState::default();
         let old = state.begin();
@@ -221,5 +241,28 @@ mod tests {
         assert_eq!(choices[1].variant.as_deref(), Some("high"));
         assert_eq!(choices[1].connection_id.as_deref(), Some("c"));
         assert_eq!(choices[1].provider_id, "deepseek");
+    }
+}
+
+pub fn template_target(template: &Template, current: &str) -> String {
+    template
+        .settings
+        .target_lang
+        .clone()
+        .unwrap_or_else(|| current.into())
+}
+
+pub fn editor_input(
+    text: String,
+    template_id: Option<String>,
+    target: String,
+) -> byoglot_core::RunnerInput {
+    byoglot_core::RunnerInput {
+        text,
+        template_id,
+        target_lang: Some(target),
+        context: String::new(),
+        app_name: "ByoGlot".into(),
+        limit: byoglot_core::EDITOR_INPUT_LIMIT,
     }
 }

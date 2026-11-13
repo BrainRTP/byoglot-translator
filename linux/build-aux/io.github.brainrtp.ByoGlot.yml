@@ -1,0 +1,39 @@
+app-id: io.github.brainrtp.ByoGlot
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: byoglot
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --talk-name=org.freedesktop.secrets
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/byoglot/cargo
+modules:
+  - name: byoglot
+    buildsystem: simple
+    build-commands:
+      - cargo build --manifest-path linux/Cargo.toml --release --frozen -p byoglot
+      - install -Dm755 linux/target/release/byoglot /app/bin/byoglot
+      - install -Dm644 linux/data/io.github.brainrtp.ByoGlot.desktop /app/share/applications/io.github.brainrtp.ByoGlot.desktop
+      - install -Dm644 linux/data/io.github.brainrtp.ByoGlot.metainfo.xml /app/share/metainfo/io.github.brainrtp.ByoGlot.metainfo.xml
+      - install -Dm644 linux/data/icons/hicolor/scalable/apps/io.github.brainrtp.ByoGlot.svg /app/share/icons/hicolor/scalable/apps/io.github.brainrtp.ByoGlot.svg
+      - install -Dm644 LICENSE /app/share/licenses/byoglot/LICENSE
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - .git
+          - node_modules
+          - linux/target
+          - linux/build-dir
+          - linux/repo
+          - linux/.flatpak-builder
+      - cargo-sources.json

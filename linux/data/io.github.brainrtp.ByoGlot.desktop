@@ -10,3 +10,9 @@ Categories=Utility;Education;
 Keywords=translate;translation;AI;
 Keywords[ru]=перевод;переводчик;ИИ;
 StartupNotify=true
+Actions=TranslateSelection;
+
+[Desktop Action TranslateSelection]
+Name=Translate selected text
+Name[ru]=Перевести выделенный текст
+Exec=byoglot --translate-selection

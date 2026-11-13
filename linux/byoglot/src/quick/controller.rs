@@ -131,10 +131,9 @@ pub mod gui {
                     | QuickEvent::TriggeredWithText(_)
                     | QuickEvent::Pasted(_)
                     | QuickEvent::Dismissed
-            ) {
-                if let Some(task) = self.capture.borrow_mut().take() {
-                    task.abort();
-                }
+            ) && let Some(task) = self.capture.borrow_mut().take()
+            {
+                task.abort();
             }
             let effects = self.controller.borrow_mut().apply(event);
             let state = self.controller.borrow().state.clone();
@@ -159,8 +158,11 @@ pub mod gui {
             }
         }
         fn read(self: &Rc<Self>, primary: bool) {
+            if primary && self.capture.borrow().is_some() {
+                return;
+            }
             let generation = self.controller.borrow().generation();
-            let display = self.window.window.display();
+            let display = gtk::prelude::WidgetExt::display(&self.window.window);
             let clipboard = if primary {
                 display.primary_clipboard()
             } else {

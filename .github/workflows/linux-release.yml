@@ -1,0 +1,80 @@
+name: Linux packages
+
+on:
+  pull_request:
+    paths: ["linux/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/linux-release.yml"]
+  push:
+    branches: [main]
+    tags: ["linux-v*"]
+    paths: ["linux/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/linux-release.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rpm:
+    runs-on: ubuntu-latest
+    container: fedora:45
+    steps:
+      - name: Install build dependencies
+        run: dnf install -y git gtk4-devel libadwaita-devel gcc rust cargo rpm-build desktop-file-utils appstream python3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check version and tag
+        run: python3 linux/build-aux/check-version.py
+      - name: Test the workspace
+        working-directory: linux
+        run: /usr/bin/cargo test --workspace --locked
+      - name: Prepare the offline source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(python3 linux/build-aux/check-version.py)
+          mkdir -p /tmp/byoglot-rpm/SOURCES /tmp/byoglot-source
+          git archive HEAD --prefix="byoglot-$version/" | tar -x -C /tmp/byoglot-source
+          cd "/tmp/byoglot-source/byoglot-$version"
+          mkdir .cargo
+          /usr/bin/cargo vendor --locked --manifest-path linux/Cargo.toml vendor > .cargo/config.toml
+          tar -czf "/tmp/byoglot-rpm/SOURCES/byoglot-$version.tar.gz" -C /tmp/byoglot-source "byoglot-$version"
+      - name: Build the RPM from the spec
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(python3 linux/build-aux/check-version.py)
+          rpmbuild -ba --define '_topdir /tmp/byoglot-rpm' --define "byoglot_version $version" linux/build-aux/byoglot.spec
+          mkdir -p linux/target/packages
+          find /tmp/byoglot-rpm/RPMS -name 'byoglot-*.rpm' -exec cp '{}' linux/target/packages/ \;
+          rpm -qpl linux/target/packages/byoglot-*.rpm
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: byoglot-rpm-x86_64
+          path: linux/target/packages/*.rpm
+          if-no-files-found: error
+  flatpak:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:45
+      options: --privileged
+    steps:
+      - name: Install packaging tools
+        run: dnf install -y git flatpak-builder flatpak ostree dbus-daemon python3-aiohttp python3-tomlkit python3-pyyaml curl
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check version and tag
+        run: python3 linux/build-aux/check-version.py
+      - name: Verify generated Cargo sources
+        run: |
+          curl --fail --silent --show-error --location https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/9d86d336a39b9af38b86f114b6ce5820fe260f91/cargo/flatpak-cargo-generator.py -o /tmp/flatpak-cargo-generator.py
+          python3 /tmp/flatpak-cargo-generator.py linux/Cargo.lock -o /tmp/cargo-sources.json
+          cmp linux/build-aux/cargo-sources.json /tmp/cargo-sources.json
+      - name: Build the offline Flatpak and bundle
+        working-directory: linux
+        run: |
+          flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          dbus-run-session flatpak-builder --user --disable-rofiles-fuse --force-clean --install-deps-from=flathub --repo=target/flatpak-repo target/flatpak-build build-aux/io.github.brainrtp.ByoGlot.yml
+          mkdir -p target/packages
+          flatpak build-bundle target/flatpak-repo target/packages/ByoGlot.flatpak io.github.brainrtp.ByoGlot --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: byoglot-flatpak-x86_64
+          path: linux/target/packages/*.flatpak
+          if-no-files-found: error

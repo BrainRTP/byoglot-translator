@@ -10,11 +10,22 @@
   <description>
     <p>Translate text using your own provider connections, models and reusable instruction templates. Connect to DeepSeek, OpenRouter, Ollama, LM Studio or a compatible API.</p>
     <p xml:lang="ru">Переводите текст со своими подключениями, моделями и шаблонами инструкций. Подключите DeepSeek, OpenRouter, Ollama, LM Studio или совместимый API.</p>
+    <p>Select text and use the desktop shortcut to open a quick translation window. A command line fallback lets your desktop bind the same action to a key.</p>
+    <p xml:lang="ru">Выделите текст и нажмите сочетание клавиш для быстрого перевода. Команду для этого действия можно назначить в настройках рабочего стола.</p>
     <p>API keys are stored in the desktop keyring when available. No translation history is saved.</p>
     <p xml:lang="ru">API-ключи хранятся в связке ключей рабочего стола, когда она доступна. История переводов не сохраняется.</p>
   </description>
+  <keywords>
+    <keyword>translate</keyword>
+    <keyword>translation</keyword>
+    <keyword>AI</keyword>
+    <keyword xml:lang="ru">перевод</keyword>
+    <keyword xml:lang="ru">переводчик</keyword>
+  </keywords>
+  <supports><control>keyboard</control><control>pointing</control></supports>
   <launchable type="desktop-id">io.github.brainrtp.ByoGlot.desktop</launchable>
   <url type="homepage">https://github.com/BrainRTP/byoglot-translator</url>
   <url type="bugtracker">https://github.com/BrainRTP/byoglot-translator/issues</url>
+  <url type="vcs-browser">https://github.com/BrainRTP/byoglot-translator</url>
   <content_rating type="oars-1.1"/>
 </component>

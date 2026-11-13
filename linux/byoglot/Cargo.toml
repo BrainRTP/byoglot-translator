@@ -26,3 +26,14 @@ futures-util = { version = "0.3.34", default-features = false, features = ["std"
 name = "byoglot"
 path = "src/main.rs"
 required-features = ["gui"]
+
+[package.metadata.generate-rpm]
+summary = "Translate text with your own AI providers"
+url = "https://github.com/BrainRTP/byoglot-translator"
+assets = [
+    { source = "target/release/byoglot", dest = "/usr/bin/byoglot", mode = "755" },
+    { source = "data/io.github.brainrtp.ByoGlot.desktop", dest = "/usr/share/applications/io.github.brainrtp.ByoGlot.desktop", mode = "644" },
+    { source = "data/io.github.brainrtp.ByoGlot.metainfo.xml", dest = "/usr/share/metainfo/io.github.brainrtp.ByoGlot.metainfo.xml", mode = "644" },
+    { source = "data/icons/hicolor/scalable/apps/io.github.brainrtp.ByoGlot.svg", dest = "/usr/share/icons/hicolor/scalable/apps/io.github.brainrtp.ByoGlot.svg", mode = "644" },
+    { source = "../LICENSE", dest = "/usr/share/licenses/byoglot/LICENSE", mode = "644" },
+]

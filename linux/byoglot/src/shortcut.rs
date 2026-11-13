@@ -73,7 +73,6 @@ pub async fn bind(app: &adw::Application) -> Result<ShortcutStatus, ShortcutErro
         .receive_shortcuts_changed()
         .await
         .map_err(|_| ShortcutError)?;
-    let closed = session.receive_closed().await.map_err(|_| ShortcutError)?;
     let shortcut = NewShortcut::new(SHORTCUT_ID, tr(Msg::ShortcutDescription))
         .preferred_trigger("<Control><Alt>t");
     let response = portal
@@ -126,7 +125,11 @@ pub async fn bind(app: &adw::Application) -> Result<ShortcutStatus, ShortcutErro
         }
     });
     let status = trigger.downgrade();
+    let closed_session = session.clone();
     let closure = glib::spawn_future_local(async move {
+        let Ok(closed) = closed_session.receive_closed().await else {
+            return;
+        };
         let mut closed = std::pin::pin!(closed);
         if closed.next().await.is_some()
             && let Some(status) = status.upgrade()

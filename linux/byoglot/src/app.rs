@@ -38,10 +38,10 @@ impl State {
                     window
                 });
                 window.present();
-                if let Some(text) = text {
-                    if let Some(action) = window.lookup_action("load-text") {
-                        action.activate(Some(&text.to_variant()));
-                    }
+                if let Some(text) = text
+                    && let Some(action) = window.lookup_action("load-text")
+                {
+                    action.activate(Some(&text.to_variant()));
                 }
             }
             Pending::Quick(text, token) => {

@@ -4,19 +4,60 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.brainrtp.byoglot.core.*
 import java.time.Instant
+import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.Json
 
 data class MainNavigationRequest(val id: Long, val destination: String)
-data class TranslationState(val working: Boolean = false, val output: RunnerOutput? = null, val error: RunnerError? = null)
+
+data class TranslationState(
+    val working: Boolean = false,
+    val output: RunnerOutput? = null,
+    val error: RunnerError? = null,
+    val complete: Boolean = false,
+    val incomplete: Boolean = false,
+    val errorAtMs: Long? = null,
+)
+
+data class MainParameters(
+    val templateId: String = Contracts.builtinTemplate.id,
+    val sourceLang: String = "auto",
+    val targetLang: String = "en",
+    val changed: Boolean = false,
+    val detectedSourceLang: String? = null,
+) {
+    val canSwap: Boolean
+        get() = sourceLang != "auto" || detectedSourceLang != null
+}
+
 class MainViewModel(
-    private val repository: SettingsRepository, secrets: SecretStore, transport: HttpTransport,
-    scope: CoroutineScope? = null, translate: (suspend (RunnerInput) -> RunnerOutput)? = null,
+    private val repository: SettingsRepository,
+    secrets: SecretStore,
+    transport: HttpTransport,
+    scope: CoroutineScope? = null,
+    translate: (suspend (RunnerInput) -> RunnerOutput)? = null,
+    stream: ((RunnerInput) -> Flow<RunnerStreamOutput>)? = null,
+    private val networkOnline: () -> Boolean = { true },
+    private val nowMs: () -> Long = System::currentTimeMillis,
+    private val sourceLanguageDetector: SourceLanguageDetector = SourceLanguageDetector {
+        emptyList()
+    },
 ) : ViewModel() {
     private val workScope = scope ?: viewModelScope
-    private val runner = translate ?: TranslationRunner(repository, secrets, transport)::translate
+    private val translationRunner = TranslationRunner(repository, secrets, transport)
+    private val streamRunner: (RunnerInput) -> Flow<RunnerStreamOutput> =
+        stream
+            ?: if (translate != null)
+                { input -> flow { emit(RunnerStreamOutput(translate(input), true)) } }
+            else translationRunner::stream
+    private val mutableParameters = MutableStateFlow(MainParameters())
+    val parameters = mutableParameters.asStateFlow()
+    private var manualTarget: String? = null
+    private var networkAvailable = false
+    private var autoJob: Job? = null
+    private var detectionJob: Job? = null
     val editor = ConnectionEditor(repository, secrets, transport)
     private val mutableSettings = MutableStateFlow<AppSettings?>(null)
     val settings = mutableSettings.asStateFlow()
@@ -35,64 +76,411 @@ class MainViewModel(
     private var navigationIdentity = 0L
     private var job: Job? = null
     private var identity = 0L
-    init { workScope.launch { refresh() } }
+
+    init {
+        workScope.launch { refresh() }
+    }
+
     suspend fun refresh() {
         val state = repository.read()
+        val previous = mutableSettings.value
+        val parametersChanged =
+            previous != null &&
+                previous.copy(theme = state.theme, autoTranslate = state.autoTranslate) != state
+        if (parametersChanged) {
+            cancel()
+            mutableTranslation.value = TranslationState()
+        }
         mutableSettings.value = state
+        syncParameters(state)
         mutableKeys.value = state.connections.associate { it.id to editor.keyState(it.id) }
+        if (
+            (previous == null || parametersChanged || !previous.autoTranslate) &&
+                state.autoTranslate &&
+                mutableText.value.isNotBlank()
+        )
+            schedule()
     }
+
     fun receiveQuickRequest(text: String?, destination: String?) {
         text?.let(::setText)
         dismissError()
-        mutableNavigation.value = MainNavigationRequest(++navigationIdentity, destination ?: "translate")
+        mutableNavigation.value =
+            MainNavigationRequest(++navigationIdentity, destination ?: "translate")
     }
-    fun navigationHandled(id: Long) { if (mutableNavigation.value?.id == id) mutableNavigation.value = null }
-    fun setText(text: String) { if (text != mutableText.value) { cancel(); mutableText.value = text; mutableTranslation.value = TranslationState() } }
-    fun translate(text: String = this.text.value, templateId: String? = null, targetLang: String? = null) {
-        val id = ++identity
-        job?.cancel()
-        mutableTranslation.value = TranslationState(working = true)
-        job = workScope.launch {
-            val result = try { TranslationState(output = runner(RunnerInput(text, templateId = templateId, targetLang = targetLang, limit = EDITOR_INPUT_LIMIT))) }
-            catch (e: CancellationException) { throw e }
-            catch (e: RunnerException) { TranslationState(error = e.error) }
-            catch (_: Exception) { TranslationState(error = RunnerError.Backend(BackendException(ErrorKind.ProviderError))) }
-            if (id == identity) mutableTranslation.value = result
+
+    fun navigationHandled(id: Long) {
+        if (mutableNavigation.value?.id == id) mutableNavigation.value = null
+    }
+
+    private fun syncParameters(state: AppSettings) {
+        val template =
+            state.templates.find { it.id == state.globals.defaultTemplateId }
+                ?: Contracts.builtinTemplate
+        if (mutableParameters.value.templateId != template.id) manualTarget = null
+        val effective = SettingsLogic.effectiveMain(template, state)
+        val target = manualTarget ?: effective.targetLang
+        mutableParameters.value =
+            mutableParameters.value.copy(
+                templateId = template.id,
+                sourceLang = state.globals.sourceLang,
+                targetLang = target,
+                changed = target != effective.targetLang,
+                detectedSourceLang =
+                    if (state.globals.sourceLang == "auto")
+                        mutableParameters.value.detectedSourceLang
+                    else null,
+            )
+    }
+
+    fun setText(text: String) {
+        if (text == mutableText.value) return
+        cancel()
+        mutableText.value = text
+        mutableParameters.value = mutableParameters.value.copy(detectedSourceLang = null)
+        mutableTranslation.value = TranslationState()
+        schedule()
+    }
+
+    fun paste(text: String) {
+        setText(text)
+        if (mutableSettings.value?.autoTranslate == true) translate()
+    }
+
+    private fun schedule() {
+        autoJob?.cancel()
+        if (
+            mutableSettings.value?.autoTranslate == true &&
+                mutableText.value.isNotBlank() &&
+                !InputCounter.editor(mutableText.value).overLimit
+        ) {
+            autoJob = workScope.launch {
+                delay(AUTO_TRANSLATE_DELAY_MS)
+                translate()
+            }
         }
     }
-    fun cancel() { identity++; job?.cancel(); mutableTranslation.value = mutableTranslation.value.copy(working = false) }
-    suspend fun update(change: (AppSettings) -> AppSettings) { repository.update(change); cancel(); mutableTranslation.value = TranslationState(); refresh() }
-    suspend fun activate(id: String) { update { it.copy(activeConnectionId = id) } }
-    suspend fun setModel(connectionId: String, model: ModelRef, page: Boolean) { update { s -> s.copy(connections = s.connections.map { if (it.id != connectionId) it else if (page) it.copy(pageModel = model) else it.copy(selectionModel = model) }) } }
+
+    fun keyboardTranslate() {
+        if (mutableSettings.value?.autoTranslate == false) translate()
+    }
+
+    fun translate(
+        text: String = this.text.value,
+        templateId: String? = null,
+        targetLang: String? = null,
+    ) {
+        autoJob?.cancel()
+        val id = ++identity
+        job?.cancel()
+        detectionJob?.cancel()
+        mutableParameters.value = mutableParameters.value.copy(detectedSourceLang = null)
+        val params = mutableParameters.value
+        val input =
+            RunnerInput(
+                text,
+                templateId = templateId ?: params.templateId,
+                targetLang = targetLang ?: params.targetLang,
+                limit = EDITOR_INPUT_LIMIT,
+                sourceLang = params.sourceLang,
+                mainModel = true,
+            )
+        val validation =
+            when {
+                text.isBlank() -> RunnerError.Empty
+                InputCounter.editor(text).overLimit -> RunnerError.TooLong(EDITOR_INPUT_LIMIT)
+                !networkOnline() -> RunnerError.Backend(BackendException(ErrorKind.Offline))
+                else -> null
+            }
+        if (validation != null) {
+            mutableTranslation.value = TranslationState(error = validation, errorAtMs = nowMs())
+            return
+        }
+        mutableTranslation.value = TranslationState(working = true)
+        job = workScope.launch {
+            try {
+                var latest: RunnerStreamOutput? = null
+                streamRunner(input)
+                    .map { chunk ->
+                        latest = chunk
+                        Result.success(chunk)
+                    }
+                    .catch { error ->
+                        if (error is CancellationException) throw error
+                        emit(Result.failure(error))
+                    }
+                    .conflate()
+                    .collect { event ->
+                        val chunk = event.getOrElse { error ->
+                            latest?.let { applyChunk(id, input, it) }
+                            throw error
+                        }
+                        applyChunk(id, input, chunk)
+                    }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: RunnerException) {
+                if (id == identity)
+                    mutableTranslation.value =
+                        mutableTranslation.value.copy(
+                            working = false,
+                            error = e.error,
+                            complete = false,
+                            errorAtMs = nowMs(),
+                        )
+            } catch (_: Exception) {
+                if (id == identity)
+                    mutableTranslation.value =
+                        mutableTranslation.value.copy(
+                            working = false,
+                            error = RunnerError.Backend(BackendException(ErrorKind.ProviderError)),
+                            complete = false,
+                            errorAtMs = nowMs(),
+                        )
+            }
+        }
+    }
+
+    private fun applyChunk(id: Long, input: RunnerInput, chunk: RunnerStreamOutput) {
+        if (id != identity) return
+        mutableTranslation.value =
+            TranslationState(
+                working = !chunk.complete,
+                output = chunk.output,
+                complete = chunk.complete,
+                incomplete = chunk.incomplete,
+            )
+        if (chunk.complete && input.sourceLang == "auto") {
+            detectionJob = workScope.launch {
+                val detected =
+                    try {
+                        confidentSource(sourceLanguageDetector.detect(input.text))
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: RuntimeException) {
+                        null
+                    }
+                if (
+                    id == identity &&
+                        mutableText.value == input.text &&
+                        parameters.value.sourceLang == "auto"
+                ) {
+                    mutableParameters.value =
+                        mutableParameters.value.copy(detectedSourceLang = detected)
+                }
+            }
+        }
+    }
+
+    private fun confidentSource(candidates: List<LanguageHypothesis>): String? {
+        val top =
+            candidates
+                .filter { it.confidence.isFinite() && it.confidence in 0f..1f }
+                .maxByOrNull { it.confidence } ?: return null
+        if (top.confidence < SOURCE_LANGUAGE_CONFIDENCE) return null
+        val language = Locale.forLanguageTag(top.languageTag).language.lowercase(Locale.ROOT)
+        return language.takeIf { it in Contracts.languageCodes }
+    }
+
+    fun isNetworkOnline() = networkOnline()
+
+    fun setNetworkAvailable(available: Boolean) {
+        val restored = !networkAvailable && available
+        networkAvailable = available
+        if (!available && mutableTranslation.value.working) {
+            cancel()
+            mutableTranslation.value =
+                mutableTranslation.value.copy(
+                    error = RunnerError.Backend(BackendException(ErrorKind.Offline)),
+                    complete = false,
+                    errorAtMs = nowMs(),
+                )
+        } else if (
+            restored &&
+                mutableSettings.value?.autoTranslate == true &&
+                (mutableTranslation.value.error as? RunnerError.Backend)?.error?.kind ==
+                    ErrorKind.Offline &&
+                text.value.isNotBlank()
+        )
+            translate()
+    }
+
+    fun cancel() {
+        identity++
+        autoJob?.cancel()
+        job?.cancel()
+        detectionJob?.cancel()
+        mutableTranslation.value = mutableTranslation.value.copy(working = false)
+    }
+
+    suspend fun update(change: (AppSettings) -> AppSettings) {
+        val before = repository.read()
+        val after = repository.update(change)
+        if (before.copy(theme = after.theme, autoTranslate = after.autoTranslate) != after) {
+            cancel()
+            mutableTranslation.value = TranslationState()
+        } else if (before.autoTranslate != after.autoTranslate) autoJob?.cancel()
+        refresh()
+    }
+
+    suspend fun selectTemplate(id: String) {
+        cancel()
+        mutableTranslation.value = TranslationState()
+        manualTarget = null
+        update { it.copy(globals = it.globals.copy(defaultTemplateId = id)) }
+        schedule()
+    }
+
+    suspend fun setTargetLanguage(code: String) {
+        if (code !in Contracts.languageCodes) return
+        cancel()
+        mutableTranslation.value = TranslationState()
+        manualTarget = code
+        update { it.copy(globals = it.globals.copy(targetLang = code)) }
+        schedule()
+    }
+
+    suspend fun setSourceLanguage(code: String) {
+        if (code != "auto" && code !in Contracts.languageCodes) return
+        cancel()
+        mutableParameters.value = mutableParameters.value.copy(detectedSourceLang = null)
+        update { it.copy(globals = it.globals.copy(sourceLang = code)) }
+        schedule()
+    }
+
+    suspend fun swap() {
+        val params = parameters.value
+        val source =
+            params.sourceLang.takeUnless { it == "auto" } ?: params.detectedSourceLang ?: return
+        val oldText = text.value
+        val old = translation.value
+        val ready = old.complete && !old.incomplete && old.error == null && old.output != null
+        cancel()
+        mutableTranslation.value = TranslationState()
+        manualTarget = source
+        update {
+            it.copy(globals = it.globals.copy(sourceLang = params.targetLang, targetLang = source))
+        }
+        if (ready) {
+            autoJob?.cancel()
+            mutableText.value = old.output!!.text
+            mutableTranslation.value =
+                TranslationState(
+                    output =
+                        old.output.copy(
+                            text = oldText,
+                            sourceLang = params.targetLang,
+                            targetLang = source,
+                        ),
+                    complete = true,
+                )
+        } else schedule()
+    }
+
+    suspend fun activate(id: String) {
+        update { it.copy(activeConnectionId = id) }
+    }
+
+    suspend fun setModel(connectionId: String, model: ModelRef, page: Boolean) {
+        update { s ->
+            s.copy(
+                connections =
+                    s.connections.map {
+                        if (it.id != connectionId) it
+                        else if (page) it.copy(pageModel = model)
+                        else it.copy(selectionModel = model)
+                    },
+            )
+        }
+    }
+
     suspend fun saveTemplate(id: String?, name: String, instructions: String, target: String?) {
         update { s ->
             val old = s.templates.find { it.id == id }
-            if (id == Contracts.builtinTemplate.id || old?.builtin == true) s else {
-                val template = Template(id ?: UUID.randomUUID().toString(), name.trim(), false, (old?.settings ?: TemplateSettings()).copy(prePrompt = instructions, targetLang = target))
+            if (id == Contracts.builtinTemplate.id || old?.builtin == true) s
+            else {
+                val template =
+                    Template(
+                        id ?: UUID.randomUUID().toString(),
+                        name.trim(),
+                        false,
+                        (old?.settings ?: TemplateSettings()).copy(
+                            prePrompt = instructions,
+                            targetLang = target,
+                        ),
+                    )
                 s.copy(templates = s.templates.filterNot { it.id == template.id } + template)
             }
         }
     }
-    suspend fun duplicate(template: Template, name: String) { saveTemplate(null, name, template.settings.prePrompt.orEmpty(), template.settings.targetLang) }
-    suspend fun deleteTemplate(id: String) { update { s ->
-        if (id == Contracts.builtinTemplate.id || s.templates.any { it.id == id && it.builtin }) s
-        else s.copy(templates = s.templates.filterNot { it.id == id }, globals = if (s.globals.defaultTemplateId == id) s.globals.copy(defaultTemplateId = Contracts.builtinTemplate.id) else s.globals)
-    } }
-    suspend fun export(now: String = Instant.now().toString()): String = portableJson.encodeToString(SettingsLogic.export(repository.read(), now))
-    suspend fun import(json: String) { val file = ExportFile.decode(json); update { SettingsLogic.merge(file, it) } }
+
+    suspend fun duplicate(template: Template, name: String) {
+        saveTemplate(
+            null,
+            name,
+            template.settings.prePrompt.orEmpty(),
+            template.settings.targetLang,
+        )
+    }
+
+    suspend fun deleteTemplate(id: String) {
+        update { s ->
+            if (id == Contracts.builtinTemplate.id || s.templates.any { it.id == id && it.builtin })
+                s
+            else
+                s.copy(
+                    templates = s.templates.filterNot { it.id == id },
+                    globals =
+                        if (s.globals.defaultTemplateId == id)
+                            s.globals.copy(defaultTemplateId = Contracts.builtinTemplate.id)
+                        else s.globals,
+                )
+        }
+    }
+
+    suspend fun export(now: String = Instant.now().toString()): String =
+        portableJson.encodeToString(SettingsLogic.export(repository.read(), now))
+
+    suspend fun import(json: String) {
+        val file = ExportFile.decode(json)
+        update { SettingsLogic.merge(file, it) }
+    }
+
     fun action(block: suspend () -> Unit) {
         if (mutableBusy.value) return
         mutableBusy.value = true
         mutableError.value = null
         workScope.launch {
-            try { block(); refresh() }
-            catch (e: CancellationException) { throw e }
-            catch (e: RunnerException) { mutableError.value = e.error }
-            catch (_: Exception) { mutableError.value = RunnerError.Backend(BackendException(ErrorKind.ProviderError)) }
-            finally { mutableBusy.value = false }
+            try {
+                block()
+                refresh()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: RunnerException) {
+                mutableError.value = e.error
+            } catch (_: Exception) {
+                mutableError.value = RunnerError.Backend(BackendException(ErrorKind.ProviderError))
+            } finally {
+                mutableBusy.value = false
+            }
         }
     }
-    fun dismissError() { mutableError.value = null }
-    override fun onCleared() { cancel() }
-    companion object { private val portableJson = Json { explicitNulls = false; encodeDefaults = true; prettyPrint = true } }
+
+    fun dismissError() {
+        mutableError.value = null
+    }
+
+    override fun onCleared() {
+        cancel()
+    }
+
+    companion object {
+        const val AUTO_TRANSLATE_DELAY_MS = 800L
+        const val SOURCE_LANGUAGE_CONFIDENCE = 0.8f
+        private val portableJson = Json {
+            explicitNulls = false
+            encodeDefaults = true
+            prettyPrint = true
+        }
+    }
 }

@@ -38,9 +38,34 @@ pub(crate) async fn register_host() -> Result<(), ShortcutError> {
         .map(|_| ())
 }
 
+struct PortalSession(Option<Arc<Session<GlobalShortcuts>>>);
+impl PortalSession {
+    fn get(&self) -> &Session<GlobalShortcuts> {
+        self.0.as_deref().expect("open portal session")
+    }
+    fn shared(&self) -> Arc<Session<GlobalShortcuts>> {
+        self.0.as_ref().expect("open portal session").clone()
+    }
+    async fn close(&mut self) {
+        if let Some(session) = &self.0 {
+            let _ = session.close().await;
+        }
+        self.0 = None;
+    }
+}
+impl Drop for PortalSession {
+    fn drop(&mut self) {
+        if let Some(session) = self.0.take() {
+            glib::spawn_future_local(async move {
+                let _ = session.close().await;
+            });
+        }
+    }
+}
+
 pub struct ShortcutStatus {
     portal: GlobalShortcuts,
-    session: Arc<Session<GlobalShortcuts>>,
+    session: PortalSession,
     trigger: gtk::Label,
     listeners: Vec<glib::JoinHandle<()>>,
 }
@@ -49,45 +74,60 @@ impl Drop for ShortcutStatus {
         for listener in &self.listeners {
             listener.abort();
         }
-        let session = self.session.clone();
-        glib::spawn_future_local(async move {
-            let _ = session.close().await;
-        });
+    }
+}
+impl ShortcutStatus {
+    async fn close(mut self) {
+        for listener in &self.listeners {
+            listener.abort();
+        }
+        self.session.close().await;
     }
 }
 
 pub async fn bind(app: &adw::Application) -> Result<ShortcutStatus, ShortcutError> {
-    register_host().await?;
+    let _ = register_host().await;
     let portal = GlobalShortcuts::new().await.map_err(|_| ShortcutError)?;
-    let session = Arc::new(
+    let mut session = PortalSession(Some(Arc::new(
         portal
             .create_session(Default::default())
             .await
             .map_err(|_| ShortcutError)?,
-    );
-    let path = serde_json::to_value(session.as_ref())
-        .map_err(|_| ShortcutError)?
-        .as_str()
-        .ok_or(ShortcutError)?
-        .to_owned();
-    let activated = portal
-        .receive_activated()
-        .await
-        .map_err(|_| ShortcutError)?;
-    let changed = portal
-        .receive_shortcuts_changed()
-        .await
-        .map_err(|_| ShortcutError)?;
-    let shortcut = NewShortcut::new(SHORTCUT_ID, tr(Msg::ShortcutDescription))
-        .preferred_trigger("<Control><Alt>t");
-    let response = portal
-        .bind_shortcuts(&session, &[shortcut], None, Default::default())
-        .await
-        .map_err(|_| ShortcutError)?
-        .response()
-        .map_err(|_| ShortcutError)?;
+    )));
+    let binding = async {
+        let path = serde_json::to_value(session.get())
+            .map_err(|_| ShortcutError)?
+            .as_str()
+            .ok_or(ShortcutError)?
+            .to_owned();
+        let activated = portal
+            .receive_activated()
+            .await
+            .map_err(|_| ShortcutError)?;
+        let changed = portal
+            .receive_shortcuts_changed()
+            .await
+            .map_err(|_| ShortcutError)?;
+        let shortcut = NewShortcut::new(SHORTCUT_ID, tr(Msg::ShortcutDescription))
+            .preferred_trigger("<Control><Alt>t");
+        let response = portal
+            .bind_shortcuts(session.get(), &[shortcut], None, Default::default())
+            .await
+            .map_err(|_| ShortcutError)?
+            .response()
+            .map_err(|_| ShortcutError)?;
+        Ok::<_, ShortcutError>((path, activated, changed, response))
+    }
+    .await;
+    let (path, activated, changed, response) = match binding {
+        Ok(binding) => binding,
+        Err(error) => {
+            session.close().await;
+            return Err(error);
+        }
+    };
     let Some(shortcut) = response.shortcuts().iter().find(|s| s.id() == SHORTCUT_ID) else {
-        let _ = session.close().await;
+        session.close().await;
         return Err(ShortcutError);
     };
     let trigger = gtk::Label::new(Some(shortcut.trigger_description()));
@@ -131,7 +171,7 @@ pub async fn bind(app: &adw::Application) -> Result<ShortcutStatus, ShortcutErro
         }
     });
     let status = trigger.downgrade();
-    let closed_session = session.clone();
+    let closed_session = session.shared();
     let closure = glib::spawn_future_local(async move {
         let Ok(closed) = closed_session.receive_closed().await else {
             return;
@@ -233,27 +273,31 @@ impl Registration {
             button.set_sensitive(false);
             glib::spawn_future_local(async move {
                 let identifier = ashpd::WindowIdentifier::from_native(&window).await;
-                if let Some(status) = status
-                    && status.portal.version() >= 2
-                {
-                    if status
-                        .portal
-                        .configure_shortcuts(
-                            &status.session,
-                            identifier.as_ref(),
-                            Default::default(),
-                        )
-                        .await
-                        .is_err()
-                    {
-                        registration.description.set_label(&fallback_hint());
+                match status {
+                    Some(status) if status.portal.version() >= 2 => {
+                        if status
+                            .portal
+                            .configure_shortcuts(
+                                status.session.get(),
+                                identifier.as_ref(),
+                                Default::default(),
+                            )
+                            .await
+                            .is_err()
+                        {
+                            registration.description.set_label(&fallback_hint());
+                        }
+                        *registration.current.borrow_mut() = Some(status);
+                        registration.busy.set(false);
                     }
-                    *registration.current.borrow_mut() = Some(status);
-                    registration.busy.set(false);
-                } else {
-                    registration.busy.set(false);
-                    if let Some(app) = window.application().and_downcast::<adw::Application>() {
-                        registration.start(&app);
+                    previous => {
+                        if let Some(status) = previous {
+                            status.close().await;
+                        }
+                        registration.busy.set(false);
+                        if let Some(app) = window.application().and_downcast::<adw::Application>() {
+                            registration.start(&app);
+                        }
                     }
                 }
                 button.set_sensitive(true);

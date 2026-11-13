@@ -33,7 +33,7 @@ public final class AppModel {
     public private(set) var keyStates: [String: Bool] = [:]
     public private(set) var catalogueErrors: [String: RunnerError] = [:]
     public private(set) var recentLanguages: [String] = []
-    public private(set) var interfaceLanguage = AppStrings.interfaceLanguage
+    public var interfaceLanguage: String { AppStrings.interfaceLanguage }
     public let editor: ConnectionEditor
     @ObservationIgnored private let store: SettingsStore
     @ObservationIgnored private let stream: Stream
@@ -419,7 +419,7 @@ public final class AppModel {
     public func setInterfaceLanguage(_ code: String) {
         guard ["system", "en", "ru"].contains(code), interfaceLanguage != code else { return }
         UserDefaults.standard.set(code, forKey: AppStrings.interfaceLanguageKey)
-        interfaceLanguage = code
+        InterfaceLocale.shared.set(code)
     }
 
     public func saveProfile(id: String, text: String) async -> Bool {

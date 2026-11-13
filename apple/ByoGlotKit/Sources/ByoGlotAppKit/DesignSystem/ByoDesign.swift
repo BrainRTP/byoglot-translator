@@ -1,4 +1,6 @@
 import SwiftUI
+import Observation
+import os
 #if canImport(UIKit)
 import UIKit
 #else
@@ -61,7 +63,7 @@ public enum ByoRadius {
 
 public enum AppStrings {
     public static let interfaceLanguageKey = "ByoGlotInterfaceLanguage"
-    public static var interfaceLanguage: String { UserDefaults.standard.string(forKey: interfaceLanguageKey) ?? "system" }
+    public static var interfaceLanguage: String { InterfaceLocale.shared.value }
     public static var locale: Locale { interfaceLanguage == "system" ? .current : Locale(identifier: interfaceLanguage) }
     public static func text(_ key: String) -> String {
         let code = interfaceLanguage == "system" ? Bundle.module.preferredLocalizations.first ?? "en" : interfaceLanguage
@@ -111,6 +113,21 @@ struct ByoFocusRing: ViewModifier {
     func body(content: Content) -> some View {
         content.overlay {
             if focused { RoundedRectangle(cornerRadius: 6).stroke(ByoColor.accent, lineWidth: 2).padding(-2) }
+        }
+    }
+}
+
+final class InterfaceLocale: Observable, @unchecked Sendable {
+    static let shared = InterfaceLocale()
+    private let registrar = ObservationRegistrar()
+    private let state = OSAllocatedUnfairLock(initialState: UserDefaults.standard.string(forKey: AppStrings.interfaceLanguageKey) ?? "system")
+    var value: String {
+        registrar.access(self, keyPath: \.value)
+        return state.withLock { $0 }
+    }
+    @MainActor func set(_ value: String) {
+        registrar.withMutation(of: self, keyPath: \.value) {
+            state.withLock { $0 = value }
         }
     }
 }

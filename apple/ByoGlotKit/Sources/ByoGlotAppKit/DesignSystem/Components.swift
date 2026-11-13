@@ -75,6 +75,7 @@ public struct ByoTextField: View {
 
 public struct Segment: View {
     let options: [String]
+    @Environment(\.dynamicTypeSize) private var typeSize
     @Binding var selection: String
     let disabled: Set<String>
     let labels: (String) -> String
@@ -83,9 +84,14 @@ public struct Segment: View {
         self.options = options; _selection = selection; self.disabled = disabled; self.labels = labels; self.accessibilityLabels = accessibilityLabels ?? labels
     }
     public var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 2) { items }
-            VStack(spacing: 2) { items }
+        Group {
+            if typeSize.isAccessibilitySize { VStack(spacing: 2) { items } }
+            else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 2) { items }
+                    VStack(spacing: 2) { items }
+                }
+            }
         }
         .padding(2).overlay { RoundedRectangle(cornerRadius: 6).stroke(ByoColor.strongBorder) }
     }
@@ -126,6 +132,7 @@ public struct Banner: View {
 }
 
 public struct ListRow: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
     let title: String
     let subtitle: String?
     let value: String?
@@ -143,8 +150,9 @@ public struct ListRow: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title).modifier(ByoTypography(mono: mono)).foregroundStyle(danger ? ByoColor.error : ByoColor.text)
                     if let subtitle { Text(subtitle).modifier(ByoTypography(13, relativeTo: .caption)).foregroundStyle(ByoColor.muted) }
+                    if typeSize.isAccessibilitySize, let value { Text(value).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted) }
                 }.frame(maxWidth: .infinity, alignment: .leading)
-                if let value { Text(value).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted) }
+                if !typeSize.isAccessibilitySize, let value { Text(value).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted) }
                 if selected { Image(systemName: "checkmark").foregroundStyle(ByoColor.accent).accessibilityHidden(true) }
                 else if !danger && disclosure { Image(systemName: "chevron.right").foregroundStyle(ByoColor.muted).accessibilityHidden(true) }
             }.padding(.horizontal, 16).padding(.vertical, 8).frame(minHeight: 48)

@@ -1916,13 +1916,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "OpenAI Chat Completions protocol. HTTPS, or HTTP on a local network."
+            "value": "OpenAI Chat Completions protocol. HTTPS only."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Протокол OpenAI Chat Completions. HTTPS или HTTP в локальной сети."
+            "value": "Протокол OpenAI Chat Completions. Только HTTPS."
           }
         }
       }
@@ -1933,13 +1933,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Enter a valid HTTPS URL or a local network HTTP URL."
+            "value": "Enter a valid HTTPS URL."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Введите корректный HTTPS URL или HTTP URL в локальной сети."
+            "value": "Введите корректный HTTPS URL."
           }
         }
       }

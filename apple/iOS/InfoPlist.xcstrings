@@ -18,23 +18,6 @@
           }
         }
       }
-    },
-    "NSLocalNetworkUsageDescription": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ByoGlot connects to a model server on your network when you add its address."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ByoGlot подключается к серверу модели в вашей сети, когда вы добавляете его адрес."
-          }
-        }
-      }
     }
   }
 }

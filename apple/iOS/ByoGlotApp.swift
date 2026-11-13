@@ -13,7 +13,7 @@ struct ByoGlotApp: App {
             Group {
                 if let model { RootView(model: model) }
                 else if failed {
-                    ContentUnavailableView(AppStrings.text("err.generic"), systemImage: "externaldrive.badge.exclamationmark", description: Text(String(localized: UserFacingError.message(.appGroupUnavailable))))
+                    ContentUnavailableView(AppStrings.text("err.generic"), systemImage: "externaldrive.badge.exclamationmark", description: Text(AppStrings.error(.appGroupUnavailable)))
                 } else { ProgressView().task { load() } }
             }.tint(ByoColor.accent)
         }
@@ -33,7 +33,7 @@ struct ByoGlotApp: App {
 
 private struct RootView: View {
     @Bindable var model: AppModel
-    @State private var providers = false
+    @SceneStorage("root.tab") private var tab = "translate"
     @State private var network = NetworkObserver()
     @State private var privacyCover = PrivacyCover()
     @Environment(\.scenePhase) private var phase
@@ -41,19 +41,31 @@ private struct RootView: View {
         switch model.settings.theme { case .system: nil; case .light: .light; case .dark: .dark }
     }
     var body: some View {
-        NavigationStack {
-            Group {
-                if let error = model.storageError {
-                    Banner(title: AppStrings.text("err.generic"), message: String(localized: UserFacingError.message(error)), actionTitle: "err.retry") { Task { await model.refresh() } }.padding(16)
-                } else if !model.loaded { ProgressView() }
-                else { ScreenMain(model: model, openProviders: { providers = true }) }
+        Group {
+            if let error = model.storageError {
+                Banner(title: AppStrings.text("err.generic"), message: AppStrings.error(error), actionTitle: "err.retry") { Task { await model.refresh() } }.padding(16)
+            } else if !model.loaded { ProgressView() }
+            else {
+                TabView(selection: $tab) {
+                    Tab(AppStrings.text("main.title"), systemImage: "character.bubble", value: "translate") {
+                        NavigationStack { ScreenMain(model: model, openProviders: { tab = "providers" }, openSettings: { tab = "settings" }, openTemplates: { tab = "templates" }) }
+                    }
+                    Tab(AppStrings.text("providers.title"), systemImage: "key", value: "providers") {
+                        NavigationStack { ScreenProviders(model: model) }
+                    }
+                    Tab(AppStrings.text("settings.templates"), systemImage: "doc.text", value: "templates") {
+                        NavigationStack { ScreenTemplateSettings(model: model) }
+                    }
+                    Tab(AppStrings.text("settings.title"), systemImage: "slider.horizontal.3", value: "settings") {
+                        NavigationStack { ScreenSettings(model: model) }
+                    }
+                }.tabViewStyle(.sidebarAdaptable)
             }
-                .navigationDestination(isPresented: $providers) { ScreenProviders(model: model) }
-        }.preferredColorScheme(scheme)
+        }.preferredColorScheme(scheme).environment(\.locale, model.interfaceLanguage == "system" ? .current : Locale(identifier: model.interfaceLanguage))
             .background(PrivacySceneAttachment(cover: privacyCover).frame(width: 0, height: 0))
             .task {
                 await model.refresh()
-                if model.loaded && model.settings.connections.isEmpty { providers = true }
+                if model.loaded && model.settings.connections.isEmpty { tab = "providers" }
                 network.start(model: model)
             }
             .onChange(of: phase) { _, value in

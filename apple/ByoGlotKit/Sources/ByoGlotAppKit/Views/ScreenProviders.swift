@@ -97,7 +97,7 @@ private struct ProviderKeyScreen: View {
                     keyField
                     if let failure {
                         let network = failure == .backend(BackendError(kind: .offline))
-                        Banner(title: AppStrings.text(authError ? "key.bad" : network ? "err.net.t" : "err.generic"), message: authError ? AppStrings.text("providers.badBody") : network ? AppStrings.text("providers.netBody") : String(localized: UserFacingError.message(failure)), actionTitle: "err.retry", action: check)
+                        Banner(title: AppStrings.text(authError ? "key.bad" : network ? "err.net.t" : "err.generic"), message: authError ? AppStrings.text("providers.badBody") : network ? AppStrings.text("providers.netBody") : AppStrings.error(failure), actionTitle: "err.retry", action: check)
                     }
                     ByoButton(checking ? "key.checking" : "key.check", kind: .primary, busy: checking, action: check)
                         .disabled(!canCheck)
@@ -151,7 +151,7 @@ private struct ProviderKeyScreen: View {
     @ViewBuilder private var savedContent: some View {
         if let connection {
             if let failure {
-                Banner(title: AppStrings.text("err.generic"), message: String(localized: UserFacingError.message(failure)), actionTitle: "err.retry", action: deleteSavedConnection)
+                Banner(title: AppStrings.text("err.generic"), message: AppStrings.error(failure), actionTitle: "err.retry", action: deleteSavedConnection)
             }
             Label(AppStrings.text(hasKey ? "key.ok" : "providers.keyMissing"), systemImage: hasKey ? "checkmark.circle.fill" : "exclamationmark.circle")
                 .foregroundStyle(hasKey ? ByoColor.success : ByoColor.error)
@@ -172,7 +172,7 @@ private struct ProviderKeyScreen: View {
                 }
             }
             if let error = model.catalogueErrors[connection.id] {
-                Banner(title: AppStrings.text("providers.modelsError"), message: String(localized: UserFacingError.message(error)), actionTitle: "err.retry") { Task { await model.warmModels(connectionId: connection.id) } }
+                Banner(title: AppStrings.text("providers.modelsError"), message: AppStrings.error(error), actionTitle: "err.retry") { Task { await model.warmModels(connectionId: connection.id) } }
             }
             ByoButton("key.replace") { replacing = true; key = ""; showKey = false }
             ByoButton("key.recheck") { Task { await model.warmModels(connectionId: connection.id) } }

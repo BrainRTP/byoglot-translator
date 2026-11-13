@@ -2,11 +2,23 @@ name: Linux packages
 
 on:
   pull_request:
-    paths: ["linux/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/linux-release.yml"]
+    paths:
+      [
+        "linux/**",
+        "contracts/**",
+        "lib/translate/profiles/**",
+        ".github/workflows/linux-release.yml",
+      ]
   push:
     branches: [main]
     tags: ["linux-v*"]
-    paths: ["linux/**", "contracts/**", "lib/translate/profiles/**", ".github/workflows/linux-release.yml"]
+    paths:
+      [
+        "linux/**",
+        "contracts/**",
+        "lib/translate/profiles/**",
+        ".github/workflows/linux-release.yml",
+      ]
   workflow_dispatch:
 
 permissions:

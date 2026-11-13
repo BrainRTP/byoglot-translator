@@ -1,5 +1,6 @@
 @testable import ByoGlotAppKit
 import ByoGlotCore
+import Darwin
 import Foundation
 import Synchronization
 import Testing
@@ -25,6 +26,7 @@ private actor FakeTranslationCache: TranslationCaching {
     var value: CachedTranslation?
     var keys: [TranslationCacheKey] = []
     var stored = 0
+    var removed: [String] = []
     var currentGeneration = UUID()
     var invalidateOnLookup = false
     var attemptedGeneration: UUID?
@@ -41,7 +43,7 @@ private actor FakeTranslationCache: TranslationCaching {
         guard generation == currentGeneration else { return }
         stored += 1; self.value = value
     }
-    func remove(connectionId: String) { value = nil }
+    func remove(connectionId: String) { removed.append(connectionId); value = nil }
     func clear() { value = nil }
     func statistics() -> TranslationCacheStatistics { TranslationCacheStatistics(count: value == nil ? 0 : 1) }
 }
@@ -78,8 +80,14 @@ private func insert(_ text: String, connectionId: String = "c1", into cache: Tra
     other = connection
     other.name = "Renamed"
     other.id = "unrelated-connection-id"
-    other.baseUrl = "https://provider.example/another-path"
+    other.baseUrl = "HTTPS://PROVIDER.EXAMPLE:443/v1///?ignored=true#fragment"
     #expect(original == (try TranslationCacheKey(connection: other, request: request)))
+    other.baseUrl = "https://provider.example/another-path"
+    #expect(original != (try TranslationCacheKey(connection: other, request: request)))
+    other.baseUrl = "https://provider.example/v1%2Ftenant"
+    let escaped = try TranslationCacheKey(connection: other, request: request)
+    other.baseUrl = "https://provider.example/v1/tenant"
+    #expect(escaped != (try TranslationCacheKey(connection: other, request: request)))
     other.preset = .custom
     var effort = request
     effort.model.variant = "low"
@@ -89,7 +97,122 @@ private func insert(_ text: String, connectionId: String = "c1", into cache: Tra
 @Test func cacheKeyMatchesTheAndroidGoldenVector() throws {
     let connection = Connection(id: "c1", preset: .deepseek, name: "Provider", baseUrl: "https://a.test/v1")
     let request = TextRequest(text: "hello", context: "", appName: "", sourceLang: "auto", targetLang: "en", prePrompt: "", languagePrompt: "", model: ModelRef(providerID: "deepseek", id: "m", variant: "high"))
-    #expect(try TranslationCacheKey(connection: connection, request: request).rawValue == "71b2cb6a0d4175a820bdc27004b4089d6655aec01c816239bbb49d68bc35a28e")
+    #expect(try TranslationCacheKey(connection: connection, request: request).rawValue == "333f77a0562939d6dfe28fda7ae6faf6c5acae8eed3854ebed674bc898eb3a7c")
+}
+
+@Test func cacheReadsAndUnchangedStoresDoNotRewriteTheIndex() async throws {
+    let f = AppFixture(), files = FileManager.default
+    let directory = f.directory.appending(path: "cache")
+    let cache = TranslationCache(directory: directory, now: { Date(timeIntervalSince1970: 1) })
+    let key = try await insert("one", into: cache)
+    let index = directory.appending(path: "index.json")
+    let inode = try #require(files.attributesOfItem(atPath: index.path)[.systemFileNumber] as? NSNumber)
+    let orphan = directory.appending(path: "orphan.entry")
+    try Data("orphan".utf8).write(to: orphan)
+    #expect(await cache.generation() != nil)
+    #expect(await cache.lookup(key).value != nil)
+    #expect(await cache.lookup(key, bypass: true).value == nil)
+    #expect(try await cache.lookup(cacheKey("missing")).value == nil)
+    #expect(await cache.statistics().count == 1)
+    #expect(try files.attributesOfItem(atPath: index.path)[.systemFileNumber] as? NSNumber == inode)
+    #expect(files.fileExists(atPath: orphan.path))
+    await cache.store(CachedTranslation(text: "translation one", targetLang: "ru"), for: key, connectionId: "c1", generation: cache.generation())
+    #expect(try files.attributesOfItem(atPath: index.path)[.systemFileNumber] as? NSNumber == inode)
+    #expect(!files.fileExists(atPath: orphan.path))
+}
+
+@Test func cacheLockContentionReturnsPromptlyAndSkipsWrites() async throws {
+    let f = AppFixture()
+    let directory = f.directory.appending(path: "cache")
+    let cache = TranslationCache(directory: directory)
+    let key = try await insert("one", into: cache)
+    let generation = await cache.generation()
+    let index = try Data(contentsOf: directory.appending(path: "index.json"))
+    let descriptor = open(directory.appending(path: "cache.lock").path, O_RDWR)
+    #expect(descriptor >= 0)
+    defer { close(descriptor) }
+    #expect(flock(descriptor, LOCK_EX | LOCK_NB) == 0)
+    let clock = ContinuousClock(), start = clock.now
+    #expect(await cache.generation() == nil)
+    #expect(await cache.lookup(key).value == nil)
+    await cache.store(CachedTranslation(text: "replacement", targetLang: "ru"), for: key, connectionId: "c1", generation: generation)
+    await cache.remove(connectionId: "c1")
+    await cache.clear()
+    #expect(await cache.statistics() == TranslationCacheStatistics())
+    #expect(start.duration(to: clock.now) < .seconds(1))
+    #expect(flock(descriptor, LOCK_UN) == 0)
+    #expect(try Data(contentsOf: directory.appending(path: "index.json")) == index)
+    #expect(await cache.lookup(key).value?.text == "translation one")
+}
+
+@Test func aReadableHitSurvivesAFailedLastUseWrite() async throws {
+    let f = AppFixture(), files = FileManager.default, clock = CacheClock()
+    let directory = f.directory.appending(path: "cache")
+    let cache = TranslationCache(directory: directory, now: { clock.now() })
+    let key = try await insert("one", into: cache)
+    let generation = await cache.generation()
+    let index = directory.appending(path: "index.json")
+    let before = try Data(contentsOf: index)
+    try files.setAttributes([.posixPermissions: 0o500], ofItemAtPath: directory.path)
+    defer { try? files.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path) }
+    let lookup = await cache.lookup(key)
+    #expect(lookup.value?.text == "translation one")
+    #expect(lookup.generation == generation)
+    #expect(try Data(contentsOf: index) == before)
+}
+
+@Test(arguments: [false, true])
+func failedEntryDeletionStillInvalidatesPendingWrites(clear: Bool) async throws {
+    let f = AppFixture(), files = FileManager.default
+    let directory = f.directory.appending(path: "cache")
+    let cache = TranslationCache(directory: directory)
+    let key = try await insert("one", into: cache)
+    let entry = directory.appending(path: key.rawValue + ".entry")
+    let generation = await cache.generation()
+    try files.setAttributes([.immutable: true], ofItemAtPath: entry.path)
+    defer { try? files.setAttributes([.immutable: false], ofItemAtPath: entry.path) }
+    if clear { await cache.clear() } else { await cache.remove(connectionId: "c1") }
+    #expect(files.fileExists(atPath: entry.path))
+    #expect(await cache.generation() != generation)
+    #expect(await cache.statistics() == TranslationCacheStatistics())
+    await cache.store(CachedTranslation(text: "late", targetLang: "ru"), for: key, connectionId: "c1", generation: generation)
+    #expect(await cache.lookup(key).value == nil)
+}
+
+@Test func failedOrphanDeletionDoesNotDisableTheCache() async throws {
+    let f = AppFixture(), files = FileManager.default
+    let directory = f.directory.appending(path: "cache")
+    let cache = TranslationCache(directory: directory)
+    _ = await cache.generation()
+    let orphan = directory.appending(path: "orphan.entry")
+    try Data("orphan".utf8).write(to: orphan)
+    try files.setAttributes([.immutable: true], ofItemAtPath: orphan.path)
+    defer { try? files.setAttributes([.immutable: false], ofItemAtPath: orphan.path) }
+    let key = try await insert("one", into: cache)
+    #expect(files.fileExists(atPath: orphan.path))
+    #expect(await cache.lookup(key).value?.text == "translation one")
+    await cache.clear()
+    #expect(await cache.statistics() == TranslationCacheStatistics())
+}
+
+@Test func deletingAConnectionInvalidatesTheCacheOnce() async throws {
+    let f = AppFixture()
+    try await f.connect()
+    let cache = FakeTranslationCache()
+    let editor = ConnectionEditor(settings: f.settings, secrets: f.secrets, transport: f.transport, translationCache: cache, urlPolicy: .httpsOnly)
+    try await editor.remove(id: "c1")
+    #expect(await cache.removed == ["c1"])
+}
+
+@Test(arguments: ["stop", "end_turn", nil] as [String?])
+func onlySuccessfulFinishReasonsAreCached(_ reason: String?) async throws {
+    let f = AppFixture()
+    try await f.connect()
+    let cache = FakeTranslationCache()
+    let finish = reason.map { ",\"finish_reason\":\"\($0)\"" } ?? ""
+    await f.transport.configure(streamBody: "data: {\"choices\":[{\"delta\":{\"content\":\"answer\"}\(finish)}]}\n\ndata: [DONE]\n\n")
+    #expect(try await cachedRunner(f, cache: cache).translate(RunnerInput(text: "hello", limit: 100)).text == "answer")
+    #expect(await cache.stored == 1)
 }
 
 @Test func diskCacheSurvivesRestartExcludesBackupsAndContainsNoSource() async throws {
@@ -234,7 +357,7 @@ private func insert(_ text: String, connectionId: String = "c1", into cache: Tra
     #expect(await cache.stored == 0)
 }
 
-@Test(arguments: ["length", "max_tokens", "partial", "failed"])
+@Test(arguments: ["length", "max_tokens", "partial", "failed", "content_filter", "tool_calls", "unknown", ""])
 func incompletePartialAndFailedStreamsAreNeverCached(_ kind: String) async throws {
     let f = AppFixture()
     try await f.connect()

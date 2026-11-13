@@ -123,6 +123,7 @@ public actor TranslationRunner {
             for try await chunk in stream(input) { final = chunk }
             try Task.checkCancellation()
             guard let final, final.complete else { throw RunnerError.backend(BackendError(kind: .badResponse)) }
+            guard !final.incomplete else { throw RunnerError.backend(BackendError(kind: .badResponse, detail: "incomplete completion")) }
             return final.output
         } catch { throw runnerError(error) }
     }
@@ -152,7 +153,7 @@ public actor TranslationRunner {
                         continuation.yield(value)
                     }
                     try Task.checkCancellation()
-                    if let final, final.complete, !final.incomplete {
+                    if let final, final.complete, !final.incomplete, final.finishReason == nil || final.finishReason == "stop" || final.finishReason == "end_turn" {
                         await self.translationCache?.store(CachedTranslation(text: final.output.text, targetLang: final.output.targetLang), for: prepared.key, connectionId: prepared.connection.id, generation: generation)
                     }
                     continuation.finish()

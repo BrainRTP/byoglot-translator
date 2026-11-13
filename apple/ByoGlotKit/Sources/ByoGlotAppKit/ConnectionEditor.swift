@@ -140,7 +140,7 @@ public actor ConnectionEditor {
             else { try secrets.delete(connectionId: id) }
             throw error
         }
-        if oldOrigin != nil && (origin != oldOrigin || secret != oldSecret) { await translationCache?.remove(connectionId: id) }
+        if origin != nil && oldOrigin != nil && (origin != oldOrigin || secret != oldSecret) { await translationCache?.remove(connectionId: id) }
     }
 
     private func acquireMutation() async throws {

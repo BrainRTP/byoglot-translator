@@ -127,8 +127,11 @@ struct ExportTests {
         #expect(own.targetLang == "de")
         #expect(own.model == templateModel)
         template.settings.selectionModel?.connectionId = "c2"
+        state.connections.append(Connection(id: "c2", preset: .custom, name: "Other", baseUrl: "http://localhost:8080", selectionModel: template.settings.selectionModel))
+        state.externalModel = template.settings.selectionModel
         template.settings.targetLang = nil
         #expect(SettingsLogic.effective(template: template, settings: state).model == connectionModel)
+        #expect(SettingsLogic.effectiveForApp(template: template, settings: state).model == template.settings.selectionModel)
         #expect(SettingsLogic.effective(template: template, settings: state).targetLang == "ru")
         state.activeConnectionId = nil
         template.settings.selectionModel?.connectionId = nil

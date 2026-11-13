@@ -1,10 +1,10 @@
 import Foundation
 
 public struct ProviderClient: Sendable {
-    private let connection: Connection
-    private let secret: String?
-    private let transport: any HTTPTransport
-    private let now: @Sendable () -> Date
+    let connection: Connection
+    let secret: String?
+    let transport: any HTTPTransport
+    let now: @Sendable () -> Date
 
     public init(connection: Connection, secret: String?, transport: any HTTPTransport, now: @escaping @Sendable () -> Date = Date.init) {
         self.connection = connection
@@ -30,15 +30,21 @@ public struct ProviderClient: Sendable {
     }
 
     public func defaultModel() async throws(BackendError) -> ModelInfo? {
-        let models = try await rawModels()
-        let raw: RawModel?
-        switch connection.preset {
-        case .openai: raw = nil
-        case .mistral: raw = models.first { $0.capabilities?.completion_chat != false }
-        case .deepseek: raw = models.first { $0.id == "deepseek-flash" }
-        default: raw = models.first
+        try await modelsWithDefault().defaultModel
+    }
+
+    public func modelsWithDefault() async throws(BackendError) -> (models: [ModelInfo], defaultModel: ModelInfo?) {
+        let raw = try await rawModels()
+        let models = raw.map(modelInfo)
+        let index = raw.firstIndex { model in
+            switch connection.preset {
+            case .openai: false
+            case .mistral: model.capabilities?.completion_chat != false
+            case .deepseek: model.id == Contracts.favoriteModel.id
+            default: true
+            }
         }
-        return raw.map(modelInfo)
+        return (models, index.map { models[$0] })
     }
 
     public func generate(prompt: String, model: ModelRef) async throws(BackendError) -> String {
@@ -89,7 +95,7 @@ public struct ProviderClient: Sendable {
         }
     }
 
-    private func failure(_ response: HTTPResponse) -> BackendError {
+    func failure(_ response: HTTPResponse) -> BackendError {
         let status = response.status
         let rawMessage = (try? JSONDecoder().decode(ErrorBody.self, from: providerJSON(response.body)))?.error?.message
         let message: String? = rawMessage.map { message in

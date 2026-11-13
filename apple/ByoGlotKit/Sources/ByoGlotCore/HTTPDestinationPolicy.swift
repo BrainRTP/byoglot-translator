@@ -7,7 +7,7 @@ public enum HTTPDestinationPolicy {
         return scheme == "http" && isLocalOrLAN(host)
     }
 
-    private static func isLocalOrLAN(_ rawHost: String) -> Bool {
+    public static func isLocalOrLAN(_ rawHost: String) -> Bool {
         let host = rawHost.hasSuffix(".") ? String(rawHost.dropLast()) : rawHost
         if host == "localhost" || host.hasSuffix(".local") { return true }
         if let bytes = ipv4(host) { return localIPv4(bytes) }

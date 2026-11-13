@@ -65,6 +65,42 @@ public actor Translator {
         return result
     }
 
+    public nonisolated func stream(_ request: TextRequest) -> AsyncThrowingStream<TranslationChunk, any Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    try await self.performStream(request, continuation: continuation)
+                    continuation.finish()
+                } catch { continuation.finish(throwing: error) }
+            }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
+        }
+    }
+
+    private func performStream(_ request: TextRequest, continuation: AsyncThrowingStream<TranslationChunk, any Error>.Continuation) async throws {
+        guard await acquire() else { throw BackendError(kind: .aborted) }
+        defer { release() }
+        try Task.checkCancellation()
+        let prompt = PromptBuilder.text(TextPromptInput(prePrompt: request.prePrompt, languagePrompt: request.languagePrompt, sourceLang: request.sourceLang, targetLang: request.targetLang, text: request.text, context: request.context, appName: request.appName))
+        let backend = try await generator()
+        var text = ""
+        var reason: String?
+        var usage: TokenUsage?
+        if let streaming = backend as? any StreamingTextGenerating {
+            for try await delta in streaming.stream(prompt: prompt, model: request.model) {
+                try Task.checkCancellation()
+                text.append(delta.text)
+                reason = delta.finishReason ?? reason
+                usage = delta.usage ?? usage
+                continuation.yield(TranslationChunk(text: text, finishReason: reason, usage: usage))
+            }
+        } else { text = try await backend.generate(prompt: prompt, model: request.model) }
+        try Task.checkCancellation()
+        let trimmed = jsTrim(text)
+        guard !trimmed.isEmpty else { throw BackendError(kind: .badResponse) }
+        continuation.yield(TranslationChunk(text: trimmed, complete: true, incomplete: reason == "length" || reason == "max_tokens", finishReason: reason, usage: usage))
+    }
+
     public func clearCache() {
         cache.removeAll()
         cacheOrder.removeAll()
@@ -96,4 +132,23 @@ public actor Translator {
         if waiters.isEmpty { active -= 1 }
         else { waiters.removeFirst().continuation.resume(returning: true) }
     }
+}
+
+public struct TranslationChunk: Sendable, Equatable, CustomStringConvertible, CustomDebugStringConvertible {
+    public var text: String
+    public var complete: Bool
+    public var incomplete: Bool
+    public var finishReason: String?
+    public var usage: TokenUsage?
+
+    public init(text: String, complete: Bool = false, incomplete: Bool = false, finishReason: String? = nil, usage: TokenUsage? = nil) {
+        self.text = text
+        self.complete = complete
+        self.incomplete = incomplete
+        self.finishReason = finishReason
+        self.usage = usage
+    }
+
+    public var description: String { "TranslationChunk(textLength: \(text.utf16.count), complete: \(complete), incomplete: \(incomplete))" }
+    public var debugDescription: String { description }
 }

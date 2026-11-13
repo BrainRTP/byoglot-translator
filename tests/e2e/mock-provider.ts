@@ -3,7 +3,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { translate } from "./mock-translate";
 
-export type ProviderMode = "ok" | "rate_limit" | "bad_key";
+export type ProviderMode = "ok" | "rate_limit" | "bad_key" | "length" | "slow";
 
 export type RecordedRequest = {
   method: string;
@@ -16,6 +16,7 @@ export type MockProvider = {
   url: string;
   key: string;
   requests: RecordedRequest[];
+  aborted: number;
   stop(): Promise<void>;
 };
 
@@ -59,6 +60,7 @@ export async function startMockProvider(
   const key = randomBytes(12).toString("hex");
   const expected = `Bearer ${key}`;
   const requests: RecordedRequest[] = [];
+  let aborted = 0;
 
   const server = http.createServer(async (req, res) => {
     const { pathname } = new URL(req.url ?? "/", "http://localhost");
@@ -85,6 +87,12 @@ export async function startMockProvider(
       return json(200, MODELS);
     }
     if (pathname === "/v1/chat/completions" && req.method === "POST") {
+      if (mode === "slow") {
+        res.on("close", () => {
+          if (!res.writableEnded) aborted++;
+        });
+        return;
+      }
       if (mode === "rate_limit") {
         return json(
           429,
@@ -95,7 +103,13 @@ export async function startMockProvider(
       const { messages } = JSON.parse(raw) as { messages: { content: string }[] };
       const content = translate(messages.at(-1)?.content ?? "");
       return json(200, {
-        choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
+        choices: [
+          {
+            index: 0,
+            message: { role: "assistant", content },
+            finish_reason: mode === "length" ? "length" : "stop",
+          },
+        ],
       });
     }
     return json(404, {});
@@ -108,6 +122,9 @@ export async function startMockProvider(
     url: `http://127.0.0.1:${port}/v1`,
     key,
     requests,
+    get aborted() {
+      return aborted;
+    },
     stop: () =>
       new Promise<void>((resolve) => {
         server.closeAllConnections();

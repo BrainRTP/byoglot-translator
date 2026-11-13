@@ -69,8 +69,14 @@ export type ProfileOp =
 export type RuleOp = { type: "upsert"; rule: SiteRule } | { type: "delete"; id: string };
 
 export type SelectionResult =
-  | { text: string; sourceLang: string; targetLang: string; model: ModelRef }
-  | { error: BackendErrorKind; retryAfterMs?: number; backend?: ConnectionKind; source?: string };
+  | { text: string; sourceLang: string; targetLang: string; model: ModelRef; truncated?: boolean }
+  | {
+      error: BackendErrorKind;
+      retryAfterMs?: number;
+      backend?: ConnectionKind;
+      source?: string;
+      timeout?: boolean;
+    };
 
 export type PageState = {
   state: "idle" | "translating" | "translated" | "error";
@@ -113,6 +119,7 @@ export interface ProtocolMap {
     templateId?: string;
     window?: "oneshot" | "pinned";
     requestId?: string;
+    editor?: { sourceLang: string; targetLang: string };
   }): SelectionResult;
   cancelSelection(requestId: string): void;
   pageBadge(state: PageState["state"]): void;

@@ -1,6 +1,24 @@
 import type { MessageKey } from "./index";
 
 export const ru = {
+  "translator.title": "Переводчик текста",
+  "translator.open": "Перевести текст",
+  "translator.input": "Текст для перевода",
+  "translator.placeholder": "Вставьте или введите текст",
+  "translator.source": "Исходный язык",
+  "translator.target": "Язык перевода",
+  "translator.translate": "Перевести",
+  "translator.result": "Перевод",
+  "translator.limit": "Текст слишком длинный ({count} / {limit}). Сократите его для перевода.",
+  "translator.count": "{count} / {limit}",
+  "translator.privacy":
+    "ByoGlot не сохраняет текст и перевод. Текст отправляется подключенному провайдеру или серверу opencode.",
+  "translator.truncated": "Перевод обрезан: модель достигла лимита ответа.",
+  "translator.unverified": "Это подключение не сообщает, был ли перевод обрезан.",
+  "translator.ready": "Перевод готов",
+  "translator.timeout.title": "Время ожидания перевода истекло",
+  "translator.timeout":
+    "Запрос занял слишком много времени. Повторите или выберите более быструю модель в настройках.",
   "template.builtin": "Обычный перевод",
   "unit.h": "ч",
   "unit.min": "мин",

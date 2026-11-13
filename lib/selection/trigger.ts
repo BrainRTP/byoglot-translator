@@ -3,7 +3,10 @@ import { t } from "../i18n";
 import type { SelectionMode, ThemeChoice } from "../settings/types";
 import { applyTheme } from "../ui/theme";
 import { type Anchor, type CardDeps, createCard, svgIcon } from "./card";
+import { MAX_CONTEXT, MAX_SELECTION } from "./limits";
 import { HOST_STYLE, STYLES } from "./styles";
+
+export { MAX_CONTEXT, MAX_EDITOR_TEXT, MAX_SELECTION } from "./limits";
 
 export type SelectionUiDeps = CardDeps & {
   theme?(): Promise<ThemeChoice>;
@@ -21,8 +24,6 @@ const DEBOUNCE_MS = 150;
 const TOUCH_DEBOUNCE_MS = 500;
 const TOUCH_ICON_SIZE = 44;
 const TOUCH_ICON_GAP = 12;
-export const MAX_SELECTION = 5000;
-export const MAX_CONTEXT = 1000;
 const ICON_SIZE = 24;
 const ICON_GAP = 4;
 const EDGE = 4;

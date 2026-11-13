@@ -109,6 +109,24 @@ export function createProviderBackend(
     return models.map(toModelInfo);
   }
 
+  async function generateWithMetadata(prompt: string, model: ModelRef, signal?: AbortSignal) {
+    const { choices } = await call("/chat/completions", chatSchema, signal, {
+      model: model.id,
+      messages: [{ role: "user", content: prompt }],
+      stream: false,
+      ...effortParams(provider.preset, model.variant),
+    });
+    const choice = choices[0];
+    const content = choice?.message.content;
+    if (!content) throw new BackendError("bad_response", { detail: "empty completion" });
+    return {
+      text: content,
+      ...(typeof choice?.finish_reason === "string" && {
+        truncated: choice.finish_reason === "length",
+      }),
+    };
+  }
+
   return {
     async info(signal) {
       await listModels(signal);
@@ -121,16 +139,8 @@ export function createProviderBackend(
         return models.find((m) => m.id === "deepseek-flash") ?? null;
       return models[0] ?? null;
     },
-    async generate(prompt, model: ModelRef, signal) {
-      const { choices } = await call("/chat/completions", chatSchema, signal, {
-        model: model.id,
-        messages: [{ role: "user", content: prompt }],
-        stream: false,
-        ...effortParams(provider.preset, model.variant),
-      });
-      const content = choices[0]?.message.content;
-      if (!content) throw new BackendError("bad_response", { detail: "empty completion" });
-      return content;
-    },
+    generate: async (prompt, model, signal) =>
+      (await generateWithMetadata(prompt, model, signal)).text,
+    generateWithMetadata,
   };
 }

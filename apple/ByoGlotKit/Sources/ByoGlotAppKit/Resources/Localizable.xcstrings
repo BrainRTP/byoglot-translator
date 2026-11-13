@@ -3560,6 +3560,38 @@
           }
         }
       }
+    },
+    "model.chooseForEffort": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a model to see its effort levels."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите модель, чтобы увидеть уровни усилия."
+          }
+        }
+      }
+    },
+    "model.capabilitiesUnknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model capabilities are not loaded. Only None can be selected until the model list is refreshed."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Возможности модели не загружены. До обновления списка моделей можно выбрать только Нет."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

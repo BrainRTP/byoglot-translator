@@ -124,7 +124,10 @@ struct EffortSegment: View {
     let ref: ModelRef?
     let choose: (ModelRef) -> Void
     private var levels: [String] { ["none"] + (model.modelInfo(ref)?.variants.filter { $0 != "none" } ?? []) }
-    private var selected: String { levels.contains(ref?.variant ?? "none") ? ref?.variant ?? "none" : "none" }
+    private var selected: String {
+        let value = ref?.variant ?? "none"
+        return model.modelInfo(ref) == nil || levels.contains(value) ? value : "none"
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionLabel("model.effort")
@@ -134,7 +137,8 @@ struct EffortSegment: View {
                 choose(ref)
             }), disabled: Set(["none", "low", "medium", "high", "max"].filter { !levels.contains($0) }), labels: { AppStrings.text("effort.short." + $0) }, accessibilityLabels: AppStrings.effort)
                 .disabled(ref == nil)
-            if levels.count == 1 { Note(text: AppStrings.text("model.noThinking")) }
+            if model.modelInfo(ref) == nil { Note(text: AppStrings.text(ref == nil ? "model.chooseForEffort" : "model.capabilitiesUnknown")) }
+            else if levels.count == 1 { Note(text: AppStrings.text("model.noThinking")) }
             else if selected != "none" { Note(text: AppStrings.text("model.thinkingNote")) }
         }
     }

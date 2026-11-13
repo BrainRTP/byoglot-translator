@@ -614,6 +614,112 @@
           "content": "translated"
         }
       }
+    },
+    {
+      "name": "openai without reasoning parameters",
+      "input": {
+        "provider": {
+          "preset": "openai",
+          "name": "OpenAI",
+          "baseUrl": "https://api.openai.com/v1",
+          "apiKey": "fixture-key"
+        },
+        "model": {
+          "providerID": "openai",
+          "id": "model-id-0",
+          "variant": "high"
+        },
+        "prompt": "Translate hello to Russian.",
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "choices": [
+              {
+                "message": {
+                  "content": "Привет"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "POST",
+          "url": "https://api.openai.com/v1/chat/completions",
+          "headers": {
+            "authorization": "Bearer fixture-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "model-id-0",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Translate hello to Russian."
+              }
+            ],
+            "stream": false
+          }
+        },
+        "result": {
+          "content": "Привет"
+        }
+      }
+    },
+    {
+      "name": "mistral without reasoning parameters",
+      "input": {
+        "provider": {
+          "preset": "mistral",
+          "name": "Mistral",
+          "baseUrl": "https://api.mistral.ai/v1",
+          "apiKey": "fixture-key"
+        },
+        "model": {
+          "providerID": "mistral",
+          "id": "mistral-large-latest",
+          "variant": "high"
+        },
+        "prompt": "Translate hello to Russian.",
+        "response": {
+          "status": 200,
+          "headers": {},
+          "body": {
+            "choices": [
+              {
+                "message": {
+                  "content": "Привет"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "request": {
+          "method": "POST",
+          "url": "https://api.mistral.ai/v1/chat/completions",
+          "headers": {
+            "authorization": "Bearer fixture-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "mistral-large-latest",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Translate hello to Russian."
+              }
+            ],
+            "stream": false
+          }
+        },
+        "result": {
+          "content": "Привет"
+        }
+      }
     }
   ]
 }

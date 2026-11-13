@@ -18,7 +18,7 @@ Provider responses that do not match the expected JSON shape have kind `incompat
 
 `samples/export-v1.json` is a raw portable export sample, outside the fixture envelope. Tests validate it with `parseExport` and with the published JSON Schema through the installed Zod `fromJSONSchema` conversion. Parsing and schema validation reject unknown keys, including nested connection secrets. `buildExport` explicitly picks portable fields and drops unknown stored keys before strict validation.
 
-The export format contains portable globals, templates, profile overrides, site rules and provider connections without secrets. It excludes opencode connections. Native apps ignore `siteRules`. Model references keep `connectionId`; an importer drops references whose connection id is absent from `connections`. Export and import controls are a separate change.
+The export format contains portable globals, templates, profile overrides, site rules and provider connections without secrets. It excludes opencode connections. Native apps ignore `siteRules`. Model references keep `connectionId`; an importer drops references whose connection id is absent from `connections`. Export and import controls are a separate change. Older clients reject export-v1 files containing the `openai` or `mistral` preset with their existing format error.
 
 | File                             | Pins                                                          | TypeScript source                                                                                              |
 | -------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |

@@ -331,6 +331,8 @@ export const en = {
   "conn.form.saving": "Saving…",
   "conn.preset.deepseek": "DeepSeek",
   "conn.preset.openrouter": "OpenRouter",
+  "conn.preset.openai": "OpenAI",
+  "conn.preset.mistral": "Mistral",
   "conn.preset.ollama": "Ollama",
   "conn.preset.lmstudio": "LM Studio",
   "conn.preset.custom": "Custom",

@@ -26,6 +26,10 @@ public enum DraftProblem: Equatable, Sendable { case baseUrl, apiKey, insecureRe
 public enum AppProviderURLPolicy: Sendable {
     case httpsOnly, allowLocalHTTP
 
+    var customBaseURLHelpKey: String { self == .httpsOnly ? "custom.baseUrlHelp.httpsOnly" : "custom.baseUrlHelp" }
+    var providerURLHelpKey: String { self == .httpsOnly ? "providers.httpsHelp.httpsOnly" : "providers.httpsHelp" }
+    var invalidURLKey: String { self == .httpsOnly ? "providers.badURL.httpsOnly" : "providers.badURL" }
+
     func permits(_ url: URL) -> Bool {
         HTTPDestinationPolicy.permits(url) && (self == .allowLocalHTTP || url.scheme?.lowercased() == "https")
     }
@@ -39,9 +43,9 @@ public actor ConnectionEditor {
     var pendingMutations: Int { mutationWaiters.count }
     private let modelCapabilities: ModelCapabilitiesCache
     private let transport: any HTTPTransport
-    private let urlPolicy: AppProviderURLPolicy
+    public nonisolated let urlPolicy: AppProviderURLPolicy
 
-    public init(settings: SettingsStore, secrets: any SecretStore, transport: any HTTPTransport, modelCapabilities: ModelCapabilitiesCache = .shared, urlPolicy: AppProviderURLPolicy = .allowLocalHTTP) {
+    public init(settings: SettingsStore, secrets: any SecretStore, transport: any HTTPTransport, modelCapabilities: ModelCapabilitiesCache = .shared, urlPolicy: AppProviderURLPolicy) {
         self.settings = settings
         self.secrets = secrets
         self.transport = transport

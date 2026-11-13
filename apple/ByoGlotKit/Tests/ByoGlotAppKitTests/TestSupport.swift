@@ -57,8 +57,8 @@ final class AppFixture: Sendable {
     let secrets = InMemorySecretStore()
     let capabilities = ModelCapabilitiesCache()
     let transport = AppTransport()
-    var runner: TranslationRunner { TranslationRunner(settings: settings, secrets: secrets, transport: transport, detector: FixedDetector(), modelCapabilities: capabilities) }
-    var editor: ConnectionEditor { ConnectionEditor(settings: settings, secrets: secrets, transport: transport, modelCapabilities: capabilities) }
+    var runner: TranslationRunner { TranslationRunner(settings: settings, secrets: secrets, transport: transport, detector: FixedDetector(), modelCapabilities: capabilities, urlPolicy: .allowLocalHTTP) }
+    var editor: ConnectionEditor { ConnectionEditor(settings: settings, secrets: secrets, transport: transport, modelCapabilities: capabilities, urlPolicy: .allowLocalHTTP) }
 
     init() { settings = SettingsStore(directory: directory) }
     deinit { try? FileManager.default.removeItem(at: directory) }

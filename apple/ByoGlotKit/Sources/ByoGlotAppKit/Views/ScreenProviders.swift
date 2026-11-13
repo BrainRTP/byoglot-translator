@@ -91,7 +91,7 @@ private struct ProviderKeyScreen: View {
                         #if os(iOS)
                         .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
                         #endif
-                    Text(AppStrings.text(invalidURL ? "providers.badURL" : "providers.httpsHelp"))
+                    Text(AppStrings.text(invalidURL ? model.editor.urlPolicy.invalidURLKey : model.editor.urlPolicy.providerURLHelpKey))
                         .modifier(ByoTypography(13)).foregroundStyle(invalidURL ? ByoColor.error : ByoColor.muted)
                 }
                 if stored {

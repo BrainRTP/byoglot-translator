@@ -1,9 +1,29 @@
-import ByoGlotAppKit
+@testable import ByoGlotAppKit
 import ByoGlotCore
 import Foundation
 import Testing
 
 struct AppProviderURLPolicyTests {
+    @Test(arguments: ["en", "ru"])
+    func urlGuidanceMatchesTheActivePolicy(_ language: String) throws {
+        let url = try #require(Bundle.module.url(forResource: language, withExtension: "lproj"))
+        let bundle = try #require(Bundle(url: url))
+        for policy in [AppProviderURLPolicy.httpsOnly, .allowLocalHTTP] {
+            let help: String
+            let error: String
+            if policy == .httpsOnly {
+                help = language == "en" ? "OpenAI Chat Completions protocol. HTTPS only." : "Протокол OpenAI Chat Completions. Только HTTPS."
+                error = language == "en" ? "Enter a valid HTTPS URL." : "Введите корректный HTTPS URL."
+            } else {
+                help = language == "en" ? "OpenAI Chat Completions protocol. HTTPS, or HTTP on a local network." : "Протокол OpenAI Chat Completions. HTTPS или HTTP в локальной сети."
+                error = language == "en" ? "Enter a valid HTTPS URL or a local network HTTP URL." : "Введите корректный HTTPS URL или HTTP URL в локальной сети."
+            }
+            #expect(bundle.localizedString(forKey: policy.customBaseURLHelpKey, value: nil, table: nil) == help)
+            #expect(bundle.localizedString(forKey: policy.providerURLHelpKey, value: nil, table: nil) == help)
+            #expect(bundle.localizedString(forKey: policy.invalidURLKey, value: nil, table: nil) == error)
+        }
+    }
+
     @Test(arguments: ["http://remote.example/v1", "http://localhost:8080/v1", "http://127.0.0.1/v1", "http://192.168.1.2/v1", "http://10.0.0.2/v1", "http://172.16.0.2/v1", "http://provider.local/v1", "http://[::1]/v1", "http://[fe80::1]/v1"])
     func httpsOnlyRejectsDraftsBeforeConsentOrNetwork(_ base: String) async throws {
         let f = AppFixture()
@@ -58,6 +78,20 @@ struct AppProviderURLPolicyTests {
         #expect(try await editor.models(connectionId: saved.id).map(\.id) == ["model"])
         let runner = TranslationRunner(settings: f.settings, secrets: f.secrets, transport: f.transport, urlPolicy: .httpsOnly)
         #expect(try await runner.translate(RunnerInput(text: "hello", limit: 100)).text == "translated")
+    }
+
+    @Test(arguments: ["https://192.168.1.2/v1", "https://provider.local/v1"])
+    func httpsOnlyAcceptsLocalNetworkProvidersWithoutRemoteConsent(_ base: String) async throws {
+        let f = AppFixture()
+        let editor = ConnectionEditor(settings: f.settings, secrets: f.secrets, transport: f.transport, urlPolicy: .httpsOnly)
+        let draft = ConnectionDraft(preset: .custom, name: "Provider", baseUrl: base, apiKey: "fixture-key")
+        #expect(editor.validate(draft, hasStoredKey: false) == nil)
+        let saved = try await editor.save(draft, consent: false)
+        #expect(try await editor.models(connectionId: saved.id).map(\.id) == ["model"])
+        let runner = TranslationRunner(settings: f.settings, secrets: f.secrets, transport: f.transport, urlPolicy: .httpsOnly)
+        #expect(try await runner.translate(RunnerInput(text: "hello", limit: 100)).text == "translated")
+        #expect(try await f.settings.read().consentedOrigins.isEmpty)
+        #expect(await f.transport.requests.count == 3)
     }
 
     @Test func localHTTPRemainsUsableWithTheDesktopPolicy() async throws {

@@ -59,7 +59,7 @@ struct TranslationRunnerTests {
             state.consentedOrigins.append("https://new.example")
         }
         await #expect(throws: RunnerError.keyMissing) { try await f.runner.translate(RunnerInput(text: "hi", limit: 10)) }
-        let locked = TranslationRunner(settings: f.settings, secrets: LockedSecrets(), transport: f.transport)
+        let locked = TranslationRunner(settings: f.settings, secrets: LockedSecrets(), transport: f.transport, urlPolicy: .httpsOnly)
         await #expect(throws: RunnerError.deviceLocked) { try await locked.translate(RunnerInput(text: "hi", limit: 10)) }
     }
 

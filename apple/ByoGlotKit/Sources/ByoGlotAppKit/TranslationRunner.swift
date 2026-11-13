@@ -93,7 +93,7 @@ public actor TranslationRunner {
         var customMirror: Mirror { Mirror(self, children: ["summary": description]) }
     }
 
-    public init(settings: SettingsStore, secrets: any SecretStore, transport: any HTTPTransport, detector: any SourceLanguageDetecting = OnDeviceLanguageDetector(), modelCapabilities: ModelCapabilitiesCache = .shared, urlPolicy: AppProviderURLPolicy = .allowLocalHTTP) {
+    public init(settings: SettingsStore, secrets: any SecretStore, transport: any HTTPTransport, detector: any SourceLanguageDetecting = OnDeviceLanguageDetector(), modelCapabilities: ModelCapabilitiesCache = .shared, urlPolicy: AppProviderURLPolicy) {
         self.settings = settings
         self.secrets = secrets
         self.transport = transport
@@ -102,11 +102,11 @@ public actor TranslationRunner {
         self.urlPolicy = urlPolicy
     }
 
-    public static func shared(appGroup: String, keychainGroup: String?, urlPolicy: AppProviderURLPolicy = .allowLocalHTTP) throws -> TranslationRunner {
+    public static func shared(appGroup: String, keychainGroup: String?, urlPolicy: AppProviderURLPolicy) throws -> TranslationRunner {
         try shared(containerURL: FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup), keychainGroup: keychainGroup, urlPolicy: urlPolicy)
     }
 
-    static func shared(containerURL: URL?, keychainGroup: String?, urlPolicy: AppProviderURLPolicy = .allowLocalHTTP) throws -> TranslationRunner {
+    static func shared(containerURL: URL?, keychainGroup: String?, urlPolicy: AppProviderURLPolicy) throws -> TranslationRunner {
         guard let directory = containerURL else { throw RunnerError.appGroupUnavailable }
         return TranslationRunner(settings: SettingsStore(directory: directory), secrets: KeychainSecretStore(accessGroup: keychainGroup), transport: URLSessionTransport(), urlPolicy: urlPolicy)
     }

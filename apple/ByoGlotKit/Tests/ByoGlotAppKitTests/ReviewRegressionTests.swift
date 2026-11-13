@@ -45,7 +45,7 @@ struct ReviewRegressionTests {
         let secrets = HookedSecrets(base: f.secrets) { secret in
             if secret == "first-key" { firstTask.withLock { $0?.cancel() } }
         }
-        let editor = ConnectionEditor(settings: f.settings, secrets: secrets, transport: transport, modelCapabilities: f.capabilities)
+        let editor = ConnectionEditor(settings: f.settings, secrets: secrets, transport: transport, modelCapabilities: f.capabilities, urlPolicy: .allowLocalHTTP)
         let first = Task { try await editor.save(ConnectionDraft(id: "c1", preset: .custom, name: "First", baseUrl: "https://first.example/v1", apiKey: "first-key"), consent: true) }
         firstTask.withLock { $0 = first }
         var started = transport.starts.stream.makeAsyncIterator()
@@ -73,7 +73,7 @@ struct ReviewRegressionTests {
                 try? FileManager.default.createDirectory(at: lock, withIntermediateDirectories: true)
             }
         }
-        let editor = ConnectionEditor(settings: f.settings, secrets: secrets, transport: f.transport)
+        let editor = ConnectionEditor(settings: f.settings, secrets: secrets, transport: f.transport, urlPolicy: .allowLocalHTTP)
         await #expect(throws: RunnerError.backend(BackendError(kind: .providerError))) {
             try await editor.save(ConnectionDraft(id: "c1", preset: .custom, name: "New", baseUrl: "https://new.example/v1", apiKey: "new-key"), consent: true)
         }
@@ -122,7 +122,7 @@ struct ReviewRegressionTests {
     }
 
     @Test func missingAppGroupIsDistinctAndLocalized() {
-        #expect(throws: RunnerError.appGroupUnavailable) { try TranslationRunner.shared(containerURL: nil, keychainGroup: nil) }
+        #expect(throws: RunnerError.appGroupUnavailable) { try TranslationRunner.shared(containerURL: nil, keychainGroup: nil, urlPolicy: .httpsOnly) }
         for (language, expected) in [("en", "ByoGlot cannot access shared storage."), ("ru", "ByoGlot не может открыть общее хранилище.")] {
             var resource = UserFacingError.message(.appGroupUnavailable)
             resource.locale = Locale(identifier: language)

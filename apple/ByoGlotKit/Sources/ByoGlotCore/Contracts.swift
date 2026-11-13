@@ -11,6 +11,7 @@ public struct Limits: Codable, Hashable, Sendable {
     public let concurrency: Int
     public let generateTimeoutMs: Int
     public let maxProfileText: Int
+    public let maxSelection: Int
     public let maxEditorText: Int
 }
 
@@ -40,6 +41,14 @@ public enum Contracts: Sendable {
             return (preset, info)
         }
     )
+    public static let presetOrder: [ProviderPreset] = {
+        let url = Bundle.module.resourceURL!.appending(path: "Resources/contracts/presets.json")
+        let data = try! Data(contentsOf: url)
+        let text = String(decoding: data, as: UTF8.self)
+        return ProviderPreset.allCases.sorted {
+            text.range(of: "\"\($0.rawValue)\":")!.lowerBound < text.range(of: "\"\($1.rawValue)\":")!.lowerBound
+        }
+    }()
     public static let favoriteModel = presetFile.favoriteModel
     public static let selectionDefaultEffort = presetFile.selectionDefaultEffort
     public static let limits: Limits = load("limits")

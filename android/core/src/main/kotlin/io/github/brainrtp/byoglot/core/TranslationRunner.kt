@@ -1,8 +1,10 @@
 package io.github.brainrtp.byoglot.core
 
 import java.net.URI
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 
 sealed interface RunnerError {
     data object NoConnection : RunnerError
@@ -98,11 +100,12 @@ class TranslationRunner(
             }
         }
     }
+        .flowOn(Dispatchers.Default)
 
     private suspend fun prepare(input: RunnerInput): Prepared {
         val text = input.text.jsTrim()
         if (text.isEmpty()) throw RunnerException(RunnerError.Empty)
-        if (input.text.length > input.limit) throw RunnerException(RunnerError.TooLong(input.limit))
+        if (text.length > input.limit) throw RunnerException(RunnerError.TooLong(input.limit))
         val state = settings.read()
         val connection =
             state.connections.find { it.id == state.activeConnectionId }

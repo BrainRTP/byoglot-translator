@@ -9,7 +9,8 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 class NetworkMonitor(context: Context) {
-    private val manager = context.getSystemService(ConnectivityManager::class.java)
+    private val manager =
+        context.applicationContext.getSystemService(ConnectivityManager::class.java)
 
     fun online(): Boolean =
         manager
@@ -19,23 +20,18 @@ class NetworkMonitor(context: Context) {
     val changes = callbackFlow {
         val callback =
             object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    trySend(online())
-                }
-
                 override fun onLost(network: Network) {
-                    trySend(online())
+                    trySend(false)
                 }
 
                 override fun onCapabilitiesChanged(
                     network: Network,
                     capabilities: NetworkCapabilities,
                 ) {
-                    trySend(online())
+                    trySend(capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
                 }
             }
         manager.registerDefaultNetworkCallback(callback)
-        trySend(online())
         awaitClose { manager.unregisterNetworkCallback(callback) }
     }
         .distinctUntilChanged()

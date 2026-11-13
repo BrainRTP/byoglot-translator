@@ -1,5 +1,6 @@
 package io.github.brainrtp.byoglot.core
 
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Assertions.*
@@ -243,9 +244,33 @@ class TranslationRunnerTest {
         val runner = runner(state)
         assertEquals(main, runner.translate(input.copy(mainModel = true)).model)
         assertEquals(model, runner.translate(input).model)
-        assertEquals(
-            RunnerError.TooLong(5000),
-            error(runner, input.copy(text = " " + "a".repeat(5000))),
-        )
+        for (limit in listOf(EXTERNAL_INPUT_LIMIT, EDITOR_INPUT_LIMIT)) {
+            assertEquals(
+                "translated",
+                runner
+                    .translate(input.copy(text = " " + "a".repeat(limit) + "\n", limit = limit))
+                    .text,
+            )
+        }
+    }
+
+    @Test
+    fun `streaming transport and parsing run away from the caller thread`() = runBlocking {
+        val caller = Thread.currentThread()
+        var worker: Thread? = null
+        val transport =
+            object : HttpTransport {
+                override suspend fun send(request: HttpRequest, timeoutMs: Long): HttpResponse {
+                    worker = Thread.currentThread()
+                    return HttpResponse(
+                        200,
+                        mapOf("content-type" to "application/json"),
+                        "{\"choices\":[{\"message\":{\"content\":\"translated\"}}]}".toByteArray(),
+                    )
+                }
+            }
+        assertEquals("translated", runner(transport = transport).stream(input).last().output.text)
+        assertNotNull(worker)
+        assertNotSame(caller, worker)
     }
 }

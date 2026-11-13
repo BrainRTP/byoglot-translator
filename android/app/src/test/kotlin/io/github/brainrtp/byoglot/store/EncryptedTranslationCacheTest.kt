@@ -69,6 +69,59 @@ class EncryptedTranslationCacheTest {
     }
 
     @Test
+    fun `hits writes and stats scan once and track replacement sizes`() = runBlocking {
+        store().also { cache ->
+            cache.put(key(1), "c1", value, cache.generation())
+            cache.put(key(2), "c1", value, cache.generation())
+        }
+        val latest = directory.listFiles()!!.maxOf { it.lastModified() }
+        var scans = 0
+        val counted = object : File(directory.path) {
+            override fun listFiles(): Array<File>? {
+                scans++
+                return super.listFiles()
+            }
+        }
+        val cache = EncryptedTranslationCache(counted, cipher, now = { 1000L })
+        assertEquals(value, cache.get(key(1)))
+        assertTrue(directory.resolve("${key(1)}.cache").lastModified() > latest)
+        cache.put(key(2), "c1", value.copy(text = "a longer translation than before"), cache.generation())
+        assertEquals(TranslationCacheStats(2, directory.listFiles()!!.sumOf { it.length() }), cache.stats())
+        cache.put(key(2), "c1", value.copy(text = "short"), cache.generation())
+        assertEquals(value, cache.get(key(1)))
+        assertEquals(TranslationCacheStats(2, directory.listFiles()!!.sumOf { it.length() }), cache.stats())
+        assertEquals(1, scans)
+    }
+
+    @Test
+    fun `failed timestamp updates preserve readable entries`() = runBlocking {
+        val cache = EncryptedTranslationCache(directory, cipher, setLastModified = { _, _ -> false })
+        cache.put(key(1), "c1", value, cache.generation())
+        repeat(2) { assertEquals(value, cache.get(key(1))) }
+        assertEquals(1, cache.stats().entries)
+        assertEquals(value, store().get(key(1)))
+    }
+
+    @Test
+    fun `failed file deletion never interrupts connection removal or clearing`() = runBlocking {
+        val blocked = directory.resolve("${key(1)}.cache").apply { mkdir() }
+        blocked.resolve("child").writeText("prevents deleting this directory")
+        val cache = store()
+        cache.put(key(2), "c1", value, cache.generation())
+        val beforeRemove = cache.generation()
+        cache.removeConnection("c1")
+        assertTrue(cache.generation() > beforeRemove)
+        assertTrue(blocked.exists())
+        assertNull(cache.get(key(2)))
+        cache.put(key(3), "c2", value, cache.generation())
+        val beforeClear = cache.generation()
+        cache.clear()
+        assertTrue(cache.generation() > beforeClear)
+        assertTrue(blocked.exists())
+        assertNull(cache.get(key(3)))
+    }
+
+    @Test
     fun `entry limit includes encryption overhead and rejects oversized answers`() = runBlocking {
         val cache = store(maxEntryBytes = 80)
         cache.put(key(1), "c1", value, cache.generation())

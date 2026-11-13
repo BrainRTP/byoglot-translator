@@ -2,6 +2,7 @@ package io.github.brainrtp.byoglot.core
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
+import java.net.URI
 import java.security.MessageDigest
 
 data class CachedTranslation(val text: String, val targetLang: String) {
@@ -39,7 +40,7 @@ object TranslationCacheKey {
             }
             string("byoglot.translation-cache")
             out.writeInt(1)
-            string(requireNotNull(originOf(connection.baseUrl)))
+            string(requireNotNull(originOf(connection.baseUrl)) + URI(connection.baseUrl).rawPath.orEmpty().trimEnd('/'))
             string(request.model.id)
             string(ProviderEffort.params(connection.preset, request.model.variant).toString())
             out.writeInt(1)

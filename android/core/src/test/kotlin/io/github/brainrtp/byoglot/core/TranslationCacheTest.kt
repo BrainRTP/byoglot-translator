@@ -19,7 +19,7 @@ class TranslationCacheTest {
     @Test
     fun `key follows every effective input and only the effort actually sent`() {
         val key = TranslationCacheKey.of(connection, request)
-        assertEquals("71b2cb6a0d4175a820bdc27004b4089d6655aec01c816239bbb49d68bc35a28e", key)
+        assertEquals("333f77a0562939d6dfe28fda7ae6faf6c5acae8eed3854ebed674bc898eb3a7c", key)
         assertEquals(key, TranslationCacheKey.of(connection, request.copy()))
         listOf(
             request.copy(text = "Hello"), request.copy(sourceLang = "ru"),
@@ -29,7 +29,12 @@ class TranslationCacheTest {
             request.copy(model = model.copy(variant = "low")),
         ).forEach { assertNotEquals(key, TranslationCacheKey.of(connection, it)) }
         assertNotEquals(key, TranslationCacheKey.of(connection.copy(baseUrl = "https://b.test"), request))
-        assertEquals(key, TranslationCacheKey.of(connection.copy(name = "Renamed", baseUrl = "https://A.test:443/v2"), request))
+        assertNotEquals(key, TranslationCacheKey.of(connection.copy(baseUrl = "https://A.test:443/v2"), request))
+        assertEquals(key, TranslationCacheKey.of(connection.copy(name = "Renamed", baseUrl = "HTTPS://A.test:443/v1///?ignored=yes#fragment"), request))
+        assertNotEquals(
+            TranslationCacheKey.of(connection.copy(baseUrl = "https://a.test/a%2Fb"), request),
+            TranslationCacheKey.of(connection.copy(baseUrl = "https://a.test/a/b"), request),
+        )
         assertEquals(key, TranslationCacheKey.of(connection, request.copy(model = model.copy(connectionId = "other"))))
         val openai = connection.copy(preset = ProviderPreset.openai)
         assertEquals(TranslationCacheKey.of(openai, request), TranslationCacheKey.of(openai, request.copy(model = model.copy(variant = "low"))))
@@ -74,10 +79,10 @@ class TranslationCacheTest {
     }
 
     @Test
-    fun `partial failed interrupted and output limited answers are never stored`() = runBlocking {
+    fun `partial failed interrupted and unsuccessful finish reasons are never stored`() = runBlocking {
         val cache = MemoryCache()
         val secrets = InMemorySecretStore().apply { set("key", "c1", "https://a.test") }
-        for (mode in listOf("failure", "interrupted", "length", "max_tokens", "partial")) {
+        for (mode in listOf("failure", "interrupted", "length", "max_tokens", "partial", "content_filter", "tool_calls", "unknown")) {
             val transport = object : HttpTransport {
                 override suspend fun send(request: HttpRequest, timeoutMs: Long): HttpResponse = error("stream only")
                 override fun stream(request: HttpRequest, timeoutMs: Long) = flow {
@@ -96,6 +101,45 @@ class TranslationCacheTest {
             else runCatching { runner.stream(input).toList() }
             assertTrue(cache.values.isEmpty(), mode)
         }
+    }
+
+    @Test
+    fun `stop end turn and absent finish reasons are stored`() = runBlocking {
+        val secrets = InMemorySecretStore().apply { set("key", "c1", "https://a.test") }
+        for (reason in listOf("stop", "end_turn", null)) {
+            val cache = MemoryCache()
+            val transport = object : HttpTransport {
+                override suspend fun send(request: HttpRequest, timeoutMs: Long): HttpResponse =
+                    HttpResponse(200, mapOf("content-type" to "application/json"), buildJsonObject {
+                        putJsonArray("choices") {
+                            addJsonObject {
+                                putJsonObject("message") { put("content", "answer") }
+                                if (reason != null) put("finish_reason", reason)
+                            }
+                        }
+                    }.toString().toByteArray())
+            }
+            val runner = TranslationRunner(InMemorySettingsRepository(initial), secrets, transport, cache)
+            assertFalse(runner.stream(input).last().incomplete)
+            assertEquals("answer", cache.values.values.single().text, reason)
+        }
+    }
+
+    @Test
+    fun `invalidation while resolving settings fences the later write`() = runBlocking {
+        val cache = MemoryCache()
+        val settings = object : SettingsRepository by InMemorySettingsRepository(initial) {
+            override suspend fun read(): AppSettings {
+                cache.removeConnection(connection.id)
+                return initial
+            }
+        }
+        val secrets = InMemorySecretStore().apply { set("key", "c1", "https://a.test") }
+        val transport = object : HttpTransport {
+            override suspend fun send(request: HttpRequest, timeoutMs: Long) = response("done")
+        }
+        assertTrue(TranslationRunner(settings, secrets, transport, cache).stream(input).last().complete)
+        assertTrue(cache.values.isEmpty())
     }
 
     @Test

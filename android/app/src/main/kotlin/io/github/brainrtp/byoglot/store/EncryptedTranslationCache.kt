@@ -27,6 +27,7 @@ class EncryptedTranslationCache internal constructor(
     private val maxBytes: Long = 20_000_000,
     private val maxEntryBytes: Int = 200_000,
     private val now: () -> Long = System::currentTimeMillis,
+    private val setLastModified: (File, Long) -> Boolean = File::setLastModified,
 ) : TranslationCache {
     constructor(context: Context) : this(
         File(context.noBackupFilesDir, "translation-cache"), KeystoreCacheCipher(),
@@ -35,13 +36,17 @@ class EncryptedTranslationCache internal constructor(
     private val lock = Mutex()
     private var epoch = 0L
     private var lastUse = 0L
+    private var initialized = false
+    private val sizes = mutableMapOf<File, Long>()
+    private var totalBytes = 0L
 
     override suspend fun generation(): Long = io { epoch }
 
     override suspend fun get(key: String): CachedTranslation? = io {
         val file = entry(key)
-        if (!file.isFile) return@io null
         try {
+            initialize()
+            if (!file.isFile) { delete(file); return@io null }
             require(file.length() <= maxEntryBytes)
             val bytes = file.readBytes()
             val record = DataInputStream(ByteArrayInputStream(bytes))
@@ -57,7 +62,7 @@ class EncryptedTranslationCache internal constructor(
             touch(file)
             value
         } catch (_: Exception) {
-            file.delete()
+            delete(file)
             null
         }
     }
@@ -69,10 +74,11 @@ class EncryptedTranslationCache internal constructor(
         val file = entry(key)
         val temporary = File(directory, "$key.tmp")
         try {
+            initialize()
             val payload = ByteArrayOutputStream().also { bytes ->
                 DataOutputStream(bytes).use { it.string(value.targetLang); it.string(value.text) }
             }.toByteArray()
-            if (payload.size > maxEntryBytes) { file.delete(); return@io }
+            if (payload.size > maxEntryBytes) { delete(file); return@io }
             val encrypted = cipher.encrypt(payload, aad(key, connectionId))
             val record = ByteArrayOutputStream().also { bytes ->
                 DataOutputStream(bytes).use {
@@ -81,39 +87,47 @@ class EncryptedTranslationCache internal constructor(
                     it.write(encrypted)
                 }
             }.toByteArray()
-            if (record.size > maxEntryBytes || record.size > maxBytes) { file.delete(); return@io }
+            if (record.size > maxEntryBytes || record.size > maxBytes) { delete(file); return@io }
             check(directory.isDirectory || directory.mkdirs())
             FileOutputStream(temporary).use { it.write(record); it.fd.sync() }
             Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-            try { touch(file) } finally { evict() }
+            totalBytes += record.size.toLong() - (sizes.put(file, record.size.toLong()) ?: 0L)
+            touch(file)
+            evict()
         } catch (_: Exception) {
-            temporary.delete()
+            delete(temporary)
         }
     }
 
     override suspend fun removeConnection(connectionId: String) = io {
         epoch++
-        files().forEach { file ->
-            val owner = runCatching {
-                DataInputStream(file.inputStream()).use {
-                    require(it.readInt() == 1)
-                    it.string()
-                }
-            }.getOrNull()
-            if (owner == null || owner == connectionId) check(file.delete())
+        runCatching {
+            initialize()
+            sizes.keys.toList().forEach { file ->
+                val owner = runCatching {
+                    DataInputStream(file.inputStream()).use {
+                        require(it.readInt() == 1)
+                        it.string()
+                    }
+                }.getOrNull()
+                if (owner == null || owner == connectionId) delete(file)
+            }
         }
+        Unit
     }
 
     override suspend fun clear() = io {
         epoch++
-        directory.listFiles()?.forEach { check(it.delete()) }
+        runCatching {
+            initialize()
+            directory.listFiles()?.forEach { delete(it) }
+        }
         Unit
     }
 
     override suspend fun stats(): TranslationCacheStats = io {
-        evict()
-        val files = files()
-        TranslationCacheStats(files.size, files.sumOf { it.length() })
+        initialize()
+        TranslationCacheStats(sizes.size, totalBytes)
     }
 
     private fun entry(key: String): File {
@@ -121,23 +135,40 @@ class EncryptedTranslationCache internal constructor(
         return File(directory, "$key.cache")
     }
 
-    private fun files() = directory.listFiles()?.filter { it.name.endsWith(".cache") }.orEmpty()
+    private fun initialize() {
+        if (initialized) return
+        directory.listFiles()?.forEach { file ->
+            when {
+                file.name.endsWith(".tmp") -> delete(file)
+                file.name.endsWith(".cache") -> {
+                    val size = file.length()
+                    totalBytes += size - (sizes.put(file, size) ?: 0L)
+                    lastUse = maxOf(lastUse, file.lastModified())
+                }
+            }
+        }
+        initialized = true
+        sizes.filterValues { it > maxEntryBytes }.keys.toList().forEach { delete(it) }
+        evict()
+    }
+
+    private fun delete(file: File) {
+        if (runCatching { file.delete() || !file.exists() }.getOrDefault(false)) {
+            totalBytes -= sizes.remove(file) ?: 0L
+        }
+    }
 
     private fun evict() {
-        directory.listFiles()?.filter { it.name.endsWith(".tmp") }?.forEach { it.delete() }
-        val files = files().sortedBy { it.lastModified() }
-        var total = files.sumOf { it.length() }
-        files.forEach { file ->
-            if (file.length() > maxEntryBytes || total > maxBytes) {
-                val size = file.length()
-                if (file.delete()) total -= size
-            }
+        if (totalBytes <= maxBytes) return
+        for (file in sizes.keys.sortedBy { it.lastModified() }) {
+            if (totalBytes <= maxBytes) break
+            delete(file)
         }
     }
 
     private fun touch(file: File) {
-        lastUse = maxOf(now(), lastUse + 1, files().maxOfOrNull { it.lastModified() + 1 } ?: 0)
-        check(file.setLastModified(lastUse))
+        lastUse = maxOf(now(), lastUse + 1)
+        runCatching { setLastModified(file, lastUse) }
     }
 
     private fun aad(key: String, connectionId: String) = "$key\n$connectionId".toByteArray(Charsets.UTF_8)

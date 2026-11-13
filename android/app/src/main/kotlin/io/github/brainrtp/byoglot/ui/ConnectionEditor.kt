@@ -155,6 +155,7 @@ class ConnectionEditor(
                 if (old != null) secrets.set(old, id, origin!!)
                 throw e
             }
+            cache.removeConnection(id)
         }
         Unit
     }

@@ -105,6 +105,48 @@ class TranslationCacheFlowTest {
     }
 
     @Test
+    fun `request started during connection removal cannot restore its entries`() = runBlocking {
+        withTimeout(5000) {
+            val model = ModelRef("custom", "m", connectionId = "local")
+            val connection = Connection("local", ProviderPreset.custom, "Local", "https://localhost/v1", pageModel = model, selectionModel = model)
+            val settings = InMemorySettingsRepository(AppSettings.initial("en").copy(
+                connections = listOf(connection), activeConnectionId = connection.id,
+            ))
+            val updateStarted = CompletableDeferred<Unit>()
+            val commitSettings = CompletableDeferred<Unit>()
+            val deletingSettings = object : SettingsRepository by settings {
+                override suspend fun update(change: (AppSettings) -> AppSettings): AppSettings {
+                    updateStarted.complete(Unit)
+                    commitSettings.await()
+                    return settings.update(change)
+                }
+            }
+            val requestStarted = CompletableDeferred<Unit>()
+            val finishRequest = CompletableDeferred<Unit>()
+            val transport = object : HttpTransport {
+                override suspend fun send(request: HttpRequest, timeoutMs: Long): HttpResponse {
+                    requestStarted.complete(Unit)
+                    finishRequest.await()
+                    return HttpResponse(200, mapOf("content-type" to "application/json"),
+                        """{"choices":[{"message":{"content":"late answer"},"finish_reason":"stop"}]}""".toByteArray())
+                }
+            }
+            val cache = MemoryCache()
+            val secrets = InMemorySecretStore()
+            val removing = async { ConnectionEditor(deletingSettings, secrets, transport, cache).remove(connection.id) }
+            updateStarted.await()
+            val pending = async { TranslationRunner(settings, secrets, transport, cache).stream(RunnerInput("hello", limit = EXTERNAL_INPUT_LIMIT)).last() }
+            requestStarted.await()
+            commitSettings.complete(Unit)
+            removing.await()
+            finishRequest.complete(Unit)
+            assertTrue(pending.await().complete)
+            assertTrue(settings.read().connections.isEmpty())
+            assertEquals(TranslationCacheStats(), cache.stats())
+        }
+    }
+
+    @Test
     fun `connection removal deletes its cache and valid import clears the cache`() = runBlocking {
         withTimeout(5000) {
             val fixture = Fixture()

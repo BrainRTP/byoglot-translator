@@ -87,7 +87,7 @@ class Translator(
                 TranslationChunk(
                     text.toString().jsTrim(),
                     complete = true,
-                    incomplete = reason == "length" || reason == "max_tokens",
+                    incomplete = reason != null && reason != "stop" && reason != "end_turn",
                     finishReason = reason,
                     usage = usage,
                 ),

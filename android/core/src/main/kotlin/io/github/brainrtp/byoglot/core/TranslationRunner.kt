@@ -82,9 +82,9 @@ class TranslationRunner(
     suspend fun translate(input: RunnerInput): RunnerOutput = stream(input).last().output
 
     fun stream(input: RunnerInput): Flow<RunnerStreamOutput> = flow {
+        val generation = cache.generation()
         val resolved = resolve(input)
         val request = resolved.request
-        val generation = cache.generation()
         val key = TranslationCacheKey.of(resolved.connection, request)
         if (!input.forceRequest) {
             val hit = cache.get(key)

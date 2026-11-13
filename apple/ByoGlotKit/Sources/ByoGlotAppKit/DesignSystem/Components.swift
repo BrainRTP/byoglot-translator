@@ -31,7 +31,7 @@ public struct ByoButton: View {
         func makeBody(configuration: Configuration) -> some View {
             configuration.label
                 .foregroundStyle(!enabled ? ByoColor.muted : kind == .primary ? ByoColor.accentForeground : kind == .danger ? ByoColor.error : kind == .text ? ByoColor.accent : ByoColor.text)
-                .background(!enabled ? ByoColor.surface : kind == .primary ? ByoColor.accent : ByoColor.background)
+                .background(kind == .text ? .clear : !enabled ? ByoColor.surface : kind == .primary ? ByoColor.accent : ByoColor.background)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay { RoundedRectangle(cornerRadius: 6).stroke(kind == .text ? .clear : !enabled ? ByoColor.border : kind == .primary ? ByoColor.accent : ByoColor.strongBorder) }
                 .opacity(configuration.isPressed ? 0.75 : 1)
@@ -75,27 +75,35 @@ public struct ByoTextField: View {
 
 public struct Segment: View {
     let options: [String]
+    @Environment(\.dynamicTypeSize) private var typeSize
     @Binding var selection: String
     let disabled: Set<String>
-    public init(_ options: [String], selection: Binding<String>, disabled: Set<String> = []) {
-        self.options = options; _selection = selection; self.disabled = disabled
+    let labels: (String) -> String
+    let accessibilityLabels: (String) -> String
+    public init(_ options: [String], selection: Binding<String>, disabled: Set<String> = [], labels: @escaping (String) -> String = { $0 }, accessibilityLabels: ((String) -> String)? = nil) {
+        self.options = options; _selection = selection; self.disabled = disabled; self.labels = labels; self.accessibilityLabels = accessibilityLabels ?? labels
     }
     public var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 2) { items }
-            VStack(spacing: 2) { items }
+        Group {
+            if typeSize.isAccessibilitySize { VStack(spacing: 2) { items } }
+            else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 2) { items }
+                    VStack(spacing: 2) { items }
+                }
+            }
         }
         .padding(2).overlay { RoundedRectangle(cornerRadius: 6).stroke(ByoColor.strongBorder) }
     }
     @ViewBuilder private var items: some View {
         ForEach(options, id: \.self) { option in
             Button { if selection != option { selection = option } } label: {
-                Text(option).modifier(ByoTypography(15, weight: option == selection ? .semibold : .regular, mono: true))
+                Text(labels(option)).modifier(ByoTypography(15, weight: option == selection ? .semibold : .regular, mono: true))
                     .frame(maxWidth: .infinity, minHeight: 44).padding(.horizontal, 4)
-                    .foregroundStyle(option == selection ? ByoColor.background : ByoColor.text)
+                    .foregroundStyle(disabled.contains(option) ? ByoColor.muted : option == selection ? ByoColor.background : ByoColor.text)
                     .background(option == selection ? ByoColor.text : .clear, in: RoundedRectangle(cornerRadius: 4)).contentShape(Rectangle())
             }.buttonStyle(.plain).disabled(disabled.contains(option))
-                .accessibilityAddTraits(option == selection ? .isSelected : [])
+                .accessibilityLabel(accessibilityLabels(option)).accessibilityAddTraits(option == selection ? .isSelected : [])
                 .modifier(ByoFocusRing())
         }
     }
@@ -124,27 +132,32 @@ public struct Banner: View {
 }
 
 public struct ListRow: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
     let title: String
     let subtitle: String?
     let value: String?
     let selected: Bool
     let danger: Bool
+    let disclosure: Bool
+    let mono: Bool
     let action: () -> Void
-    public init(_ title: String, subtitle: String? = nil, value: String? = nil, selected: Bool = false, danger: Bool = false, action: @escaping () -> Void) {
-        self.title = title; self.subtitle = subtitle; self.value = value; self.selected = selected; self.danger = danger; self.action = action
+    public init(_ title: String, subtitle: String? = nil, value: String? = nil, selected: Bool = false, danger: Bool = false, disclosure: Bool = true, mono: Bool = false, action: @escaping () -> Void) {
+        self.title = title; self.subtitle = subtitle; self.value = value; self.selected = selected; self.danger = danger; self.disclosure = disclosure; self.mono = mono; self.action = action
     }
     public var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title).modifier(ByoTypography()).foregroundStyle(danger ? ByoColor.error : ByoColor.text)
+                    Text(title).modifier(ByoTypography(mono: mono)).foregroundStyle(danger ? ByoColor.error : ByoColor.text)
                     if let subtitle { Text(subtitle).modifier(ByoTypography(13, relativeTo: .caption)).foregroundStyle(ByoColor.muted) }
+                    if typeSize.isAccessibilitySize, let value { Text(value).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted) }
                 }.frame(maxWidth: .infinity, alignment: .leading)
-                if let value { Text(value).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted) }
+                if !typeSize.isAccessibilitySize, let value { Text(value).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted) }
                 if selected { Image(systemName: "checkmark").foregroundStyle(ByoColor.accent).accessibilityHidden(true) }
-                else if !danger { Image(systemName: "chevron.right").foregroundStyle(ByoColor.muted).accessibilityHidden(true) }
+                else if !danger && disclosure { Image(systemName: "chevron.right").foregroundStyle(ByoColor.muted).accessibilityHidden(true) }
             }.padding(.horizontal, 16).padding(.vertical, 8).frame(minHeight: 48)
                 .background(selected ? ByoColor.surface : ByoColor.background)
+                .overlay(alignment: .bottom) { ByoColor.border.frame(height: 0.5) }
                 .contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : []).modifier(ByoFocusRing())
     }

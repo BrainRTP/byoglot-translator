@@ -1,6 +1,7 @@
 @testable import ByoGlotAppKit
 import ByoGlotCore
 import Foundation
+import Darwin
 import Testing
 
 private actor ModelStream {
@@ -298,5 +299,191 @@ private actor ModelStream {
     model.sceneChanged(.active)
     try await Task.sleep(for: .milliseconds(60))
     #expect(await stream.count == 2)
+    model.stop()
+}
+
+@MainActor @Test func parameterTemplateUpdateWritesOnlyEditedFieldsAndNeverThePrompt() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    let value = Template(id: "inherited", name: "Inherited", builtin: false, settings: TemplateSettings())
+    #expect(await model.saveTemplate(value))
+    await model.chooseTemplate(value)
+    model.setPrePrompt("Transient instructions")
+    #expect(!model.templateChanges)
+    #expect(!(await model.storeCurrentTemplate()))
+    await model.chooseTarget("fr")
+    let chosen = ModelRef(providerID: "custom", id: "second", variant: "none", connectionId: "c1")
+    model.chooseModel(chosen)
+    model.edit("Hello"); model.translate()
+    try await eventually { await stream.count == 1 }
+    await stream.emit(0, text: "done", complete: true)
+    try await eventually { model.complete }
+    #expect(await model.storeCurrentTemplate())
+    let saved = try #require(model.settings.templates.first { $0.id == value.id })
+    #expect(saved.settings.prePrompt == nil)
+    #expect(saved.settings.targetLang == "fr" && saved.settings.pageModel == chosen)
+    #expect(saved.settings.selectionModel == nil)
+    #expect(model.prePrompt == "Transient instructions" && model.changed)
+    #expect(model.result == "done" && model.complete && !model.templateChanges)
+    #expect(await stream.count == 1)
+    #expect(await model.storeCurrentTemplate(name: "New template"))
+    #expect(model.template.settings.prePrompt == nil && model.prePrompt == "Transient instructions")
+    #expect(model.result == "done")
+    #expect(await stream.count == 1)
+    model.stop()
+}
+
+@MainActor @Test func promptOnlyTemplateCopyKeepsInheritedFieldsAndBuiltinCannotBeEdited() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    let value = Template(id: "own", name: "Own", builtin: false, settings: TemplateSettings())
+    #expect(await model.saveTemplate(value))
+    await model.chooseTemplate(value)
+    model.setPrePrompt("Not persistent")
+    #expect(await model.storeCurrentTemplate(name: "Prompt copy"))
+    #expect(model.template.settings == TemplateSettings())
+    var builtin = Contracts.builtinTemplate
+    builtin.name = "Changed"
+    builtin.builtin = false
+    #expect(!(await model.saveTemplate(builtin)))
+    #expect(!(await model.deleteTemplate(Contracts.builtinTemplate.id)))
+    #expect(await model.deleteTemplate(model.template.id))
+    #expect(model.template.id == Contracts.builtinTemplate.id)
+}
+
+@MainActor @Test func appExportAndImportPreserveDeviceSettingsAndApplyThePickerRule() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    let template = Template(id: "fixed", name: "Fixed", builtin: false, settings: TemplateSettings(targetLang: "de"))
+    #expect(await model.saveTemplate(template))
+    await model.chooseTemplate(template)
+    await model.updateSettings { $0.theme = .dark; $0.autoTranslate = false; $0.externalModel = ModelRef(providerID: "custom", id: "external", connectionId: "c1") }
+    let data = try await model.exportData(now: Date(timeIntervalSince1970: 0))
+    let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(Set(object.keys) == ["format", "version", "exportedAt", "globals", "templates", "profileOverrides", "siteRules", "connections"])
+    #expect(!String(decoding: data, as: UTF8.self).contains("apiKey"))
+    var file = try ExportFile.decode(data)
+    file.globals.targetLang = "fr"
+    file.globals.sourceLang = "en"
+    #expect(await model.applyImport(file))
+    #expect(model.sourceLang == "en" && model.targetLang == "de")
+    #expect(model.settings.theme == .dark && !model.settings.autoTranslate)
+    #expect(model.settings.externalModel?.id == "external")
+    await model.chooseTarget("it")
+    await model.chooseTemplate(model.template)
+    #expect(model.targetLang == "it")
+    #expect(await stream.count == 0)
+}
+
+@MainActor @Test func settingsModelChoiceTranslatesOnlyWhenMainInputsDiffer() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    model.edit("Hello"); model.translate()
+    try await eventually { await stream.count == 1 }
+    await stream.emit(0, text: "done", complete: true)
+    try await eventually { model.complete }
+    let same = try #require(model.model)
+    await model.setConfiguredModel(same, slot: "main")
+    await model.setConfiguredModel(ModelRef(providerID: "custom", id: "external", connectionId: "c1"), slot: "external")
+    #expect(model.complete && model.result == "done")
+    #expect(await stream.count == 1)
+    let next = ModelRef(providerID: "custom", id: "other", connectionId: "c1")
+    await model.setConfiguredModel(next, slot: "main")
+    try await eventually { await stream.count == 2 }
+    await model.setConfiguredModel(next, slot: "main")
+    #expect(await stream.count == 2)
+    model.stop()
+}
+
+@MainActor @Test func catalogueEffortClampsTheRequestWithoutRewritingDeviceOrTemplateSettings() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    await model.warmModels(connectionId: "c1")
+    await model.updateSettings { $0.mainModel = ModelRef(providerID: "custom", id: "model", variant: "max", connectionId: "c1") }
+    #expect(model.settings.mainModel?.variant == "max" && model.model?.variant == "none")
+    #expect(model.modelInfo(model.model)?.variants == ["none"])
+    model.edit("Hello"); model.translate()
+    try await eventually { await stream.count == 1 }
+    #expect(await stream.inputs[0].model?.variant == "none")
+    #expect(model.settings.mainModel?.variant == "max")
+    model.stop()
+}
+
+@MainActor @Test func parameterUpdatePreservesFieldsChangedInTheStoreSinceTheSheetOpened() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    let template = Template(id: "concurrent", name: "Original", builtin: false, settings: TemplateSettings(targetLang: "de"))
+    #expect(await model.saveTemplate(template))
+    await model.chooseTemplate(template)
+    await model.chooseTarget("fr")
+    _ = try await f.settings.update { state in
+        let index = state.templates.firstIndex { $0.id == "concurrent" }!
+        state.templates[index].name = "Renamed elsewhere"
+        state.templates[index].settings.prePrompt = "Stored instructions"
+        state.templates[index].settings.selectionModel = ModelRef(providerID: "custom", id: "external", connectionId: "c1")
+    }
+    #expect(await model.storeCurrentTemplate())
+    let saved = try #require(model.settings.templates.first { $0.id == "concurrent" })
+    #expect(saved.name == "Renamed elsewhere")
+    #expect(saved.settings.targetLang == "fr")
+    #expect(saved.settings.prePrompt == "Stored instructions")
+    #expect(saved.settings.selectionModel?.id == "external")
+    #expect(saved.settings.pageModel == nil)
+}
+
+@MainActor @Test(arguments: [true, false]) func importCannotReplaceBuiltinAndCustomEntriesBecomeEditable(_ importedBuiltin: Bool) async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    let expected = Contracts.builtinTemplate
+    var file = try ExportFile.decode(await model.exportData())
+    var poisoned = expected
+    poisoned.builtin = importedBuiltin
+    poisoned.settings.prePrompt = "Imported instructions"
+    file.templates = [poisoned, Template(id: "custom-import", name: "Imported", builtin: true, settings: TemplateSettings())]
+    #expect(await model.applyImport(file))
+    #expect(model.settings.templates.first { $0.id == expected.id } == expected)
+    let imported = try #require(model.settings.templates.first { $0.id == "custom-import" })
+    #expect(!imported.builtin)
+    #expect(await model.deleteTemplate(imported.id))
+    _ = try await f.settings.update { state in
+        let index = state.templates.firstIndex { $0.id == expected.id }!
+        state.templates[index].builtin = false
+    }
+    await model.refresh()
+    var forged = expected
+    forged.builtin = false
+    forged.name = "Changed"
+    #expect(!(await model.saveTemplate(forged)))
+    #expect(!(await model.deleteTemplate(expected.id)))
+}
+
+@MainActor @Test func editorSaveAfterParameterUpdatePreservesTheNewTargetAndOtherUntouchedFields() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    let base = Template(id: "editor", name: "Original", builtin: false, settings: TemplateSettings(prePrompt: "Keep code", targetLang: "de"))
+    #expect(await model.saveTemplate(base))
+    var draft = TemplateDraft(template: base)
+    draft.value.name = "Renamed"
+    await model.chooseTemplate(base)
+    await model.chooseTarget("fr")
+    #expect(await model.storeCurrentTemplate())
+    #expect(await model.saveTemplate(draft.value, base: draft.base))
+    let saved = try #require(model.settings.templates.first { $0.id == base.id })
+    #expect(saved.name == "Renamed" && saved.settings.targetLang == "fr")
+    #expect(saved.settings.prePrompt == "Keep code" && saved.settings.pageModel == nil)
+    draft.rebase(on: saved)
+    #expect(draft.value.settings.targetLang == "fr" && draft.value.name == "Renamed")
+    #expect(draft.base == saved)
+}
+
+@MainActor @Test func overlappingTargetChoicesOnlySendTheLatestRequest() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    model.edit("Hello")
+    let descriptor = open(f.directory.appending(path: "settings.lock").path, O_RDWR)
+    #expect(descriptor >= 0)
+    defer { close(descriptor) }
+    #expect(flock(descriptor, LOCK_EX) == 0)
+    let first = Task { await model.chooseTarget("fr") }
+    try await eventually { model.targetLang == "fr" }
+    let second = Task { await model.chooseTarget("de") }
+    try await eventually { model.targetLang == "de" }
+    #expect(flock(descriptor, LOCK_UN) == 0)
+    await first.value
+    await second.value
+    try await eventually { await stream.count == 1 }
+    #expect(await stream.inputs[0].targetLang == "de")
+    #expect(await stream.count == 1)
     model.stop()
 }

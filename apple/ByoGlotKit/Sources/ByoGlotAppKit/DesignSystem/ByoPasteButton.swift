@@ -35,7 +35,10 @@ private struct NativePasteControl: UIViewRepresentable {
         control.accessibilityLabel = AppStrings.text(label)
         return control
     }
-    func updateUIView(_ control: PasteControl, context: Context) { control.action = action }
+    func updateUIView(_ control: PasteControl, context: Context) {
+        control.action = action
+        control.accessibilityLabel = AppStrings.text(label)
+    }
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: PasteControl, context: Context) -> CGSize? {
         let size = uiView.intrinsicContentSize
         return CGSize(width: max(44, size.width), height: max(44, size.height))

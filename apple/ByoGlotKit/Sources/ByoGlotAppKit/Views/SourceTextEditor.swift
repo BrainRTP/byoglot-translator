@@ -30,6 +30,7 @@ struct SourceTextEditor: UIViewRepresentable {
     }
     func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.parent = self
+        view.accessibilityLabel = AppStrings.text("main.source")
         if view.text != text { view.text = text }
         view.font = UIFont.preferredFont(forTextStyle: .body)
         view.textColor = UIColor(ByoColor.text)

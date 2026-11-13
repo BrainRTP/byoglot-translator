@@ -11,7 +11,7 @@ public struct MainErrorPresentation {
 
     public init(error: RunnerError, provider: String, now: Date = .now) {
         var title = AppStrings.text("err.generic")
-        var message = String(localized: UserFacingError.message(error))
+        var message = AppStrings.error(error)
         var action = Action.retry
         var actionTitle = "err.retry"
         var warning = false

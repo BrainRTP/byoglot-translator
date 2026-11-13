@@ -7,10 +7,15 @@ import UIKit
 public struct ScreenMain: View {
     @Bindable var model: AppModel
     let openProviders: () -> Void
+    let openSettings: () -> Void
+    let openTemplates: (() -> Void)?
     @State private var text = ""
-    @State private var showModels = false
+    @SceneStorage("main.sheet") private var sheet = ""
+    @State private var afterSheet: (() -> Void)?
     @Environment(\.dynamicTypeSize) private var typeSize
-    public init(model: AppModel, openProviders: @escaping () -> Void) { self.model = model; self.openProviders = openProviders }
+    public init(model: AppModel, openProviders: @escaping () -> Void, openSettings: (() -> Void)? = nil, openTemplates: (() -> Void)? = nil) {
+        self.model = model; self.openProviders = openProviders; self.openSettings = openSettings ?? openProviders; self.openTemplates = openTemplates
+    }
     public var body: some View {
         Group {
             if typeSize.isAccessibilitySize { ScrollView { mainContent } }
@@ -18,89 +23,54 @@ public struct ScreenMain: View {
         }
         .background(ByoColor.background).foregroundStyle(ByoColor.text)
         .navigationTitle(AppStrings.text("main.title"))
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) { ByoIconButton(title: "providers.title", symbol: "slider.horizontal.3", action: openProviders) }
-        }
-        .sheet(isPresented: $showModels) {
-            ByoBottomSheet("model.title", close: { showModels = false }) {
-                VStack(spacing: 8) {
-                    modelChoices
-                    effortPicker
-                    if model.settings.connections.isEmpty { ByoButton("providers.add") { showModels = false; openProviders() } }
-                }
-            }.task { for c in model.settings.connections { await model.warmModels(connectionId: c.id) } }
+        .toolbar { ToolbarItem(placement: .primaryAction) { ByoIconButton(title: "settings.title", symbol: "slider.horizontal.3", action: openSettings) } }
+        .sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } }), onDismiss: {
+            let action = afterSheet
+            afterSheet = nil
+            action?()
+        }) {
+            switch sheet {
+            case "params": ScreenParamsSheet(model: model, close: { sheet = "" }, providers: { leaveSheet(openProviders) }, manageTemplates: openTemplates.map { action in { leaveSheet(action) } })
+            case "source": ScreenLanguageSheet(source: true, selected: model.sourceLang, recent: model.recentLanguages, detected: model.detectedSourceLang, choose: { code in sheet = ""; Task { await model.chooseSource(code) } }, close: { sheet = "" })
+            case "target": ScreenLanguageSheet(selected: model.targetLang, recent: model.recentLanguages, choose: { code in sheet = ""; Task { await model.chooseTarget(code) } }, close: { sheet = "" })
+            default: ScreenModelSheet(model: model, selected: model.model, choose: model.chooseModel, close: { sheet = "" }, providers: { leaveSheet(openProviders) })
+            }
         }
         .onAppear { text = model.inputText }
     }
     private var mainContent: some View {
         VStack(spacing: 0) {
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { templateMenu; changedChip; Spacer(minLength: 0); modelMenu }
-                VStack(alignment: .leading, spacing: 0) { HStack { templateMenu; changedChip }; modelMenu }
+                HStack(spacing: 8) { templateButton; changedChip; Spacer(minLength: 0); modelButton }
+                VStack(alignment: .leading, spacing: 0) { HStack { templateButton; changedChip }; modelButton }
             }.padding(.horizontal, 16).padding(.bottom, 4)
-            TranslatorBlock(model: model, text: $text, openProviders: openProviders, openModels: { showModels = true })
+            TranslatorBlock(model: model, text: $text, openProviders: openProviders, openModels: { sheet = "model" }, openLanguage: { sheet = $0 ? "source" : "target" })
                 .frame(minHeight: typeSize.isAccessibilitySize ? 840 : nil)
         }
     }
-    private var templateMenu: some View {
-        Menu {
-            ForEach(model.settings.templates) { template in
-                Button { Task { await model.chooseTemplate(template) } } label: {
-                    if template.id == model.selection.templateId { Label(template.builtin ? AppStrings.text("main.builtinTemplate") : template.name, systemImage: "checkmark") } else { Text(template.builtin ? AppStrings.text("main.builtinTemplate") : template.name) }
-                }
-            }
-        } label: {
-            HStack(spacing: 6) { Text(model.template.builtin ? AppStrings.text("main.builtinTemplate") : model.template.name).fontWeight(.semibold); Image(systemName: "chevron.down").font(.caption) }
+    private var templateButton: some View {
+        Button { sheet = "params" } label: {
+            HStack(spacing: 6) { Text(templateLabel(model.template)).fontWeight(.semibold); Image(systemName: "chevron.down").font(.caption).accessibilityHidden(true) }
                 .modifier(ByoTypography(15)).frame(minHeight: 44)
-        }.accessibilityLabel(AppStrings.text("main.template") + ": " + model.template.name).modifier(ByoFocusRing())
+        }.buttonStyle(.plain).accessibilityLabel(AppStrings.text("main.template") + ": " + templateLabel(model.template)).modifier(ByoFocusRing())
     }
-    @ViewBuilder private var changedChip: some View {
-        if model.changed {
-            Text(AppStrings.text("main.changed")).modifier(ByoTypography(12, relativeTo: .caption2))
-                .padding(.horizontal, 8).padding(.vertical, 1).overlay { RoundedRectangle(cornerRadius: 10).stroke(ByoColor.strongBorder) }
-        }
-    }
-    private var modelMenu: some View {
-        Button { showModels = true } label: {
+    @ViewBuilder private var changedChip: some View { if model.changed { Chip(title: "main.changed") } }
+    private var modelButton: some View {
+        Button { sheet = "model" } label: {
             Text(model.model.map { "\($0.id) · \(AppStrings.effort($0.variant))" } ?? AppStrings.text("main.chooseModel"))
                 .modifier(ByoTypography(13, mono: true)).foregroundStyle(ByoColor.muted).frame(minHeight: 44).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityLabel(AppStrings.text("model.title")).modifier(ByoFocusRing())
     }
-    @ViewBuilder private var effortPicker: some View {
-        if let ref = model.model {
-            let info = ref.connectionId.flatMap { model.models[$0]?.first { $0.id == ref.id } }
-            let levels = ["none"] + (info?.variants.filter { $0 != "none" } ?? [])
-            Picker(AppStrings.text("model.effort"), selection: Binding(get: { model.model?.variant ?? "none" }, set: { variant in
-                var selected = ref
-                selected.variant = variant
-                model.chooseModel(selected)
-            })) {
-                ForEach(levels, id: \.self) { Text(AppStrings.effort($0)).tag($0) }
-            }.modifier(ByoTypography(13, mono: true)).frame(minHeight: 44)
-        }
-    }
-    @ViewBuilder private var modelChoices: some View {
-        ForEach(model.settings.connections) { connection in
-            Text(connection.name).font(.headline).frame(maxWidth: .infinity, alignment: .leading)
-            if let error = model.catalogueErrors[connection.id] {
-                Banner(title: AppStrings.text("providers.modelsError"), message: String(localized: UserFacingError.message(error)), actionTitle: "err.retry") {
-                    Task { await model.warmModels(connectionId: connection.id) }
-                }
-            }
-            ForEach(model.models[connection.id] ?? [], id: \.id) { info in
-                ListRow(info.name, subtitle: info.id, selected: model.model?.id == info.id && model.model?.connectionId == connection.id) {
-                    model.chooseModel(ModelRef(providerID: info.providerID, id: info.id, variant: "none", connectionId: connection.id)); showModels = false
-                }
-            }
-        }
-    }
+    private func leaveSheet(_ action: @escaping () -> Void) { afterSheet = action; sheet = "" }
+
 }
 
 public struct LangBar: View {
     @Bindable var model: AppModel
     @Environment(\.dynamicTypeSize) private var typeSize
     let swap: () -> Void
-    public init(model: AppModel, swap: @escaping () -> Void) { self.model = model; self.swap = swap }
+    let openLanguage: (Bool) -> Void
+    public init(model: AppModel, swap: @escaping () -> Void, openLanguage: @escaping (Bool) -> Void) { self.model = model; self.swap = swap; self.openLanguage = openLanguage }
     private var sourceLabel: String {
         if model.sourceLang != "auto" { return AppStrings.language(model.sourceLang) }
         return model.detectedSourceLang.map { AppStrings.text("main.auto") + " " + AppStrings.language($0) } ?? AppStrings.text("main.autoUndetected")
@@ -117,23 +87,14 @@ public struct LangBar: View {
             .accessibilityElement(children: .contain)
     }
     private var sourceMenu: some View {
-        Menu {
-            Button(AppStrings.text("lang.auto")) { Task { await model.chooseSource("auto") } }
-            ForEach(Contracts.languageCodes, id: \.self) { code in
-                Button(AppStrings.language(code)) { Task { await model.chooseSource(code) } }
-            }
-        } label: { languageLabel(sourceLabel) }
+        Button { openLanguage(true) } label: { languageLabel(sourceLabel) }.buttonStyle(.plain)
             .accessibilityLabel(AppStrings.text("lang.srcTitle") + ": " + sourceLabel)
     }
     private var swapButton: some View {
         ByoIconButton(title: "main.swap", symbol: "arrow.left.arrow.right", action: swap).disabled(!model.canSwap)
     }
     private var targetMenu: some View {
-        Menu {
-            ForEach(Contracts.languageCodes, id: \.self) { code in
-                Button(AppStrings.language(code)) { Task { await model.chooseTarget(code) } }
-            }
-        } label: { languageLabel(AppStrings.language(model.targetLang)) }
+        Button { openLanguage(false) } label: { languageLabel(AppStrings.language(model.targetLang)) }.buttonStyle(.plain)
             .accessibilityLabel(AppStrings.text("lang.dstTitle") + ": " + AppStrings.language(model.targetLang))
     }
     private func languageLabel(_ label: String) -> some View {
@@ -147,10 +108,11 @@ public struct TranslatorBlock: View {
     @Binding var text: String
     let openProviders: () -> Void
     let openModels: () -> Void
+    let openLanguage: (Bool) -> Void
     @State private var editing = false
     @Environment(\.dynamicTypeSize) private var typeSize
-    public init(model: AppModel, text: Binding<String>, openProviders: @escaping () -> Void, openModels: @escaping () -> Void) {
-        self.model = model; _text = text; self.openProviders = openProviders; self.openModels = openModels
+    public init(model: AppModel, text: Binding<String>, openProviders: @escaping () -> Void, openModels: @escaping () -> Void, openLanguage: @escaping (Bool) -> Void) {
+        self.model = model; _text = text; self.openProviders = openProviders; self.openModels = openModels; self.openLanguage = openLanguage
     }
     public var body: some View {
         Group {
@@ -183,7 +145,7 @@ public struct TranslatorBlock: View {
             }
     }
     private var languages: some View {
-        LangBar(model: model) { Task { if let swapped = await model.swap() { text = swapped } } }
+        LangBar(model: model, swap: { Task { if let swapped = await model.swap() { text = swapped } } }, openLanguage: openLanguage)
     }
     private var source: some View {
         VStack(spacing: 0) {

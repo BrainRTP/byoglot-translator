@@ -204,6 +204,7 @@ pub fn present(window: &adw::ApplicationWindow, services: Arc<Services>) {
             .active(services.startup_enabled())
             .build();
         startup.add(&start);
+        let weak_window = window.downgrade();
         let changing = Rc::new(Cell::new(false));
         let service = services.clone();
         let error_start = error.clone();
@@ -211,6 +212,9 @@ pub fn present(window: &adw::ApplicationWindow, services: Arc<Services>) {
             if changing.get() {
                 return;
             }
+            let Some(window) = weak_window.upgrade() else {
+                return;
+            };
             let enabled = row.is_active();
             let row = row.clone();
             let service = service.clone();
@@ -218,7 +222,17 @@ pub fn present(window: &adw::ApplicationWindow, services: Arc<Services>) {
             let changing = changing.clone();
             row.set_sensitive(false);
             glib::spawn_future_local(async move {
-                let actual = match service.set_startup(enabled, tr(Msg::StartupReason)).await {
+                // Keep the GTK export on the main thread until the portal responds.
+                let parent = ashpd::WindowIdentifier::from_native(&window).await;
+                let result = if let Some(parent) = &parent {
+                    service
+                        .set_startup(enabled, tr(Msg::StartupReason), parent.to_string())
+                        .await
+                } else {
+                    Err(byoglot_core::RunnerError::Storage)
+                };
+                drop(parent);
+                let actual = match result {
                     Ok(actual) => {
                         if actual != enabled {
                             error.set_title(tr(Msg::PortalUnavailable));

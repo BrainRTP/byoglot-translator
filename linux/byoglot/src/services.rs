@@ -2,12 +2,15 @@ use crate::{
     net::ReqwestTransport, secrets::FallbackSecretStore, settings_file::FileSettingsRepository,
 };
 use byoglot_core::{
-    AppSettings, BackendError, Connection, ConnectionDraft, ConnectionEditor, ErrorKind,
-    MemorySecretStore, MemorySettingsRepository, RunnerError, SecretStore, SettingsRepository,
-    TranslationRunner, origin_of,
+    AppSettings, Connection, ConnectionDraft, ConnectionEditor, MemorySecretStore,
+    MemorySettingsRepository, RunnerError, SecretStore, SettingsRepository, TranslationRunner,
+    origin_of,
 };
 use std::{path::PathBuf, sync::Arc};
-use tokio::{runtime::Handle, sync::Mutex};
+use tokio::{
+    runtime::Handle,
+    sync::{Mutex, RwLock},
+};
 
 type Settings = Arc<FileSettingsRepository>;
 type Secrets = Arc<FallbackSecretStore>;
@@ -22,12 +25,13 @@ pub struct Services {
     pub editor: Editor,
     pub runtime: Handle,
     mutation: Mutex<()>,
+    writes: RwLock<()>,
     #[cfg(feature = "gui")]
     startup_path: PathBuf,
 }
 
 fn failed() -> RunnerError {
-    BackendError::new(ErrorKind::Offline).into()
+    RunnerError::Storage
 }
 
 impl Services {
@@ -39,7 +43,7 @@ impl Services {
         #[cfg(feature = "gui")]
         let startup_path = path.with_file_name("startup.json");
         let settings = Arc::new(FileSettingsRepository::new(path, language));
-        let secrets = Arc::new(FallbackSecretStore::open().await);
+        let secrets = Arc::new(FallbackSecretStore::lazy());
         let transport = ReqwestTransport::new(runtime.clone()).map_err(|_| failed())?;
         Ok(Arc::new(Self {
             runner: TranslationRunner::new(settings.clone(), secrets.clone(), transport.clone()),
@@ -49,9 +53,18 @@ impl Services {
             transport,
             runtime,
             mutation: Mutex::new(()),
+            writes: RwLock::new(()),
             #[cfg(feature = "gui")]
             startup_path,
         }))
+    }
+
+    pub async fn initialize_secrets(self: &Arc<Self>) {
+        let services = self.clone();
+        let _ = self
+            .runtime
+            .spawn(async move { services.secrets.initialize().await })
+            .await;
     }
 
     pub async fn translate(
@@ -99,12 +112,34 @@ impl Services {
         self: &Arc<Self>,
         enabled: bool,
         reason: &'static str,
+        parent: String,
     ) -> Result<bool, RunnerError> {
         let services = self.clone();
         self.runtime
             .spawn(async move {
-                let _guard = services.mutation.lock().await;
+                let _writes = services.writes.read().await;
+                static REGISTERED: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+                REGISTERED
+                    .get_or_try_init(|| async {
+                        if !ashpd::is_sandboxed() {
+                            ashpd::register_host_app(crate::APP_ID.parse().map_err(|_| failed())?)
+                                .await
+                                .map_err(|_| failed())?;
+                        }
+                        Ok::<(), RunnerError>(())
+                    })
+                    .await?;
+                let identifier = if let Some(handle) = parent.strip_prefix("wayland:") {
+                    ashpd::WindowIdentifier::from_xdg_foreign_exported(handle.into())
+                } else if let Some(handle) = parent.strip_prefix("x11:") {
+                    ashpd::WindowIdentifier::from_xid(
+                        u64::from_str_radix(handle, 16).map_err(|_| failed())? as _,
+                    )
+                } else {
+                    return Err(failed());
+                };
                 let response = ashpd::desktop::background::Background::request()
+                    .identifier(identifier)
                     .reason(reason)
                     .auto_start(enabled)
                     .command(["byoglot", "--background"])
@@ -115,6 +150,7 @@ impl Services {
                     .response()
                     .map_err(|_| failed())?;
                 let actual = response.auto_start();
+                let _guard = services.mutation.lock().await;
                 if let Some(parent) = services.startup_path.parent() {
                     std::fs::create_dir_all(parent).map_err(|_| failed())?;
                 }
@@ -136,7 +172,10 @@ impl Services {
         let services = self.clone();
         // Once submitted, the transaction completes even if its dialog closes.
         self.runtime
-            .spawn(async move { services.commit_connection(draft, consent).await })
+            .spawn(async move {
+                let _writes = services.writes.read().await;
+                services.commit_connection(draft, consent).await
+            })
             .await
             .map_err(|_| failed())?
     }
@@ -146,18 +185,15 @@ impl Services {
         draft: ConnectionDraft,
         consent: bool,
     ) -> Result<Connection, RunnerError> {
-        let _guard = self.mutation.lock().await;
         let before = self.settings.read().await;
         let previous = draft
             .id
             .as_ref()
             .and_then(|id| before.connections.iter().find(|c| &c.id == id));
+        let previous_connection = previous.cloned();
         let old_origin = previous.and_then(|c| origin_of(&c.base_url));
         let old_key = if let (Some(c), Some(origin)) = (previous, &old_origin) {
-            self.secrets
-                .get(&c.id, origin)
-                .await
-                .map_err(|_| failed())?
+            readable_key(self.secrets.as_ref(), &c.id, origin).await
         } else {
             None
         };
@@ -180,6 +216,17 @@ impl Services {
             .get(&connection.id, &origin)
             .await
             .map_err(|_| failed())?;
+        let _guard = self.mutation.lock().await;
+        let latest = self.settings.read().await;
+        if latest.connections.iter().find(|c| c.id == connection.id) != previous_connection.as_ref()
+        {
+            return Err(failed());
+        }
+        let old_key = if let Some(origin) = &old_origin {
+            readable_key(self.secrets.as_ref(), &connection.id, origin).await
+        } else {
+            None
+        };
         if let Some(key) = &key {
             self.secrets
                 .set(key, &connection.id, &origin)
@@ -224,31 +271,35 @@ impl Services {
     }
 
     pub async fn change(
-        &self,
-        change: impl FnOnce(AppSettings) -> AppSettings,
+        self: &Arc<Self>,
+        change: impl FnOnce(AppSettings) -> AppSettings + Send + 'static,
     ) -> Result<AppSettings, RunnerError> {
-        let _guard = self.mutation.lock().await;
-        self.settings.try_update(change).map_err(|_| failed())
+        let services = self.clone();
+        self.runtime
+            .spawn(async move {
+                let _writes = services.writes.read().await;
+                let _guard = services.mutation.lock().await;
+                services.settings.try_update(change).map_err(|_| failed())
+            })
+            .await
+            .map_err(|_| failed())?
     }
 
     pub async fn wait_for_writes(&self) {
-        let _guard = self.mutation.lock().await;
+        let _guard = self.writes.write().await;
     }
 
     pub async fn remove_connection(self: &Arc<Self>, id: String) -> Result<(), RunnerError> {
         let services = self.clone();
         self.runtime
             .spawn(async move {
+                let _writes = services.writes.read().await;
                 let _guard = services.mutation.lock().await;
                 let before = services.settings.read().await;
                 let previous = before.connections.iter().find(|c| c.id == id);
                 let origin = previous.and_then(|c| origin_of(&c.base_url));
                 let key = if let Some(origin) = &origin {
-                    services
-                        .secrets
-                        .get(&id, origin)
-                        .await
-                        .map_err(|_| failed())?
+                    readable_key(services.secrets.as_ref(), &id, origin).await
                 } else {
                     None
                 };
@@ -278,6 +329,10 @@ impl Services {
     }
 }
 
+async fn readable_key(store: &impl SecretStore, id: &str, origin: &str) -> Option<String> {
+    store.get(id, origin).await.ok().flatten()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -302,6 +357,7 @@ mod tests {
             transport,
             runtime,
             mutation: Mutex::new(()),
+            writes: RwLock::new(()),
             #[cfg(feature = "gui")]
             startup_path,
         })
@@ -335,6 +391,91 @@ mod tests {
             base_url: url,
             api_key: "new-key".into(),
         }
+    }
+
+    #[tokio::test]
+    async fn unreadable_old_keys_do_not_block_replacement_or_deletion() {
+        let path =
+            std::env::temp_dir().join(format!("byoglot-recover-{}.json", std::process::id()));
+        let service = services(path.clone());
+        let (url, server) = provider();
+        let origin = origin_of(&url).unwrap();
+        let mut settings = AppSettings::initial(None);
+        settings.connections.push(Connection {
+            id: "c".into(),
+            preset: byoglot_core::ProviderPreset::Custom,
+            name: "Local".into(),
+            base_url: url.clone(),
+            page_model: None,
+            selection_model: None,
+        });
+        service.settings.try_update(|_| settings).unwrap();
+        service
+            .secrets
+            .set("old-key", "c", "https://wrong-origin.example")
+            .await
+            .unwrap();
+        service.save_connection(draft(url), true).await.unwrap();
+        assert_eq!(
+            service.secrets.get("c", &origin).await.unwrap().as_deref(),
+            Some("new-key")
+        );
+        server.join().unwrap();
+        service
+            .secrets
+            .set("old-key", "c", "https://wrong-origin.example")
+            .await
+            .unwrap();
+        service.remove_connection("c".into()).await.unwrap();
+        assert!(service.settings.read().await.connections.is_empty());
+        assert!(!service.secrets.has("c").await.unwrap());
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[tokio::test]
+    async fn slow_model_validation_does_not_block_settings_and_shutdown_waits_for_it() {
+        let path =
+            std::env::temp_dir().join(format!("byoglot-concurrent-{}.json", std::process::id()));
+        let service = services(path.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let (started, ready) = tokio::sync::oneshot::channel();
+        let (release, resume) = std::sync::mpsc::channel();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            let mut bytes = [0; 8192];
+            socket.read(&mut bytes).unwrap();
+            started.send(()).unwrap();
+            resume.recv_timeout(Duration::from_secs(5)).unwrap();
+            let body = r#"{"data":[{"id":"model"}]}"#;
+            write!(
+                socket,
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            )
+            .unwrap();
+        });
+        let working = service.clone();
+        let saving = tokio::spawn(async move { working.save_connection(draft(url), true).await });
+        ready.await.unwrap();
+        let waiting =
+            tokio::time::timeout(Duration::from_millis(20), service.wait_for_writes()).await;
+        let changed = tokio::time::timeout(
+            Duration::from_secs(1),
+            service.change(|mut s| {
+                s.globals.target_lang = "de".into();
+                s
+            }),
+        )
+        .await;
+        release.send(()).unwrap();
+        saving.await.unwrap().unwrap();
+        server.join().unwrap();
+        assert!(waiting.is_err());
+        assert!(changed.unwrap().is_ok());
+        assert_eq!(service.settings.read().await.globals.target_lang, "de");
+        std::fs::remove_file(path).unwrap();
     }
 
     #[tokio::test]
@@ -383,7 +524,10 @@ mod tests {
         working.settings.try_update(|_| before).unwrap();
         working.secrets.set("old-key", "c", &origin).await.unwrap();
         std::fs::create_dir(temporary.with_extension("json.tmp")).unwrap();
-        assert!(working.save_connection(draft(url), true).await.is_err());
+        assert_eq!(
+            working.save_connection(draft(url), true).await,
+            Err(RunnerError::Storage)
+        );
         assert_eq!(
             working.secrets.get("c", &origin).await.unwrap().as_deref(),
             Some("old-key")

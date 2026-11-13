@@ -75,10 +75,10 @@ impl<T: HttpTransport> ProviderClient<T> {
             )
             .await
             .map_err(|error| {
-                BackendError::new(if error == TransportError::Cancelled {
-                    ErrorKind::Aborted
-                } else {
-                    ErrorKind::Offline
+                BackendError::new(match error {
+                    TransportError::Cancelled => ErrorKind::Aborted,
+                    TransportError::BadResponse => ErrorKind::BadResponse,
+                    TransportError::Offline | TransportError::Timeout => ErrorKind::Offline,
                 })
             })?;
         if !(200..300).contains(&response.status) {

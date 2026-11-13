@@ -9,6 +9,7 @@ pub fn error_text(error: &RunnerError) -> String {
         RunnerError::ConsentNeeded { origin } => tr_with(Msg::ErrConsent, origin),
         RunnerError::TooLong { limit } => tr_with(Msg::ErrTooLong, &limit.to_string()),
         RunnerError::Empty => tr(Msg::ErrEmpty).into(),
+        RunnerError::Storage => tr(Msg::ErrStorage).into(),
         RunnerError::Backend(error) => match error.kind {
             ErrorKind::Offline => tr(Msg::ErrOffline).into(),
             ErrorKind::Unauthorized | ErrorKind::ProviderAuth => tr_with(
@@ -55,6 +56,7 @@ mod tests {
             (RunnerError::NoModel, Msg::ErrNoModel),
             (RunnerError::KeyMissing, Msg::ErrKeyMissing),
             (RunnerError::Empty, Msg::ErrEmpty),
+            (RunnerError::Storage, Msg::ErrStorage),
         ] {
             assert_eq!(error_text(&error), tr(message));
         }
@@ -64,6 +66,7 @@ mod tests {
             }),
             tr_with(Msg::ErrConsent, "https://example.com")
         );
+        assert!(!connection_fix(&RunnerError::Storage));
         assert_eq!(
             error_text(&RunnerError::TooLong { limit: 20000 }),
             tr_with(Msg::ErrTooLong, "20000")

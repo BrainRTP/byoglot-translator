@@ -107,12 +107,12 @@ async fn perform(client: Client, request: HttpRequest) -> Result<HttpResponse, T
             .content_length()
             .is_some_and(|n| n > MAX_BODY as u64)
         {
-            return Err(TransportError::Offline);
+            return Err(TransportError::BadResponse);
         }
         let mut bytes = Vec::new();
         while let Some(chunk) = response.chunk().await.map_err(map_error)? {
             if bytes.len().saturating_add(chunk.len()) > MAX_BODY {
-                return Err(TransportError::Offline);
+                return Err(TransportError::BadResponse);
             }
             bytes.extend_from_slice(&chunk);
         }
@@ -130,5 +130,55 @@ fn map_error(error: reqwest::Error) -> TransportError {
         TransportError::Timeout
     } else {
         TransportError::Offline
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        io::{Read, Write},
+        net::TcpListener,
+    };
+
+    #[tokio::test]
+    async fn oversized_declared_and_streamed_bodies_are_bad_responses() {
+        for chunked in [false, true] {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let url = format!("http://{}", listener.local_addr().unwrap());
+            let server = std::thread::spawn(move || {
+                let (mut socket, _) = listener.accept().unwrap();
+                let mut request = [0; 4096];
+                socket.read(&mut request).unwrap();
+                if chunked {
+                    let body = vec![b'x'; MAX_BODY + 1];
+                    let _ = write!(
+                        socket,
+                        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n{:x}\r\n",
+                        body.len()
+                    );
+                    let _ = socket.write_all(&body);
+                    let _ = socket.write_all(b"\r\n0\r\n\r\n");
+                } else {
+                    let _ = write!(
+                        socket,
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n",
+                        MAX_BODY + 1
+                    );
+                }
+            });
+            let transport = ReqwestTransport::new(Handle::current()).unwrap();
+            let request = HttpRequest {
+                method: "GET".into(),
+                url,
+                headers: BTreeMap::new(),
+                body: None,
+            };
+            assert_eq!(
+                transport.send(request, Duration::from_secs(3)).await,
+                Err(TransportError::BadResponse)
+            );
+            server.join().unwrap();
+        }
     }
 }

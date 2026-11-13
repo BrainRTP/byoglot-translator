@@ -150,7 +150,7 @@ pub fn present(
             api_key: key.text().into(),
         };
         let consent = consent.is_active();
-        key.set_text("");
+        let key = key.clone();
         let service = services.clone();
         let id = current_id.clone();
         let changed = changed_save.clone();
@@ -171,6 +171,7 @@ pub fn present(
             let _hold = hold;
             match service.save_connection(draft, consent).await {
                 Ok(connection) => {
+                    key.set_text("");
                     *id.borrow_mut() = Some(connection.id.clone());
                     changed();
                     load_models(&models, service, connection, &error);
@@ -249,7 +250,7 @@ fn load_models(
             group.set_description(Some(tr(Msg::NoModels)));
             return;
         }
-        let mut names = vec![tr(Msg::ErrNoModel).to_string()];
+        let mut names = vec![tr(Msg::NotSelected).to_string()];
         names.extend(choices.iter().map(|m| match &m.variant {
             Some(variant) => format!("{} ({})", m.id, crate::i18n::effort_name(variant)),
             None => m.id.clone(),

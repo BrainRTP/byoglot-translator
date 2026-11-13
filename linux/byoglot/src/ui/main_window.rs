@@ -65,14 +65,19 @@ pub fn build(app: &adw::Application, services: Arc<Services>) -> adw::Applicatio
         .build();
     toolbar.add_bottom_bar(&switcher_bar);
     toolbar.set_content(Some(&stack));
-    if !services.secrets.is_persistent() {
-        toolbar.add_top_bar(
-            &adw::Banner::builder()
-                .title(tr(Msg::NoKeyring))
-                .revealed(true)
-                .build(),
-        );
-    }
+    let secret_banner = adw::Banner::builder()
+        .title(tr(Msg::NoKeyring))
+        .revealed(!services.secrets.is_persistent())
+        .build();
+    toolbar.add_top_bar(&secret_banner);
+    let service = services.clone();
+    let weak_banner = secret_banner.downgrade();
+    gtk::glib::spawn_future_local(async move {
+        service.initialize_secrets().await;
+        if let Some(banner) = weak_banner.upgrade() {
+            banner.set_revealed(!service.secrets.is_persistent());
+        }
+    });
     window.set_content(Some(&toolbar));
     let action = gio::SimpleAction::new("preferences", None);
     let weak = window.downgrade();
@@ -133,6 +138,9 @@ pub fn banner() -> adw::Banner {
     adw::Banner::builder().title("").revealed(false).build()
 }
 pub fn show_error(banner: &adw::Banner, error: &byoglot_core::RunnerError) {
+    if !super::error_text::connection_fix(error) {
+        banner.set_button_label(None);
+    }
     banner.set_title(&super::error_text::error_text(error));
     banner.set_revealed(true);
 }

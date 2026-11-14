@@ -101,10 +101,19 @@ class HttpEngineTransportTest {
             override fun checkSelfPermission(permission: String): Int = android.content.pm.PackageManager.PERMISSION_DENIED
         }
         val deniedTransport = HttpEngineTransport(deniedContext)
-        Server { null }.use {
-            try { deniedTransport.send(request(it.url), 300); fail() }
-            catch (e: TransportException) { assertEquals(TransportException.Reason.LocalNetworkDenied, e.reason) }
-            assertEquals(1L, it.connected.count)
+        try { deniedTransport.send(request("https://192.168.1.2"), 300); fail() }
+        catch (e: TransportException) { assertEquals(TransportException.Reason.LocalNetworkDenied, e.reason) }
+    }
+    @Test fun loopback_does_not_require_local_network_permission() = runBlocking {
+        val deniedContext = object : android.content.ContextWrapper(context) {
+            override fun getApplicationContext(): android.content.Context = this
+            override fun checkSelfPermission(permission: String): Int = error("Loopback must not check LAN permission")
+        }
+        val deniedTransport = HttpEngineTransport(deniedContext)
+        Server { "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n" }.use {
+            try { deniedTransport.send(request(it.url.replace("http:", "https:")), 300); fail() }
+            catch (e: TransportException) { assertNotEquals(TransportException.Reason.LocalNetworkDenied, e.reason) }
+            assertTrue(it.connected.await(3, TimeUnit.SECONDS))
         }
     }
 }

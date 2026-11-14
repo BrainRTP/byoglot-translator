@@ -9,7 +9,6 @@ private struct TemplateEditorRoute: Hashable {
 public struct ScreenTemplateSettings: View {
     @Bindable var model: AppModel
     @SceneStorage("templates.search") private var query = ""
-    @SceneStorage("template.editor.draft") private var storedDraft = ""
     @State private var editing: TemplateEditorRoute?
     public init(model: AppModel) { self.model = model }
     public var body: some View {
@@ -25,7 +24,7 @@ public struct ScreenTemplateSettings: View {
                     }
                 }
             }
-            ByoButton("template.new") { storedDraft = ""; editing = TemplateEditorRoute(templateID: nil) }
+            ByoButton("template.new") { editing = TemplateEditorRoute(templateID: nil) }
         }.navigationDestination(item: $editing) { route in
             ScreenTemplateEditor(model: model, original: route.templateID.flatMap { id in model.settings.templates.first { $0.id == id } })
 
@@ -52,12 +51,10 @@ public struct ScreenTemplateEditor: View {
     @Bindable var model: AppModel
     let original: Template?
     @Environment(\.dismiss) private var dismiss
-    @SceneStorage("template.editor.draft") private var storedDraft = ""
     @SceneStorage("template.editor.sheet") private var sheet = ""
     @State private var draft: TemplateDraft
     @State private var deleting = false
     @State private var busy = false
-    @State private var leaving = false
     public init(model: AppModel, original: Template? = nil) {
         self.model = model; self.original = original
         _draft = State(initialValue: TemplateDraft(template: original))
@@ -90,19 +87,18 @@ public struct ScreenTemplateEditor: View {
                     copy.id = UUID().uuidString
                     copy.name = AppStrings.format("template.copyName", ["name": templateLabel(original)])
                     copy.builtin = false
-                    if await model.saveTemplate(copy) { clearDraft(); dismiss() }
+                    if await model.saveTemplate(copy) { dismiss() }
                     busy = false
                 } }
                 ByoButton("template.makeDefault") { Task { await model.chooseTemplate(original) } }.disabled(model.settings.globals.defaultTemplateId == original.id)
                 if !readOnly {
                     if deleting {
-                        InlineConfirm(text: AppStrings.format("template.deleteConfirm", ["name": original.name]), danger: true, confirm: { Task { if await model.deleteTemplate(original.id) { clearDraft(); dismiss() } } }, cancel: { deleting = false })
+                        InlineConfirm(text: AppStrings.format("template.deleteConfirm", ["name": original.name]), danger: true, confirm: { Task { if await model.deleteTemplate(original.id) { dismiss() } } }, cancel: { deleting = false })
                     } else { ByoButton("common.delete", kind: .danger) { deleting = true } }
                 }
             }
-        }.onAppear { loadDraft() }
+        }.onAppear { if let latest { draft.rebase(on: latest) } }
             .onChange(of: latest) { _, value in if let value { draft.rebase(on: value) } }
-            .onChange(of: draft) { _, value in if !leaving { storedDraft = (try? JSONEncoder().encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? "" } }
             .sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } })) {
                 if sheet == "language" {
                     ScreenLanguageSheet(selected: target, inherit: true, choose: { draft.value.settings.targetLang = $0.isEmpty ? nil : $0; sheet = "" }, close: { sheet = "" })
@@ -113,15 +109,6 @@ public struct ScreenTemplateEditor: View {
         draft.value.settings.pageModel = value
         draft.value.settings.selectionModel = value
     }
-    private func clearDraft() { leaving = true; storedDraft = ""; sheet = "" }
-    private func loadDraft() {
-        leaving = false
-        if let data = storedDraft.data(using: .utf8), let saved = try? JSONDecoder().decode(TemplateDraft.self, from: data),
-           saved.base?.id == original?.id {
-            draft = saved
-        } else { draft = TemplateDraft(template: latest ?? original) }
-        if let latest { draft.rebase(on: latest) }
-    }
     private func save() {
         var value = draft.value
         value.name = jsTrim(value.name)
@@ -129,7 +116,7 @@ public struct ScreenTemplateEditor: View {
         let base = draft.base
         Task {
             busy = true
-            if await model.saveTemplate(saved, base: base) { clearDraft(); dismiss() }
+            if await model.saveTemplate(saved, base: base) { dismiss() }
             busy = false
         }
     }

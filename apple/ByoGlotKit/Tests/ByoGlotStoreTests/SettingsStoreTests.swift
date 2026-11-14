@@ -49,6 +49,32 @@ struct SettingsStoreTests {
         #expect(next.consentedOrigins == changed.consentedOrigins)
     }
 
+    @Test func futureThemeAndPresetDoNotHideKnownSettings() async throws {
+        let directory = directory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = SettingsStore(directory: directory)
+        let original = try await store.read()
+        var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as? [String: Any])
+        object["theme"] = "future-theme"
+        let known: [String: Any] = ["id": "known", "preset": "custom", "name": "Known", "baseUrl": "https://provider.example/v1"]
+        object["connections"] = [["preset": "future-provider"], known, ["preset": "another-provider"]]
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let file = directory.appending(path: "settings.json")
+        try data.write(to: file)
+        let loaded = try await store.read()
+        #expect(loaded.theme == .system)
+        #expect(loaded.connections == [Connection(id: "known", preset: .custom, name: "Known", baseUrl: "https://provider.example/v1")])
+        #expect(loaded.templates == original.templates && loaded.globals == original.globals)
+        #expect(try Data(contentsOf: file) == data)
+        var malformed = known
+        malformed["baseUrl"] = 42
+        object["connections"] = [malformed]
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(AppSettings.self, from: JSONSerialization.data(withJSONObject: object)) }
+        object["connections"] = [known]
+        object["theme"] = 42
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(AppSettings.self, from: JSONSerialization.data(withJSONObject: object)) }
+    }
+
     @Test func twoStoresOnOneDirectoryDoNotLoseUpdates() async throws {
         let directory = directory()
         defer { try? FileManager.default.removeItem(at: directory) }

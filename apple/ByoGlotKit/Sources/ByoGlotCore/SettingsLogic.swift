@@ -51,6 +51,8 @@ public struct AppSettings: Codable, Hashable, Sendable {
         case schemaVersion, revision, globals, templates, profileOverrides, siteRules, connections, activeConnectionId, consentedOrigins, theme, resultAnimation, autoTranslate, mainModel, externalModel, fallbackModel
     }
 
+    private enum ConnectionCodingKeys: CodingKey { case preset }
+
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
@@ -59,10 +61,19 @@ public struct AppSettings: Codable, Hashable, Sendable {
         templates = try c.decode([Template].self, forKey: .templates)
         profileOverrides = try c.decodeIfPresent([String: ProfileOverride].self, forKey: .profileOverrides) ?? [:]
         siteRules = try c.decodeIfPresent([SiteRule].self, forKey: .siteRules) ?? []
-        connections = try c.decodeIfPresent([Connection].self, forKey: .connections) ?? []
+        connections = []
+        if c.contains(.connections), try !c.decodeNil(forKey: .connections) {
+            var entries = try c.nestedUnkeyedContainer(forKey: .connections)
+            while !entries.isAtEnd {
+                let entry = try entries.superDecoder()
+                let fields = try entry.container(keyedBy: ConnectionCodingKeys.self)
+                let preset = try fields.decode(String.self, forKey: .preset)
+                if ProviderPreset(rawValue: preset) != nil { connections.append(try Connection(from: entry)) }
+            }
+        }
         activeConnectionId = try c.decodeIfPresent(String.self, forKey: .activeConnectionId)
         consentedOrigins = try c.decodeIfPresent([String].self, forKey: .consentedOrigins) ?? []
-        theme = try c.decodeIfPresent(ThemeChoice.self, forKey: .theme) ?? .system
+        theme = ThemeChoice(rawValue: try c.decodeIfPresent(String.self, forKey: .theme) ?? "system") ?? .system
         resultAnimation = ResultAnimation(rawValue: try c.decodeIfPresent(String.self, forKey: .resultAnimation) ?? "fade") ?? .fade
         autoTranslate = try c.decodeIfPresent(Bool.self, forKey: .autoTranslate) ?? true
         mainModel = try c.decodeIfPresent(ModelRef.self, forKey: .mainModel)

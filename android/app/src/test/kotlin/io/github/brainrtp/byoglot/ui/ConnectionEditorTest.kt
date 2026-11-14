@@ -143,6 +143,27 @@ class ConnectionEditorTest {
         assertFalse(secrets.has(c.id))
         assertNull(settings.read().activeConnectionId)
         assertTrue(settings.read().connections.isEmpty())
+        assertTrue(settings.read().consentedOrigins.isEmpty())
+    }
+
+    @Test
+    fun consent_is_revoked_only_after_the_last_connection_to_its_origin_is_removed() = runTest {
+        val first = editor.save(draft(), true).connection
+        val sameOrigin = editor.save(draft("https://a.test:443/v2"), true).connection
+        editor.save(draft("https://b.test"), true)
+        editor.remove(first.id)
+        assertEquals(listOf("https://a.test", "https://b.test"), settings.read().consentedOrigins)
+        editor.remove(sameOrigin.id)
+        assertEquals(listOf("https://b.test"), settings.read().consentedOrigins)
+        settings.update { state ->
+            state.copy(connections = state.connections + first)
+        }
+        secrets.set("key", first.id, "https://a.test")
+        val failure = runCatching { editor.models(first.id) }.exceptionOrNull()
+        assertEquals(
+            RunnerError.ConsentNeeded("https://a.test"),
+            assertInstanceOf(RunnerException::class.java, failure).error,
+        )
     }
 
     @Test

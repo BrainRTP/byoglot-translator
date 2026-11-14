@@ -1,6 +1,7 @@
 package io.github.brainrtp.byoglot.store
 
 import android.content.ContextWrapper
+import androidx.datastore.core.CorruptionException
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.brainrtp.byoglot.core.AppSettings
@@ -51,14 +52,12 @@ class DataStoreSettingsRepositoryTest {
     }
 
     @Test
-    fun a_corrupt_file_is_replaced() = runBlocking {
-        File(context.filesDir, "datastore/settings.json").apply {
+    fun a_corrupt_file_is_preserved() = runBlocking {
+        val file = File(context.filesDir, "datastore/settings.json").apply {
             parentFile!!.mkdirs()
             writeText("broken")
         }
-        assertEquals(
-            AppSettings.initial(Locale.getDefault().language),
-            DataStoreSettingsRepository(context).read(),
-        )
+        assertTrue(runCatching { DataStoreSettingsRepository(context).read() }.exceptionOrNull() is CorruptionException)
+        assertEquals("broken", file.readText())
     }
 }

@@ -123,6 +123,11 @@ class ConnectionEditor(
                     val remaining = state.connections.filterNot { it.id == id }
                     state.copy(
                         connections = remaining,
+                        consentedOrigins =
+                            state.consentedOrigins.filterNot { consented ->
+                                consented == origin &&
+                                    remaining.none { originOf(it.baseUrl) == origin }
+                            },
                         mainModel = state.mainModel?.takeUnless { it.connectionId == id },
                         externalModel = state.externalModel?.takeUnless { it.connectionId == id },
                         fallbackModel = state.fallbackModel?.takeUnless { it.connectionId == id },

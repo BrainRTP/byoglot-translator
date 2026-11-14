@@ -48,6 +48,7 @@ public final class AppModel {
     private var composing = false
     @ObservationIgnored private var requestId: UUID?
     @ObservationIgnored private var choiceRevision = 0
+    @ObservationIgnored private var resumeOnActive = false
     private var manualTarget: String?
     private var manualModel: ModelRef?
     private var manualPrompt: String?
@@ -114,10 +115,11 @@ public final class AppModel {
 
     public func refresh() async {
         do {
+            let refreshed = try await store.read()
             let before = inputs
             let previous = settings
             let first = !loaded
-            settings = try await store.read()
+            settings = refreshed
             if let manualModel, SettingsLogic.bindModel(manualModel, settings: settings) == nil { self.manualModel = nil }
             if first {
                 sourceLang = settings.globals.sourceLang
@@ -126,14 +128,14 @@ public final class AppModel {
                 loaded = true
             }
             storageError = nil
-            for connection in settings.connections {
-                keyStates[connection.id] = await editor.keyState(connectionId: connection.id)
-                models[connection.id] = await editor.cachedModels(connectionId: connection.id)
-            }
             if !first && before != inputs { invalidate(); schedule() }
             else if previous.autoTranslate != settings.autoTranslate {
                 pending?.cancel()
                 if settings.autoTranslate && !complete && !running { schedule() }
+            }
+            for connection in settings.connections {
+                keyStates[connection.id] = await editor.keyState(connectionId: connection.id)
+                models[connection.id] = await editor.cachedModels(connectionId: connection.id)
             }
         } catch { storageError = .appGroupUnavailable }
     }
@@ -161,7 +163,8 @@ public final class AppModel {
 
     private func schedule() {
         pending?.cancel()
-        guard loaded, activity != .background, settings.autoTranslate, canTranslate else { return }
+        guard loaded, settings.autoTranslate, canTranslate else { return }
+        guard activity != .background else { resumeOnActive = true; return }
         pending = Task { [weak self, delay] in
             do { try await Task.sleep(for: delay) } catch { return }
             guard !Task.isCancelled else { return }
@@ -248,6 +251,7 @@ public final class AppModel {
     }
 
     private func cancelTasks() {
+        resumeOnActive = false
         resultAnimation = nil
         requestId = nil
         latestChunk = nil
@@ -274,8 +278,11 @@ public final class AppModel {
         case .inactive: break
         case .active:
             backgroundTask?.end()
-            if !running && result.isEmpty { schedule() }
+            let resume = resumeOnActive
+            resumeOnActive = false
+            if resume && !running && result.isEmpty { schedule() }
         case .background:
+            resumeOnActive = pending != nil
             pending?.cancel()
             pending = nil
             guard running, let id = requestId else { return }
@@ -284,6 +291,7 @@ public final class AppModel {
                 if let chunk = self.latestChunk { self.apply(chunk) }
                 self.cancelTasks()
                 self.markInterrupted()
+                self.resumeOnActive = true
             }
         }
     }
@@ -523,7 +531,9 @@ public final class AppModel {
         sourceLang = oldTarget
         _ = selection.selectTarget(source)
         detectedSourceLang = nil
+        let revision = choiceRevision
         await updateSettings { $0.globals.sourceLang = oldTarget; $0.globals.targetLang = source }
+        guard revision == choiceRevision else { return nil }
         if ready {
             inputText = oldResult
             result = oldSource
@@ -544,14 +554,12 @@ public final class AppModel {
         } catch { catalogueErrors[connectionId] = error }
     }
 
-    public func setDefaultModel(connectionId: String, model: ModelRef) async {
-        var bound = model
-        bound.connectionId = connectionId
-        let chosen = bound
+    public func setDefaultModel(connectionId: String, model: ModelInfo) async {
+        let pair = SettingsLogic.pickInitialModels(models: [model], defaultModel: model, connectionId: connectionId)
         await updateSettings { state in
             guard let index = state.connections.firstIndex(where: { $0.id == connectionId }) else { return }
-            state.connections[index].pageModel = chosen
-            state.connections[index].selectionModel = chosen
+            state.connections[index].pageModel = pair.page
+            state.connections[index].selectionModel = pair.selection
         }
     }
 

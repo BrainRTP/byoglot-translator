@@ -5,8 +5,8 @@ import UIKit
     private var identifier = UIBackgroundTaskIdentifier.invalid
     func begin(expiration: @escaping @MainActor @Sendable () -> Void) {
         guard identifier == .invalid else { return }
-        identifier = UIApplication.shared.beginBackgroundTask(withName: "ByoGlot translation") {
-            Task { @MainActor in expiration() }
+        identifier = UIApplication.shared.beginBackgroundTask(withName: "ByoGlot translation") { [weak self] in
+            MainActor.assumeIsolated { expiration(); self?.end() }
         }
         if identifier == .invalid { expiration() }
     }

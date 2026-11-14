@@ -169,7 +169,7 @@ private struct ProviderKeyScreen: View {
                         ForEach(list, id: \.id) { info in
                             ListRow(info.id, subtitle: AppStrings.text(info.variants.contains(where: { $0 != "none" }) ? "model.thinking" : "model.noThinking"), selected: connection.pageModel?.id == info.id && connection.pageModel?.providerID == info.providerID, disclosure: false, mono: true) {
                                 guard connection.pageModel?.id != info.id || connection.pageModel?.providerID != info.providerID else { return }
-                                Task { await model.setDefaultModel(connectionId: connection.id, model: ModelRef(providerID: info.providerID, id: info.id, variant: "none", connectionId: connection.id)) }
+                                Task { await model.setDefaultModel(connectionId: connection.id, model: info) }
                             }
                         }
                     }

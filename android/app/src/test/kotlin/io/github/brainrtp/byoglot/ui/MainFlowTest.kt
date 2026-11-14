@@ -97,7 +97,7 @@ class MainFlowTest {
     }
 
     @Test
-    fun `manual mode uses keyboard action and counts UTF16 before trimming`() = runTest {
+    fun `manual mode uses keyboard action and counts UTF16 after JS trimming`() = runTest {
         var calls = 0
         val vm =
             MainViewModel(
@@ -119,11 +119,59 @@ class MainFlowTest {
         runCurrent()
         assertEquals(1, calls)
         assertEquals(InputCounter(20000, 20000), InputCounter.editor("😀".repeat(10000)))
-        vm.setText(" " + "😀".repeat(10000))
+        val padded = "\uFEFF " + "😀".repeat(10000) + "\n".repeat(20)
+        assertEquals(InputCounter(20000, 20000), InputCounter.editor(padded))
+        vm.setText(padded)
+        vm.keyboardTranslate()
+        runCurrent()
+        assertNull(vm.translation.value.error)
+        assertEquals(2, calls)
+        vm.setText("😀".repeat(10000) + "x")
         vm.keyboardTranslate()
         runCurrent()
         assertEquals(RunnerError.TooLong(20000), vm.translation.value.error)
-        assertEquals(1, calls)
+        assertEquals(2, calls)
+    }
+
+    @Test
+    fun `equivalent edits and pastes never repeat an automatic request without a cache`() = runTest {
+        for (incomplete in listOf(false, true)) {
+            var calls = 0
+            val vm =
+                MainViewModel(
+                    InMemorySettingsRepository(AppSettings.initial("en")),
+                    InMemorySecretStore(),
+                    transport,
+                    backgroundScope,
+                    stream = { input ->
+                        calls++
+                        flowOf(RunnerStreamOutput(output(input), true, incomplete))
+                    },
+                )
+            runCurrent()
+            vm.setText("source")
+            advanceTimeBy(801)
+            runCurrent()
+            val answer = vm.translation.value
+            assertEquals(1, calls)
+            vm.setText("source ")
+            advanceTimeBy(801)
+            runCurrent()
+            vm.setText("source")
+            advanceTimeBy(801)
+            runCurrent()
+            vm.paste("\uFEFFsource\n")
+            runCurrent()
+            assertEquals(answer, vm.translation.value)
+            vm.setText("different")
+            vm.setText("source")
+            advanceTimeBy(801)
+            runCurrent()
+            assertEquals(1, calls)
+            vm.translate(forceRequest = true)
+            runCurrent()
+            assertEquals(2, calls)
+        }
     }
 
     @Test

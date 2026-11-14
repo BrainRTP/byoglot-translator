@@ -57,12 +57,11 @@ class MainViewModel(
     },
 ) : ViewModel() {
     private val workScope = scope ?: viewModelScope
-    private val translationRunner = TranslationRunner(repository, secrets, transport, cache)
     private val streamRunner: (RunnerInput) -> Flow<RunnerStreamOutput> =
         stream
             ?: if (translate != null)
                 { input -> flow { emit(RunnerStreamOutput(translate(input), true)) } }
-            else translationRunner::stream
+            else TranslationRunner(repository, secrets, transport, cache)::stream
     private val mutableParameters = MutableStateFlow(MainParameters())
     val parameters = mutableParameters.asStateFlow()
     private var manualTarget: String? = null
@@ -256,9 +255,12 @@ class MainViewModel(
 
     fun setText(text: String) {
         if (text == mutableText.value) return
-        cancel()
         mutableText.value = text
-        lastRequestInputs = null
+        if (requestInputs() == lastRequestInputs) {
+            autoJob?.cancel()
+            return
+        }
+        cancel()
         mutableParameters.value = mutableParameters.value.copy(detectedSourceLang = null)
         mutableTranslation.value = TranslationState()
         schedule()
@@ -266,13 +268,14 @@ class MainViewModel(
 
     fun paste(text: String) {
         setText(text)
-        if (mutableSettings.value?.autoTranslate == true) translate()
+        if (mutableSettings.value?.autoTranslate == true) translateChoice()
     }
 
     private fun schedule() {
         autoJob?.cancel()
         if (
             mutableSettings.value?.autoTranslate == true &&
+                requestInputs() != lastRequestInputs &&
                 mutableText.value.isNotBlank() &&
                 !InputCounter.editor(mutableText.value).overLimit
         ) {

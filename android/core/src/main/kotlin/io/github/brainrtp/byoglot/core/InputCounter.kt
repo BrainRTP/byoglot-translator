@@ -5,6 +5,6 @@ data class InputCounter(val count: Int, val limit: Int) {
         get() = count > limit
 
     companion object {
-        fun editor(text: String) = InputCounter(text.length, EDITOR_INPUT_LIMIT)
+        fun editor(text: String) = InputCounter(text.jsTrim().length, EDITOR_INPUT_LIMIT)
     }
 }

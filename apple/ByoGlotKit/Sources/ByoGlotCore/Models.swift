@@ -72,6 +72,20 @@ public struct TemplateSettings: Codable, Hashable, Sendable {
         self.pageModel = pageModel
         self.selectionModel = selectionModel
     }
+
+    private enum CodingKeys: CodingKey {
+        case prePrompt, targetLang, displayMode, visibleOnly, pageModel, selectionModel
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        prePrompt = try c.decodeIfPresent(String.self, forKey: .prePrompt)
+        targetLang = try c.decodeIfPresent(String.self, forKey: .targetLang)
+        displayMode = DisplayMode(rawValue: try c.decodeIfPresent(String.self, forKey: .displayMode) ?? "")
+        visibleOnly = try c.decodeIfPresent(Bool.self, forKey: .visibleOnly)
+        pageModel = try c.decodeIfPresent(ModelRef.self, forKey: .pageModel)
+        selectionModel = try c.decodeIfPresent(ModelRef.self, forKey: .selectionModel)
+    }
 }
 
 public struct Template: Codable, Hashable, Sendable, Identifiable {

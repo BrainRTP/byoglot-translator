@@ -129,7 +129,7 @@ public struct ScreenParamsSheet: View {
     let manageTemplates: (() -> Void)?
     @SceneStorage("params.sheet") private var sheet = ""
     @SceneStorage("params.expanded") private var expanded = false
-    @SceneStorage("params.saving") private var saving = false
+    @State private var saving = false
     @State private var name = ""
     @State private var confirming = false
     @State private var promptDraft = ""

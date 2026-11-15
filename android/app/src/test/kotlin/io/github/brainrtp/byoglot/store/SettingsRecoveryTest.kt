@@ -32,6 +32,7 @@ class SettingsRecoveryTest {
                 assertNull(main.settings.value)
                 assertNull(quick.settings.value)
                 assertEquals("broken", file.readText())
+                main.refreshModels()
                 repository.resetCorruptSettings()
                 main.refresh()
                 quick.refresh()

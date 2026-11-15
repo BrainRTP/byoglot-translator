@@ -1,5 +1,6 @@
 package io.github.brainrtp.byoglot.ui
 
+import androidx.datastore.core.CorruptionException
 import io.github.brainrtp.byoglot.core.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
@@ -24,7 +25,11 @@ class ModelCatalogue(
 
     suspend fun refresh() = coroutineScope {
         val id = ++generation
-        val connections = repository.read().connections
+        val connections = try {
+            repository.read().connections
+        } catch (_: CorruptionException) {
+            return@coroutineScope
+        }
         val descriptors = connections.associate { it.id to (it.preset to it.baseUrl) }
         val previous = groups.value.filterKeys { origins[it] == descriptors[it] }
         origins = descriptors

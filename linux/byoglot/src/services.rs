@@ -39,12 +39,14 @@ impl Services {
         path: PathBuf,
         language: Option<String>,
         runtime: Handle,
-    ) -> Result<Arc<Self>, RunnerError> {
+    ) -> std::io::Result<Arc<Self>> {
         #[cfg(feature = "gui")]
         let startup_path = path.with_file_name("startup.json");
         let settings = Arc::new(FileSettingsRepository::new(path, language));
+        settings.try_read()?;
         let secrets = Arc::new(FallbackSecretStore::lazy());
-        let transport = ReqwestTransport::new(runtime.clone()).map_err(|_| failed())?;
+        let transport = ReqwestTransport::new(runtime.clone())
+            .map_err(|_| std::io::Error::other("transport unavailable"))?;
         Ok(Arc::new(Self {
             runner: TranslationRunner::new(settings.clone(), secrets.clone(), transport.clone()),
             editor: ConnectionEditor::new(settings.clone(), secrets.clone(), transport.clone()),
@@ -70,12 +72,28 @@ impl Services {
     pub async fn translate(
         self: &Arc<Self>,
         input: byoglot_core::RunnerInput,
+        source: Option<String>,
     ) -> Result<byoglot_core::RunnerOutput, RunnerError> {
         let services = self.clone();
-        let mut task = crate::net::AbortOnDrop(
-            self.runtime
-                .spawn(async move { services.runner.translate(input).await }),
-        );
+        let mut task = crate::net::AbortOnDrop(self.runtime.spawn(async move {
+            tokio::time::timeout(std::time::Duration::from_secs(180), async {
+                if let Some(source) = source {
+                    services
+                        .update_settings(move |mut s| {
+                            s.globals.source_lang = source;
+                            s
+                        })
+                        .await?;
+                }
+                services.runner.translate(input).await
+            })
+            .await
+            .map_err(|_| {
+                RunnerError::from(byoglot_core::BackendError::new(
+                    byoglot_core::ErrorKind::Offline,
+                ))
+            })?
+        }));
         (&mut task.0).await.map_err(|_| failed())?
     }
 
@@ -268,13 +286,18 @@ impl Services {
     ) -> Result<AppSettings, RunnerError> {
         let services = self.clone();
         self.runtime
-            .spawn(async move {
-                let _writes = services.writes.read().await;
-                let _guard = services.mutation.lock().await;
-                services.settings.try_update(change).map_err(|_| failed())
-            })
+            .spawn(async move { services.update_settings(change).await })
             .await
             .map_err(|_| failed())?
+    }
+
+    async fn update_settings(
+        &self,
+        change: impl FnOnce(AppSettings) -> AppSettings,
+    ) -> Result<AppSettings, RunnerError> {
+        let _writes = self.writes.read().await;
+        let _guard = self.mutation.lock().await;
+        self.settings.try_update(change).map_err(|_| failed())
     }
 
     pub async fn wait_for_writes(&self) {
@@ -383,6 +406,75 @@ mod tests {
             base_url: url,
             api_key: "new-key".into(),
         }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn total_deadline_includes_waiting_for_settings_before_http() {
+        let path =
+            std::env::temp_dir().join(format!("byoglot-deadline-{}.json", std::process::id()));
+        let service = services(path.clone());
+        let settings = service.settings.clone();
+        let (started, ready) = tokio::sync::oneshot::channel();
+        let (release, resume) = std::sync::mpsc::channel();
+        let writer = std::thread::spawn(move || {
+            settings
+                .try_update(|s| {
+                    started.send(()).unwrap();
+                    resume.recv_timeout(Duration::from_secs(5)).unwrap();
+                    s
+                })
+                .unwrap();
+        });
+        ready.await.unwrap();
+        let working = service.clone();
+        let task = tokio::spawn(async move {
+            working
+                .translate(
+                    crate::view_state::editor_input("hello".into(), None, "en".into()),
+                    None,
+                )
+                .await
+        });
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(180)).await;
+        let result = task.await;
+        release.send(()).unwrap();
+        writer.join().unwrap();
+        assert_eq!(
+            result.unwrap(),
+            Err(byoglot_core::BackendError::new(byoglot_core::ErrorKind::Offline).into())
+        );
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[tokio::test]
+    async fn editor_deadline_includes_the_settings_mutation_queue() {
+        tokio::time::pause();
+        let path = std::env::temp_dir().join(format!(
+            "byoglot-editor-deadline-{}.json",
+            std::process::id()
+        ));
+        let service = services(path.clone());
+        let guard = service.mutation.lock().await;
+        let working = service.clone();
+        let task = tokio::spawn(async move {
+            working
+                .translate(
+                    crate::view_state::editor_input("hello".into(), None, "en".into()),
+                    Some("de".into()),
+                )
+                .await
+        });
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(180)).await;
+        assert_eq!(
+            task.await.unwrap(),
+            Err(byoglot_core::BackendError::new(byoglot_core::ErrorKind::Offline).into())
+        );
+        drop(guard);
+        tokio::task::yield_now().await;
+        assert!(!path.exists());
+        assert_eq!(service.settings.read().await.globals.source_lang, "auto");
     }
 
     #[tokio::test]

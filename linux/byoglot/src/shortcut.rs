@@ -67,6 +67,7 @@ pub struct ShortcutStatus {
     portal: GlobalShortcuts,
     session: PortalSession,
     trigger: gtk::Label,
+    closed: Rc<Cell<bool>>,
     listeners: Vec<glib::JoinHandle<()>>,
 }
 impl Drop for ShortcutStatus {
@@ -85,7 +86,10 @@ impl ShortcutStatus {
     }
 }
 
-pub async fn bind(app: &adw::Application) -> Result<ShortcutStatus, ShortcutError> {
+async fn bind(
+    app: &adw::Application,
+    registration: std::rc::Weak<Registration>,
+) -> Result<ShortcutStatus, ShortcutError> {
     let _ = register_host().await;
     let portal = GlobalShortcuts::new().await.map_err(|_| ShortcutError)?;
     let mut session = PortalSession(Some(Arc::new(
@@ -172,21 +176,34 @@ pub async fn bind(app: &adw::Application) -> Result<ShortcutStatus, ShortcutErro
     });
     let status = trigger.downgrade();
     let closed_session = session.shared();
+    let closed = Rc::new(Cell::new(false));
+    let closed_state = closed.clone();
     let closure = glib::spawn_future_local(async move {
         let Ok(closed) = closed_session.receive_closed().await else {
             return;
         };
         let mut closed = std::pin::pin!(closed);
-        if closed.next().await.is_some()
-            && let Some(status) = status.upgrade()
-        {
-            status.set_label(&fallback_hint());
+        if closed.next().await.is_some() {
+            closed_state.set(true);
+            if let Some(status) = status.upgrade() {
+                status.set_label(&fallback_hint());
+            }
+            if let Some(registration) = registration.upgrade() {
+                let mut current = registration.current.borrow_mut();
+                if current
+                    .as_ref()
+                    .is_some_and(|s| Rc::ptr_eq(&s.closed, &closed_state))
+                {
+                    current.take();
+                }
+            }
         }
     });
     Ok(ShortcutStatus {
         portal,
         session,
         trigger,
+        closed,
         listeners: vec![activation, changes, closure],
     })
 }
@@ -214,9 +231,11 @@ impl Registration {
         let weak = Rc::downgrade(self);
         let app = app.clone();
         glib::spawn_future_local(async move {
-            let result = bind(&app).await;
+            let result = bind(&app, weak.clone()).await;
             if let Some(registration) = weak.upgrade() {
-                if let Ok(status) = result {
+                if let Ok(status) = result
+                    && !status.closed.get()
+                {
                     registration.description.set_label(&status.trigger.label());
                     let description = registration.description.downgrade();
                     status.trigger.connect_label_notify(move |status| {
@@ -287,7 +306,9 @@ impl Registration {
                         {
                             registration.description.set_label(&fallback_hint());
                         }
-                        *registration.current.borrow_mut() = Some(status);
+                        if !status.closed.get() {
+                            *registration.current.borrow_mut() = Some(status);
+                        }
                         registration.busy.set(false);
                     }
                     previous => {

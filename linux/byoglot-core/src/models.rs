@@ -34,7 +34,7 @@ pub enum DisplayMode {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct ModelRef {
     #[serde(rename = "providerID")]
     pub provider_id: String,
@@ -58,7 +58,7 @@ pub struct ModelInfo {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct Connection {
     pub id: String,
     pub preset: ProviderPreset,
@@ -71,7 +71,7 @@ pub struct Connection {
 }
 
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct TemplateSettings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pre_prompt: Option<String>,
@@ -88,7 +88,7 @@ pub struct TemplateSettings {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct Template {
     pub id: String,
     pub name: String,
@@ -97,7 +97,7 @@ pub struct Template {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct ProfileOverride {
     pub text: String,
     pub base: String,
@@ -105,7 +105,7 @@ pub struct ProfileOverride {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortableGlobals {
     pub source_lang: String,
     pub target_lang: String,
@@ -115,7 +115,7 @@ pub struct PortableGlobals {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct SiteRule {
     pub id: String,
     pub pattern: String,

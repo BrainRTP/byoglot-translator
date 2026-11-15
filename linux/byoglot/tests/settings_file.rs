@@ -47,13 +47,64 @@ async fn update_persists_across_instances() {
     assert!(!temp.0.join("settings.json.tmp").exists());
 }
 #[tokio::test]
-async fn a_corrupt_file_is_replaced() {
+async fn corrupt_or_future_settings_are_preserved_and_cannot_be_overwritten() {
     let temp = Temp::new();
-    fs::write(temp.0.join("settings.json"), "broken").unwrap();
-    let settings = temp.repo().update(Box::new(|s| s)).await;
-    let bytes = fs::read(temp.0.join("settings.json")).unwrap();
-    assert_eq!(
-        serde_json::from_slice::<AppSettings>(&bytes).unwrap(),
-        settings
-    );
+    let path = temp.0.join("settings.json");
+    let mut future = AppSettings::initial(None);
+    future.schema_version = 2;
+    let mut unknown_enum = serde_json::to_value(AppSettings::initial(None)).unwrap();
+    unknown_enum["templates"][0]["settings"]["displayMode"] = "future-mode".into();
+    for bytes in [
+        "broken".to_string(),
+        serde_json::to_string(&future).unwrap(),
+        unknown_enum.to_string(),
+    ] {
+        fs::write(&path, &bytes).unwrap();
+        let repo = temp.repo();
+        assert!(repo.try_read().is_err());
+        assert!(matches!(
+            byoglot::services::Services::new(path.clone(), None, tokio::runtime::Handle::current())
+                .await,
+            Err(error) if error.kind() == std::io::ErrorKind::InvalidData
+        ));
+        assert!(repo.try_update(|s| s).is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), bytes);
+        let backup = repo.reset_invalid().unwrap();
+        assert_eq!(fs::read_to_string(&backup).unwrap(), bytes);
+        assert_eq!(
+            repo.try_read().unwrap(),
+            AppSettings::initial(Some("ru_RU"))
+        );
+        assert!(!path.exists());
+        fs::write(&path, "different corruption").unwrap();
+        assert!(repo.try_update(|s| s).is_err());
+        let next_backup = repo.reset_invalid().unwrap();
+        assert_ne!(next_backup, backup);
+        assert_eq!(
+            fs::read_to_string(next_backup).unwrap(),
+            "different corruption"
+        );
+        assert_eq!(fs::read_to_string(backup).unwrap(), bytes);
+        assert!(repo.reset_invalid().is_err());
+    }
+}
+
+#[tokio::test]
+async fn stored_settings_accept_new_fields_without_losing_connections_or_templates() {
+    let temp = Temp::new();
+    let mut settings = serde_json::to_value(AppSettings::initial(None)).unwrap();
+    settings["globals"]["future"] = true.into();
+    settings["templates"][0]["future"] = true.into();
+    settings["templates"][0]["settings"]["future"] = true.into();
+    settings["connections"] = serde_json::json!([{
+        "id": "c", "preset": "custom", "name": "Saved", "baseUrl": "https://example.com",
+        "selectionModel": {"providerID": "custom", "id": "m", "future": true}, "future": true
+    }]);
+    fs::write(temp.0.join("settings.json"), settings.to_string()).unwrap();
+    let repo = temp.repo();
+    let loaded = repo.try_read().unwrap();
+    assert_eq!(loaded.connections.len(), 1);
+    assert_eq!(loaded.templates.len(), 1);
+    repo.try_update(|s| s).unwrap();
+    assert_eq!(repo.read().await, loaded);
 }

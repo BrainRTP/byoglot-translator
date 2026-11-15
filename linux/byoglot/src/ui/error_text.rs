@@ -10,6 +10,7 @@ pub fn error_text(error: &RunnerError) -> String {
         RunnerError::TooLong { limit } => tr_with(Msg::ErrTooLong, &limit.to_string()),
         RunnerError::Empty => tr(Msg::ErrEmpty).into(),
         RunnerError::Storage => tr(Msg::ErrStorage).into(),
+        RunnerError::InvalidUrl => tr(Msg::InvalidUrl).into(),
         RunnerError::Backend(error) => match error.kind {
             ErrorKind::Offline => tr(Msg::ErrOffline).into(),
             ErrorKind::Unauthorized | ErrorKind::ProviderAuth => tr_with(
@@ -42,6 +43,7 @@ pub fn connection_fix(error: &RunnerError) -> bool {
             | RunnerError::NoModel
             | RunnerError::KeyMissing
             | RunnerError::ConsentNeeded { .. }
+            | RunnerError::InvalidUrl
     ) || matches!(error, RunnerError::Backend(e) if matches!(e.kind, ErrorKind::Unauthorized | ErrorKind::ProviderAuth | ErrorKind::Incompatible | ErrorKind::NoModel))
 }
 
@@ -57,6 +59,7 @@ mod tests {
             (RunnerError::KeyMissing, Msg::ErrKeyMissing),
             (RunnerError::Empty, Msg::ErrEmpty),
             (RunnerError::Storage, Msg::ErrStorage),
+            (RunnerError::InvalidUrl, Msg::InvalidUrl),
         ] {
             assert_eq!(error_text(&error), tr(message));
         }

@@ -89,6 +89,9 @@ impl QuickController {
                 };
             }
             Event::TemplateSelected(id) => {
+                if self.template_id == id {
+                    return Vec::new();
+                }
                 let Some(template) = self.templates.iter().find(|t| self.ready && t.id == id)
                 else {
                     return Vec::new();
@@ -102,8 +105,8 @@ impl QuickController {
             }
             Event::TargetSelected(target) => {
                 if !self.ready
-                    || (!contracts::language_codes().contains(&target)
-                        && target != self.target_lang)
+                    || target == self.target_lang
+                    || !contracts::language_codes().contains(&target)
                 {
                     return Vec::new();
                 }
@@ -185,6 +188,31 @@ mod tests {
             session: controller.session(),
             settings: &settings(),
         });
+    }
+    #[test]
+    fn selecting_active_choices_does_not_repeat_a_paid_request() {
+        let mut controller = QuickController::default();
+        trigger(&mut controller);
+        let generation = controller.generation();
+        assert!(
+            controller
+                .apply(Event::TemplateSelected(controller.template_id.clone()))
+                .is_empty()
+        );
+        assert!(
+            controller
+                .apply(Event::TargetSelected(controller.target_lang.clone()))
+                .is_empty()
+        );
+        assert_eq!(controller.generation(), generation);
+        controller.apply(Event::TemplateSelected("formal".into()));
+        controller.apply(Event::TargetSelected("de".into()));
+        assert!(
+            controller
+                .apply(Event::TemplateSelected("formal".into()))
+                .is_empty()
+        );
+        assert_eq!(controller.target_lang, "de");
     }
     #[test]
     fn choices_reset_and_templates_move_the_target_before_manual_picks_win() {
@@ -350,20 +378,13 @@ pub mod gui {
             ) {
                 self.window.clear_entry();
             }
-            if matches!(
-                &event,
-                Event::State(
-                    QuickEvent::Triggered
-                        | QuickEvent::TriggeredWithText(_)
-                        | QuickEvent::Pasted(_)
-                        | QuickEvent::Dismissed
-                ) | Event::TemplateSelected(_)
-                    | Event::TargetSelected(_)
-            ) && let Some(task) = self.capture.borrow_mut().take()
+            let generation = self.controller.borrow().generation();
+            let effects = self.controller.borrow_mut().apply(event);
+            if generation != self.controller.borrow().generation()
+                && let Some(task) = self.capture.borrow_mut().take()
             {
                 task.abort();
             }
-            let effects = self.controller.borrow_mut().apply(event);
             let (state, templates, template_id, target, ready) = {
                 let controller = self.controller.borrow();
                 (
@@ -439,7 +460,7 @@ pub mod gui {
             let services = self.services.clone();
             let driver = Rc::downgrade(self);
             *self.translation.borrow_mut() = Some(glib::spawn_future_local(async move {
-                let output = services.translate(input).await;
+                let output = services.translate(input, None).await;
                 if let Some(driver) = driver.upgrade()
                     && driver.controller.borrow().accept(generation)
                 {

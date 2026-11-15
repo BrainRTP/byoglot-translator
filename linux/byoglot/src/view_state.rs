@@ -87,6 +87,13 @@ impl RequestState {
     pub fn cancel(&mut self) {
         self.active = None;
     }
+    pub fn invalidate_for_edit(&mut self, programmatic: bool) -> bool {
+        if programmatic {
+            return false;
+        }
+        self.cancel();
+        true
+    }
     pub fn finish(&mut self, request: u64) -> bool {
         if self.active != Some(request) {
             return false;
@@ -131,14 +138,14 @@ pub fn delete_template(settings: &mut AppSettings, id: &str) -> bool {
 mod tests {
     use super::*;
     #[test]
-    fn opening_editor_text_accepts_its_own_limit_and_counts_utf16() {
-        assert!(validate_editor_text(&"x".repeat(byoglot_core::QUICK_INPUT_LIMIT + 1)).is_ok());
-        let text = "😀".repeat(byoglot_core::editor_input_limit() / 2);
-        assert!(validate_editor_text(&text).is_ok());
+    fn external_text_uses_the_selection_limit_and_counts_utf16() {
+        assert!(validate_open_text(&"x".repeat(byoglot_core::QUICK_INPUT_LIMIT + 1)).is_err());
+        let text = "😀".repeat(byoglot_core::contracts::limits().max_selection / 2);
+        assert!(validate_open_text(&text).is_ok());
         assert_eq!(
-            validate_editor_text(&(text + "x")),
+            validate_open_text(&(text + "x")),
             Err(byoglot_core::RunnerError::TooLong {
-                limit: byoglot_core::editor_input_limit()
+                limit: byoglot_core::contracts::limits().max_selection
             })
         );
     }
@@ -172,6 +179,17 @@ mod tests {
         let cancelled = state.begin();
         state.cancel();
         assert!(!state.finish(cancelled));
+    }
+    #[test]
+    fn programmatic_picker_refresh_does_not_cancel_or_clear_a_result() {
+        let mut state = RequestState::default();
+        let request = state.begin();
+        assert!(!state.invalidate_for_edit(true));
+        assert!(state.finish(request));
+        assert!(!state.invalidate_for_edit(true));
+        let edited = state.begin();
+        assert!(state.invalidate_for_edit(false));
+        assert!(!state.finish(edited));
     }
     #[test]
     fn builtin_templates_cannot_be_changed_or_deleted() {
@@ -279,10 +297,10 @@ pub fn editor_input(
     }
 }
 
-pub fn validate_editor_text(text: &str) -> Result<(), byoglot_core::RunnerError> {
-    if text.encode_utf16().count() > byoglot_core::editor_input_limit() {
+pub fn validate_open_text(text: &str) -> Result<(), byoglot_core::RunnerError> {
+    if text.encode_utf16().count() > byoglot_core::contracts::limits().max_selection {
         Err(byoglot_core::RunnerError::TooLong {
-            limit: byoglot_core::editor_input_limit(),
+            limit: byoglot_core::contracts::limits().max_selection,
         })
     } else {
         Ok(())

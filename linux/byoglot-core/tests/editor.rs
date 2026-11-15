@@ -65,7 +65,7 @@ async fn unparsable_url_is_rejected() {
     let mut d = draft();
     d.base_url = "broken url".into();
     assert_eq!(editor.validate(&d, false), Some(DraftProblem::BaseUrl));
-    assert!(editor.save(d, true).await.is_err());
+    assert_eq!(editor.save(d, true).await, Err(RunnerError::InvalidUrl));
 }
 #[test]
 fn public_cleartext_is_rejected_and_lan_is_allowed() {
@@ -340,7 +340,7 @@ async fn models_refuses_insecure_remote_urls_before_consent_or_io() {
         let (editor, _, _) = editor(s.clone(), transport.clone());
         assert!(matches!(
             editor.models("c1").await,
-            Err(RunnerError::Backend(_))
+            Err(RunnerError::InvalidUrl)
         ));
         assert!(transport.requests.lock().unwrap().is_empty());
     }

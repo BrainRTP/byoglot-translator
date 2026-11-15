@@ -4,12 +4,13 @@ use crate::{
     i18n::{Msg, tr},
     quick::controller::gui::Driver,
     services::Services,
+    settings_file::FileSettingsRepository,
     shortcut::Registration,
     ui::main_window,
 };
 use adw::prelude::*;
 use gtk::{gio, glib};
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, path::PathBuf, rc::Rc, sync::Arc};
 
 enum Pending {
     Main(Option<String>),
@@ -19,6 +20,7 @@ struct State {
     services: RefCell<Option<Arc<Services>>>,
     quick: RefCell<Option<Rc<Driver>>>,
     main: glib::WeakRef<adw::ApplicationWindow>,
+    startup_error: glib::WeakRef<adw::ApplicationWindow>,
     pending: RefCell<Vec<Pending>>,
     hold: RefCell<Option<gio::ApplicationHoldGuard>>,
     token: RefCell<Option<String>>,
@@ -28,6 +30,9 @@ impl State {
     fn dispatch(self: &Rc<Self>, app: &adw::Application, command: Pending) {
         let Some(services) = self.services.borrow().clone() else {
             self.pending.borrow_mut().push(command);
+            if let Some(window) = self.startup_error.upgrade() {
+                window.present();
+            }
             return;
         };
         match command {
@@ -50,6 +55,96 @@ impl State {
                 }
             }
         }
+    }
+
+    fn initialize(
+        self: &Rc<Self>,
+        app: &adw::Application,
+        path: PathBuf,
+        language: Option<String>,
+        handle: tokio::runtime::Handle,
+        reset: bool,
+    ) {
+        *self.hold.borrow_mut() = Some(app.hold());
+        let state = self.clone();
+        let app = app.clone();
+        let settings_path = path.clone();
+        let preferred_language = language.clone();
+        let runtime = handle.clone();
+        let task = handle.spawn(async move {
+            if reset {
+                FileSettingsRepository::new(settings_path.clone(), preferred_language.clone())
+                    .reset_invalid()?;
+            }
+            Services::new(settings_path, preferred_language, runtime).await
+        });
+        glib::spawn_future_local(async move {
+            let outcome = task.await;
+            if let Some(window) = state.startup_error.upgrade() {
+                window.close();
+            }
+            match outcome {
+                Ok(Ok(services)) => {
+                    *state.quick.borrow_mut() = Some(Driver::new(&app, services.clone()));
+                    *state.services.borrow_mut() = Some(services);
+                    let pending = std::mem::take(&mut *state.pending.borrow_mut());
+                    for command in pending {
+                        state.dispatch(&app, command);
+                    }
+                    if reset {
+                        state.dispatch(&app, Pending::Main(None));
+                    }
+                }
+                error => {
+                    let invalid =
+                        matches!(error, Ok(Err(e)) if e.kind() == std::io::ErrorKind::InvalidData);
+                    let window = adw::ApplicationWindow::builder()
+                        .application(&app)
+                        .title("ByoGlot")
+                        .default_width(500)
+                        .build();
+                    let content = main_window::page_box();
+                    let message = if invalid {
+                        tr(Msg::ErrSettings)
+                            .replacen("{}", &path.display().to_string(), 1)
+                            .replacen(
+                                "{}",
+                                &path.with_extension("json.bad").display().to_string(),
+                                1,
+                            )
+                    } else {
+                        tr(Msg::ErrStorage).into()
+                    };
+                    content.append(
+                        &gtk::Label::builder()
+                            .label(message)
+                            .wrap(true)
+                            .selectable(true)
+                            .build(),
+                    );
+                    if invalid {
+                        let button = gtk::Button::with_label(tr(Msg::ResetSettings));
+                        let state = state.clone();
+                        let app = app.clone();
+                        button.connect_clicked(move |button| {
+                            button.set_sensitive(false);
+                            state.initialize(
+                                &app,
+                                path.clone(),
+                                language.clone(),
+                                handle.clone(),
+                                true,
+                            );
+                        });
+                        content.append(&button);
+                    }
+                    window.set_content(Some(&content));
+                    state.startup_error.set(Some(&window));
+                    window.present();
+                    state.hold.borrow_mut().take();
+                }
+            }
+        });
     }
 }
 
@@ -83,6 +178,7 @@ pub fn run() -> glib::ExitCode {
         services: RefCell::new(None),
         quick: RefCell::new(None),
         main: glib::WeakRef::new(),
+        startup_error: glib::WeakRef::new(),
         pending: RefCell::new(Vec::new()),
         hold: RefCell::new(None),
         token: RefCell::new(None),
@@ -92,7 +188,6 @@ pub fn run() -> glib::ExitCode {
     let handle = runtime.handle().clone();
     app.connect_startup(move |app| {
         let state = startup_state.clone();
-        *state.hold.borrow_mut() = Some(app.hold());
         let quit = gio::SimpleAction::new("quit", None);
         let weak = app.downgrade();
         let quitting = state.clone();
@@ -142,31 +237,7 @@ pub fn run() -> glib::ExitCode {
         state.shortcuts.start(app);
         let path = glib::user_config_dir().join("byoglot/settings.json");
         let language = glib::language_names().first().map(|s| s.to_string());
-        let runtime_handle = handle.clone();
-        let task = handle.spawn(async move { Services::new(path, language, runtime_handle).await });
-        let app = app.clone();
-        glib::spawn_future_local(async move {
-            match task.await {
-                Ok(Ok(services)) => {
-                    *state.quick.borrow_mut() = Some(Driver::new(&app, services.clone()));
-                    *state.services.borrow_mut() = Some(services);
-                    let pending = std::mem::take(&mut *state.pending.borrow_mut());
-                    for command in pending {
-                        state.dispatch(&app, command);
-                    }
-                }
-                _ => {
-                    let window = adw::ApplicationWindow::builder()
-                        .application(&app)
-                        .title("ByoGlot")
-                        .build();
-                    window.set_content(Some(&gtk::Label::new(Some(tr(Msg::ErrOffline)))));
-                    window.present();
-                    state.pending.borrow_mut().clear();
-                    state.hold.borrow_mut().take();
-                }
-            }
-        });
+        state.initialize(app, path, language, handle.clone(), false);
     });
     let activate_state = state.clone();
     app.connect_activate(move |app| activate_state.dispatch(app, Pending::Main(None)));

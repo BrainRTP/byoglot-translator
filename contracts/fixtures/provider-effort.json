@@ -429,6 +429,114 @@
         "params": {},
         "needsKey": true
       }
+    },
+    {
+      "name": "ollama noncanonical 010.1.2.3 needs a key",
+      "input": {
+        "preset": "ollama",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://010.1.2.3/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": true
+      }
+    },
+    {
+      "name": "ollama noncanonical 172.016.0.1 needs a key",
+      "input": {
+        "preset": "ollama",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://172.016.0.1/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": true
+      }
+    },
+    {
+      "name": "ollama noncanonical 012.1.2.3 needs a key",
+      "input": {
+        "preset": "ollama",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://012.1.2.3/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": true
+      }
+    },
+    {
+      "name": "ollama noncanonical 0x7f.0.0.1 needs a key",
+      "input": {
+        "preset": "ollama",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://0x7f.0.0.1/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": true
+      }
+    },
+    {
+      "name": "ollama noncanonical 2130706433 needs a key",
+      "input": {
+        "preset": "ollama",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://2130706433/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": true
+      }
+    },
+    {
+      "name": "ollama noncanonical 127.1 needs a key",
+      "input": {
+        "preset": "ollama",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://127.1/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": true
+      }
     }
   ]
 }

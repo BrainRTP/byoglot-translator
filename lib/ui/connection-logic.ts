@@ -32,8 +32,7 @@ export function validProviderUrl(baseUrl: string, android = false): boolean {
     const url = new URL(baseUrl.trim());
     return (
       url.protocol === "https:" ||
-      (url.protocol === "http:" &&
-        (isLocalOrigin(url.origin) || (!android && isLanOrigin(url.origin))))
+      (url.protocol === "http:" && (isLocalOrigin(baseUrl) || (!android && isLanOrigin(baseUrl))))
     );
   } catch {
     return false;
@@ -68,7 +67,7 @@ export function cleartextSecret(baseUrl: string, secret: string, hasKey = false)
   if (secret.trim() === "" && !hasKey) return false;
   try {
     const url = new URL(baseUrl.trim());
-    return url.protocol === "http:" && !isLocalOrigin(url.origin);
+    return url.protocol === "http:" && !isLocalOrigin(baseUrl);
   } catch {
     return false;
   }

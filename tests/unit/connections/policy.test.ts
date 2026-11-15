@@ -2,11 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { createBackendProvider, withConnectionPolicy } from "../../../lib/background/connection";
-import { isLanOrigin, isLocalOrigin, originPattern } from "../../../lib/connections/list";
+import {
+  isLanOrigin,
+  isLocalOrigin,
+  normalizeBaseUrl,
+  originPattern,
+} from "../../../lib/connections/list";
 import type { ConnectionRecord } from "../../../lib/connections/types";
 import { createProviderBackend } from "../../../lib/provider/backend";
 import { needsKey } from "../../../lib/provider/presets";
 import { connectionsStore } from "../../../lib/settings/store";
+import { validProviderUrl } from "../../../lib/ui/connection-logic";
 import { requestOrigin } from "../../../lib/ui/host-permission";
 
 const provider = {
@@ -76,6 +82,12 @@ describe("host and key policy", () => {
     "[fe7f::1]",
     "[fec0::1]",
     "[2001:db8::1]",
+    "010.1.2.3",
+    "172.016.0.1",
+    "012.1.2.3",
+    "0x7f.0.0.1",
+    "2130706433",
+    "127.1",
   ])("%s is external and requires a key", (host) => {
     const url = `https://${host}/v1`;
     expect(isLocalOrigin(url)).toBe(false);
@@ -83,6 +95,18 @@ describe("host and key policy", () => {
     expect(needsKey("ollama", url)).toBe(true);
     expect(needsKey("lmstudio", url)).toBe(true);
   });
+
+  it.each(["010.1.2.3", "172.016.0.1", "012.1.2.3", "0x7f.0.0.1", "2130706433", "127.1"])(
+    "%s stays external after saving and requires HTTPS",
+    (host) => {
+      const saved = normalizeBaseUrl(`https://user:secret@${host}/v1/?query=1#fragment`);
+      expect(saved).toBe(`https://${host}/v1`);
+      expect(needsKey("ollama", saved)).toBe(true);
+      expect(needsKey("custom", saved)).toBe(true);
+      expect(validProviderUrl(`http://${host}/v1`)).toBe(false);
+      expect(validProviderUrl(saved)).toBe(true);
+    },
+  );
 
   it("does not send any backend request to LAN before permission, then honors revocation", async () => {
     const contains = vi

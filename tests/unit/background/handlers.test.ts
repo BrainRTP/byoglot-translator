@@ -670,11 +670,12 @@ describe("background handlers", () => {
       expect(translateText).not.toHaveBeenCalled();
     });
 
-    it.each(["close", "navigate"])(
+    it.each(["close", "navigate", "loading"])(
       "aborts all jobs in a tab on %s and preserves other tabs",
       async (action) => {
         const { handlers, translateText, translateSelection } = setup();
         await globalsItem.setValue({ ...DEFAULT_GLOBALS, selectionModel });
+        await tabSettings(5).setValue((await handlers.tabView({ tabId: 5 })).settings);
         let release!: () => void;
         const gate = new Promise<void>((resolve) => {
           release = resolve;
@@ -712,10 +713,17 @@ describe("background handlers", () => {
           expect(translateSelection).toHaveBeenCalledTimes(2);
         });
         if (action === "close") await handlers.tabRemoved(5);
-        else await handlers.tabNavigated(5, "https://example.com/another-page");
+        else
+          await handlers.tabNavigated(
+            5,
+            action === "navigate" ? "https://example.com/another-page" : undefined,
+          );
+        if (action === "loading") expect(await tabSettings(5).getValue()).not.toBeNull();
         expect(translateText.mock.calls[0]?.[1].aborted).toBe(true);
         expect(selectionSignal.aborted).toBe(true);
-        expect(translateSelection.mock.calls[1]?.[1].aborted).toBe(false);
+        expect(
+          translateSelection.mock.calls.find(([input]) => input.text === "Other")?.[1].aborted,
+        ).toBe(false);
         release();
         expect(await editor).toMatchObject({ error: "aborted" });
         expect(await selection).toMatchObject({ error: "aborted" });

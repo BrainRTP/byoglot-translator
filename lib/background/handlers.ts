@@ -913,13 +913,14 @@ export function createHandlers(deps: HandlerDeps) {
       await Promise.all([tabSettings(tabId).removeValue(), tabHostItem(tabId).removeValue()]);
     },
 
-    async tabNavigated(tabId: number, url: string): Promise<void> {
+    async tabNavigated(tabId: number, url?: string): Promise<void> {
       for (const [id, job] of selectionJobs) {
         if (job.tabId === tabId) {
           job.controller.abort();
           selectionJobs.delete(id);
         }
       }
+      if (!url) return;
       const next = hostnameOf(url);
       const previous = await tabHostItem(tabId).getValue();
       await rememberHost(tabId, next);

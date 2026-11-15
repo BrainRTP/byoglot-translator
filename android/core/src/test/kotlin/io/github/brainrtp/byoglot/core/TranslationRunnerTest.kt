@@ -150,8 +150,10 @@ class TranslationRunnerTest {
 
     @Test
     fun `saved Ollama and LM Studio connections require consent off device and keys externally`() = runBlocking {
+        val loopback = listOf("localhost", "127.0.0.2", "[::1]")
+        val external = listOf("provider.test", "010.0.0.1", "172.016.0.1", "172.017.0.1", "192.168.001.1", "169.254.01.1", "127.00.0.1", "127.0.0.01", "0x7f000001", "2130706433", "167772161")
         for (preset in listOf(ProviderPreset.ollama, ProviderPreset.lmstudio)) {
-            for (host in listOf("localhost", "127.0.0.2", "[::1]", "192.168.1.5", "provider.test")) {
+            for (host in loopback + "192.168.1.5" + external) {
                 val origin = "https://$host"
                 val ref = model.copy(providerID = preset.name)
                 val saved = connection.copy(preset = preset, baseUrl = "$origin/v1", selectionModel = ref)
@@ -160,12 +162,12 @@ class TranslationRunnerTest {
                 val secrets = InMemorySecretStore()
                 val transport = RecordingTransport(HttpResponse(200, emptyMap(), """{"choices":[{"message":{"content":"ok"}}]}""".toByteArray()))
                 val runner = TranslationRunner(repository, secrets, transport)
-                if (host in listOf("192.168.1.5", "provider.test")) {
+                if (host !in loopback) {
                     assertEquals(RunnerError.ConsentNeeded(origin), error(runner))
                     assertTrue(transport.requests.isEmpty())
                     repository.update { it.copy(consentedOrigins = listOf(origin)) }
                 }
-                if (host == "provider.test") {
+                if (host in external) {
                     assertEquals(RunnerError.KeyMissing, error(runner))
                     assertTrue(transport.requests.isEmpty())
                     secrets.set("fixture-key", saved.id, origin)

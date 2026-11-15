@@ -48,7 +48,7 @@ fun isLanHost(host: String): Boolean {
             (address is java.net.Inet6Address && address.address[0].toInt() and 0xfe == 0xfc)
     }.getOrDefault(false)
     val parts = name.split('.')
-    if (parts.size != 4 || parts.any { !it.matches(Regex("[0-9]{1,3}")) }) return false
+    if (parts.size != 4 || parts.any { !it.matches(Regex("0|[1-9][0-9]{0,2}")) }) return false
     val octets = parts.map { it.toInt() }
     if (octets.any { it !in 0..255 }) return false
     return octets[0] == 10 ||
@@ -65,7 +65,7 @@ fun isLoopbackHost(host: String): Boolean {
     }.getOrDefault(false)
     val parts = name.split('.')
     return parts.size == 4 && parts[0] == "127" &&
-        parts.all { it.matches(Regex("[0-9]{1,3}")) && it.toInt() in 0..255 }
+        parts.all { it.matches(Regex("0|[1-9][0-9]{0,2}")) && it.toInt() in 0..255 }
 }
 
 fun isLocalHost(host: String): Boolean = isLoopbackHost(host) || isLanHost(host)

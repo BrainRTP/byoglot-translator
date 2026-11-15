@@ -62,14 +62,47 @@ public class TranslationRunnerTests
     }
 
     [Fact]
-    public async Task LocalNetworkNeedsNoConsentWithAStoredCustomKey()
+    public async Task LocalNetworkNeedsConsentEvenWithAStoredCustomKey()
     {
         var transport = new RecordingTransport();
         var secrets = new InMemorySecretStore();
         await secrets.SetAsync("lan-key", "c", "http://192.168.1.5:11434");
-        var runner = new TranslationRunner(new InMemorySettingsRepository(Configured("http://192.168.1.5:11434/v1", ProviderPreset.Custom, false)), secrets, transport);
+        var initial = Configured("http://192.168.1.5:11434/v1", ProviderPreset.Custom, false);
+        var repository = new InMemorySettingsRepository(initial);
+        var runner = new TranslationRunner(repository, secrets, transport);
+        Assert.Equal(new RunnerError.ConsentNeeded("http://192.168.1.5:11434"), (await Assert.ThrowsAsync<RunnerException>(() => runner.TranslateAsync(new("hi", 5000), CancellationToken.None))).Error);
+        Assert.Empty(transport.Calls);
+        Assert.Same(initial, await repository.ReadAsync());
+        Assert.Equal("lan-key", await secrets.GetAsync("c", "http://192.168.1.5:11434"));
+        await repository.UpdateAsync(s => s with { ConsentedOrigins = ["http://192.168.1.5:11434"] });
         Assert.Equal("translated", (await runner.TranslateAsync(new("hi", 5000), CancellationToken.None)).Text);
         Assert.Equal("Bearer lan-key", Assert.Single(transport.Calls).Request.Headers["authorization"]);
+    }
+
+    [Theory]
+    [InlineData("http://localhost:11434/v1")]
+    [InlineData("http://127.0.0.2:11434/v1")]
+    [InlineData("http://[::1]:11434/v1")]
+    public async Task LoopbackNeedsNeitherConsentNorKey(string url)
+    {
+        var transport = new RecordingTransport();
+        var runner = new TranslationRunner(new InMemorySettingsRepository(Configured(url, ProviderPreset.Ollama, false)), new InMemorySecretStore(), transport);
+        Assert.Equal("translated", (await runner.TranslateAsync(new("hi", 5000), CancellationToken.None)).Text);
+        Assert.False(Assert.Single(transport.Calls).Request.Headers.ContainsKey("authorization"));
+    }
+
+    [Theory]
+    [InlineData(ProviderPreset.Ollama)]
+    [InlineData(ProviderPreset.Lmstudio)]
+    public async Task ExternalLocalPresetNeedsAKeyAndKeepsTheStoredConnection(ProviderPreset preset)
+    {
+        var initial = Configured("https://models.example/v1", preset);
+        var repository = new InMemorySettingsRepository(initial);
+        var transport = new RecordingTransport();
+        var runner = new TranslationRunner(repository, new InMemorySecretStore(), transport);
+        Assert.IsType<RunnerError.KeyMissing>((await Assert.ThrowsAsync<RunnerException>(() => runner.TranslateAsync(new("hi", 5000), CancellationToken.None))).Error);
+        Assert.Empty(transport.Calls);
+        Assert.Same(initial, await repository.ReadAsync());
     }
 
     [Fact]

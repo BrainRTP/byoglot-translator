@@ -141,6 +141,7 @@ describe("generate", () => {
     const { url, init } = callAt(fetchImpl, 0);
     expect(url).toBe("https://api.deepseek.com/chat/completions");
     expect(init.method).toBe("POST");
+    expect(init.redirect).toBe("error");
     expect((init.headers as Record<string, string>).authorization).toBe("Bearer sk-test");
     expect(JSON.parse(String(init.body))).toEqual({
       model: "deepseek-flash",

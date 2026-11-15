@@ -36,7 +36,7 @@ function fakePort() {
 }
 
 const forgetStatus = vi.fn(async () => {});
-const handlersWith = (pageJob: () => Promise<PageJob>, kind?: "opencode" | "provider") =>
+const handlersWith = (pageJob: Handlers["pageJob"], kind?: "opencode" | "provider") =>
   ({
     pageJob,
     activeKind: async () => kind,
@@ -46,6 +46,29 @@ const handlersWith = (pageJob: () => Promise<PageJob>, kind?: "opencode" | "prov
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 describe("attachPagePort", () => {
+  it("keeps the same deadline through job preparation and generation", async () => {
+    const deadline = new AbortController();
+    const spy = vi.spyOn(AbortSignal, "timeout").mockReturnValue(deadline.signal);
+    try {
+      const { port, sent, send } = fakePort();
+      const pageJob = vi.fn<Handlers["pageJob"]>(async () => job);
+      const translatePage = vi.fn(
+        async (_job: PageJob, _cb: PageCallbacks, signal: AbortSignal) =>
+          new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve())),
+      );
+      attachPagePort(port, handlersWith(pageJob), { translatePage });
+      send(translate);
+      await tick();
+      expect(translatePage.mock.calls[0]?.[2]).toBe(pageJob.mock.calls[0]?.[2]);
+      expect(spy).toHaveBeenCalledExactlyOnceWith(180_000);
+      deadline.abort(new DOMException("timed out", "TimeoutError"));
+      await tick();
+      expect(sent).toEqual([expect.objectContaining({ type: "fatal", kind: "offline" })]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("forwards callbacks and posts done", async () => {
     const { port, sent, send } = fakePort();
     const translatePage = vi.fn(async (_j: PageJob, cb: PageCallbacks) => {

@@ -25,7 +25,7 @@ export async function pair(
   const signal = AbortSignal.timeout(PAIR_TIMEOUT_MS);
   let response: Response;
   try {
-    response = await fetchImpl(`${origin}/auth/connect/${code}`, { signal });
+    response = await fetchImpl(`${origin}/auth/connect/${code}`, { signal, redirect: "error" });
   } catch (error) {
     throw fromFetchFailure(error, signal);
   }

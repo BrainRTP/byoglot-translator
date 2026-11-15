@@ -28,10 +28,10 @@ export const DEFAULT_LIMITS: Limits = { maxBlocks: 25, maxChars: 4000, concurren
 export const GENERATE_TIMEOUT_MS = 180_000;
 
 function toBackendError(error: unknown, signal: AbortSignal): BackendError {
-  if (error instanceof BackendError) return error;
   if (isTimeout(error) || isTimeout(signal.reason)) {
-    return new BackendError("offline", { cause: error });
+    return new BackendError("offline", { detail: "timeout", cause: error });
   }
+  if (error instanceof BackendError) return error;
   if (signal.aborted) return new BackendError("aborted", { cause: error });
   return new BackendError("incompatible", {
     detail: error instanceof Error ? error.message : String(error),
@@ -72,8 +72,7 @@ export function createTranslationService(deps: {
       return await semaphore.run(async () => {
         const backend = await deps.getBackend();
         signal.throwIfAborted();
-        const limited = AbortSignal.any([signal, AbortSignal.timeout(GENERATE_TIMEOUT_MS)]);
-        return backend.generate(prompt, model, limited);
+        return backend.generate(prompt, model, signal);
       }, signal);
     } catch (error) {
       throw toBackendError(error, signal);
@@ -83,7 +82,7 @@ export function createTranslationService(deps: {
   async function translatePage(job: PageJob, cb: PageCallbacks, signal: AbortSignal) {
     if (signal.aborted) return;
     const controller = new AbortController();
-    const onCallerAbort = () => controller.abort();
+    const onCallerAbort = () => controller.abort(signal.reason);
     signal.addEventListener("abort", onCallerAbort, { once: true });
     const stopped = () => controller.signal.aborted;
 
@@ -231,18 +230,10 @@ export function createTranslationService(deps: {
       return await semaphore.run(async () => {
         const backend = await deps.getBackend();
         signal.throwIfAborted();
-        const limited = AbortSignal.any([signal, AbortSignal.timeout(GENERATE_TIMEOUT_MS)]);
-        try {
-          const result = backend.generateWithMetadata
-            ? await backend.generateWithMetadata(prompt, i.model, limited)
-            : { text: await backend.generate(prompt, i.model, limited) };
-          return { ...result, text: result.text.trim() };
-        } catch (error) {
-          if (isTimeout(limited.reason) || isTimeout(error)) {
-            throw new BackendError("offline", { detail: "timeout", cause: error });
-          }
-          throw error;
-        }
+        const result = backend.generateWithMetadata
+          ? await backend.generateWithMetadata(prompt, i.model, signal)
+          : { text: await backend.generate(prompt, i.model, signal) };
+        return { ...result, text: result.text.trim() };
       }, signal);
     } catch (error) {
       throw toBackendError(error, signal);

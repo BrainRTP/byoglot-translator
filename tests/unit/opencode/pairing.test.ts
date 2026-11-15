@@ -78,6 +78,8 @@ describe("pair", () => {
     });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(callAt(fetchImpl, 0).url).toBe(link);
+    expect(callAt(fetchImpl, 0).init.redirect).toBe("error");
+    expect(callAt(fetchImpl, 1).init.redirect).toBe("error");
     expect(new Headers(callAt(fetchImpl, 0).init.headers).get("authorization")).toBeNull();
     expect(callAt(fetchImpl, 1).url).toBe("http://127.0.0.1:49374/api/info");
     expect(new Headers(callAt(fetchImpl, 1).init.headers).get("authorization")).toBe(

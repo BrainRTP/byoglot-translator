@@ -1,5 +1,5 @@
 import type { PortToBackground, PortToContent } from "../messaging/page-port";
-import type { createTranslationService } from "../translate/service";
+import { type createTranslationService, GENERATE_TIMEOUT_MS } from "../translate/service";
 import { type Handlers, type Sender, toBackendError } from "./handlers";
 
 export interface PagePort {
@@ -24,9 +24,10 @@ export function attachPagePort(port: PagePort, handlers: Handlers, service: Serv
     const { jobId } = msg;
     jobs.get(jobId)?.abort();
     const controller = new AbortController();
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(GENERATE_TIMEOUT_MS)]);
     jobs.set(jobId, controller);
     try {
-      const job = await handlers.pageJob(port.sender ?? {}, msg);
+      const job = await handlers.pageJob(port.sender ?? {}, msg, signal);
       if (controller.signal.aborted) return;
       const backend = await handlers.activeKind();
       const sourceOf = await handlers.errorSource(job.model);
@@ -48,12 +49,13 @@ export function attachPagePort(port: PagePort, handlers: Handlers, service: Serv
             });
           },
         },
-        controller.signal,
+        signal,
       );
+      signal.throwIfAborted();
       if (!controller.signal.aborted) post({ type: "done", jobId });
     } catch (error) {
       if (controller.signal.aborted) return;
-      const e = toBackendError(error);
+      const e = toBackendError(error, signal);
       void handlers.forgetStatus();
       const source = (await handlers.errorSource())(e);
       post({

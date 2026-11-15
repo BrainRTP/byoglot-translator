@@ -95,15 +95,15 @@ fn refresh(
                     let mut template = template.clone();
                     if duplicate {
                         template.id = crate::view_state::new_id("template");
-                        template.builtin = false;
                         template.name = tr_with(
                             Msg::CopyName,
-                            if template.name.is_empty() {
+                            if template.builtin || template.name.is_empty() {
                                 tr(Msg::Builtin)
                             } else {
                                 &template.name
                             },
                         );
+                        template.builtin = false;
                     }
                     let list = weak_list.clone();
                     let weak = weak_window.clone();

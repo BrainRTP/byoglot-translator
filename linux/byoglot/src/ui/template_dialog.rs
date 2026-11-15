@@ -33,13 +33,19 @@ pub fn present(
         .text(&template.name)
         .build();
     group.add(&name);
+    let mut codes = contracts::language_codes().to_vec();
+    if let Some(code) = &template.settings.target_lang
+        && !codes.contains(code)
+    {
+        codes.push(code.clone());
+    }
     let mut languages = vec![tr(Msg::UseDefault).into()];
-    languages.extend(contracts::language_codes().iter().map(|s| language_name(s)));
+    languages.extend(codes.iter().map(|s| language_name(s)));
     let selected = template
         .settings
         .target_lang
         .as_ref()
-        .and_then(|s| contracts::language_codes().iter().position(|c| c == s))
+        .and_then(|s| codes.iter().position(|c| c == s))
         .map_or(0, |i| i + 1);
     let target = combo(tr(Msg::TargetLanguage), &languages, selected);
     group.add(&target);
@@ -80,7 +86,7 @@ pub fn present(
         template.settings.target_lang = target
             .selected()
             .checked_sub(1)
-            .and_then(|i| contracts::language_codes().get(i as usize).cloned());
+            .and_then(|i| codes.get(i as usize).cloned());
         let service = services.clone();
         let error = error.clone();
         let dialog = weak.clone();

@@ -193,7 +193,14 @@ impl QuickWindow {
     pub fn set_choices(&self, templates: &[Template], active: &str, target: &str, ready: bool) {
         let menu = gio::Menu::new();
         for template in templates {
-            let item = gio::MenuItem::new(Some(&template.name), None);
+            let item = gio::MenuItem::new(
+                Some(if template.builtin {
+                    tr(Msg::Builtin)
+                } else {
+                    &template.name
+                }),
+                None,
+            );
             item.set_action_and_target_value(
                 Some("quick.template"),
                 Some(&template.id.to_variant()),
@@ -202,7 +209,11 @@ impl QuickWindow {
         }
         self.templates.set_menu_model(Some(&menu));
         if let Some(template) = templates.iter().find(|t| t.id == active) {
-            self.templates.set_label(&template.name);
+            self.templates.set_label(if template.builtin {
+                tr(Msg::Builtin)
+            } else {
+                &template.name
+            });
         }
         self.templates.set_tooltip_text(Some(tr(Msg::Template)));
         self.templates.set_sensitive(ready);

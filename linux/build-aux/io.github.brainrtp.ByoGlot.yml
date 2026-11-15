@@ -32,6 +32,9 @@ modules:
         skip:
           - .git
           - node_modules
+          - android
+          - apple
+          - windows
           - linux/target
           - linux/build-dir
           - linux/repo

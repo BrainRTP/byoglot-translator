@@ -149,8 +149,7 @@ class TranslationRunner(
 
     private suspend fun prepare(resolved: Resolved): Translator {
         val (state, connection, origin) = resolved
-        val local = isLocalHost(URI(origin).host)
-        if (!local && origin !in state.consentedOrigins)
+        if (!isLoopbackHost(URI(origin).host) && origin !in state.consentedOrigins)
             throw RunnerException(RunnerError.ConsentNeeded(origin))
         val secret =
             try {

@@ -108,6 +108,22 @@ class ConnectionEditorTest {
     }
 
     @Test
+    fun key_checks_require_LAN_consent_and_loopback_needs_neither_consent_nor_key() = runTest {
+        for (host in listOf("192.168.1.5", "provider.local", "[fd12::5]")) {
+            val origin = "https://$host"
+            val failure = runCatching { editor.save(draft(origin), false) }.exceptionOrNull()
+            assertEquals(RunnerError.ConsentNeeded(origin), assertInstanceOf(RunnerException::class.java, failure).error)
+        }
+        assertEquals(0, calls)
+        assertEquals(initial, settings.read())
+        for (host in listOf("localhost", "127.0.0.2", "[::1]")) {
+            editor.save(draft("https://$host", ""), false)
+        }
+        assertEquals(3, calls)
+        assertTrue(settings.read().consentedOrigins.isEmpty())
+    }
+
+    @Test
     fun a_401_leaves_settings_and_secrets_unchanged() = runTest {
         val c = editor.save(draft(), true).connection
         val before = settings.read()

@@ -112,7 +112,7 @@ class TranslationRunnerTest {
     }
 
     @Test
-    fun `LAN connections need a key but permit HTTP without consent`() = runBlocking {
+    fun `LAN custom connections need consent and a key while core transport still permits HTTP`() = runBlocking {
         listOf(
                 "http://192.168.1.5:11434/v1",
                 "http://[fd12::5]:11434/v1",
@@ -131,17 +131,52 @@ class TranslationRunnerTest {
                             "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}".toByteArray(),
                         ),
                     )
-                val runner =
-                    TranslationRunner(InMemorySettingsRepository(state), secrets, transport)
+                val repository = InMemorySettingsRepository(state)
+                val runner = TranslationRunner(repository, secrets, transport)
+                val origin = checkNotNull(originOf(url))
+                assertEquals(RunnerError.ConsentNeeded(origin), error(runner))
+                assertTrue(transport.requests.isEmpty())
+                repository.update { it.copy(consentedOrigins = listOf(origin)) }
                 assertEquals(RunnerError.KeyMissing, error(runner))
                 assertTrue(transport.requests.isEmpty())
-                secrets.set("fixture-key", local.id, checkNotNull(originOf(url)))
+                secrets.set("fixture-key", local.id, origin)
                 assertEquals("ok", runner.translate(input).text)
                 assertEquals(
                     "Bearer fixture-key",
                     transport.requests.single().headers["authorization"],
                 )
             }
+    }
+
+    @Test
+    fun `saved Ollama and LM Studio connections require consent off device and keys externally`() = runBlocking {
+        val loopback = listOf("localhost", "127.0.0.2", "[::1]")
+        val external = listOf("provider.test", "010.0.0.1", "172.016.0.1", "172.017.0.1", "192.168.001.1", "169.254.01.1", "127.00.0.1", "127.0.0.01", "0x7f000001", "2130706433", "167772161")
+        for (preset in listOf(ProviderPreset.ollama, ProviderPreset.lmstudio)) {
+            for (host in loopback + "192.168.1.5" + external) {
+                val origin = "https://$host"
+                val ref = model.copy(providerID = preset.name)
+                val saved = connection.copy(preset = preset, baseUrl = "$origin/v1", selectionModel = ref)
+                val state = initial.copy(connections = listOf(saved), consentedOrigins = emptyList())
+                val repository = InMemorySettingsRepository(state)
+                val secrets = InMemorySecretStore()
+                val transport = RecordingTransport(HttpResponse(200, emptyMap(), """{"choices":[{"message":{"content":"ok"}}]}""".toByteArray()))
+                val runner = TranslationRunner(repository, secrets, transport)
+                if (host !in loopback) {
+                    assertEquals(RunnerError.ConsentNeeded(origin), error(runner))
+                    assertTrue(transport.requests.isEmpty())
+                    repository.update { it.copy(consentedOrigins = listOf(origin)) }
+                }
+                if (host in external) {
+                    assertEquals(RunnerError.KeyMissing, error(runner))
+                    assertTrue(transport.requests.isEmpty())
+                    secrets.set("fixture-key", saved.id, origin)
+                }
+                assertEquals("ok", runner.translate(input).text)
+                assertEquals(1, transport.requests.size)
+                assertEquals(state.connections, repository.read().connections)
+            }
+        }
     }
 
     @Test

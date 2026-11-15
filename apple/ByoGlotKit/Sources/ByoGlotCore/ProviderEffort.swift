@@ -44,11 +44,11 @@ public enum ProviderEffort: Sendable {
     }
 
     public static func needsKey(preset: ProviderPreset, baseUrl: String) -> Bool {
-        if preset == .custom, let url = URL(string: baseUrl),
-           url.scheme != nil,
-           let host = url.host?.lowercased(), ["localhost", "127.0.0.1"].contains(host) {
-            return false
+        guard let url = URL(string: baseUrl), url.scheme != nil, let host = url.host?.lowercased() else { return true }
+        switch preset {
+        case .custom: return !HTTPDestinationPolicy.isLoopback(host)
+        case .ollama, .lmstudio: return !HTTPDestinationPolicy.isLocalOrLAN(host)
+        default: return Contracts.presets[preset]!.needsKey
         }
-        return Contracts.presets[preset]!.needsKey
     }
 }

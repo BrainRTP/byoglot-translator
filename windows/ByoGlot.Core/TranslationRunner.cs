@@ -44,7 +44,7 @@ public sealed class TranslationRunner(ISettingsRepository settings, ISecretStore
         var model = effective.Model ?? throw new RunnerException(new RunnerError.NoModel());
         var origin = Origins.OriginOf(connection.BaseUrl) ?? throw new RunnerException(new RunnerError.Backend(new BackendException(ErrorKind.Offline)));
         if (!Origins.IsAllowedEndpoint(connection.BaseUrl)) throw new RunnerException(new RunnerError.Backend(new BackendException(ErrorKind.Offline)));
-        if (!Origins.IsLocalHost(new Uri(origin).Host) && !state.ConsentedOrigins.Contains(origin))
+        if (!Origins.IsLoopbackHost(Origins.HostOf(connection.BaseUrl)) && !state.ConsentedOrigins.Contains(origin))
             throw new RunnerException(new RunnerError.ConsentNeeded(origin));
         string? secret;
         try { secret = await secrets.GetAsync(connection.Id, origin); }

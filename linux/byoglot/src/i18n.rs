@@ -41,7 +41,7 @@ messages! {
     ApiKey => ("API key", "API-ключ"),
     ApiKeyKeep => ("API key (leave empty to keep it)", "API-ключ (оставьте пустым для сохранения)"),
     ConsentRequired => ("Confirm the destination before saving.", "Подтвердите адрес перед сохранением."),
-    Consent => ("Text I translate and my instructions are sent to {}.", "Переводимый текст и мои инструкции отправляются на {}."),
+    Consent => ("Allow requests to {} for model lists, key checks, text and instructions.", "Разрешить запросы на {} для списка моделей, проверки ключа, текста и инструкций."),
     InvalidUrl => ("Enter a valid HTTPS URL, or HTTP for a local network host.", "Введите корректный HTTPS URL или HTTP для узла локальной сети."),
     Active => ("Active", "Активно"),
     MakeActive => ("Use this connection", "Использовать подключение"),

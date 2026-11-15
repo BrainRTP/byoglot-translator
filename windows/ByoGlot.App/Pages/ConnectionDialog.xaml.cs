@@ -33,7 +33,7 @@ public sealed partial class ConnectionDialog : ContentDialog
     {
         var origin = Origins.OriginOf(url.Text);
         consent.Content = Strings.Format("Consent_Text", origin ?? "");
-        consent.Visibility = origin is not null && !Origins.IsLocalHost(new Uri(origin).Host) ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
+        consent.Visibility = origin is not null && !Origins.IsLoopbackHost(Origins.HostOf(url.Text)) ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
     }
     private async void Save(ContentDialog sender, ContentDialogButtonClickEventArgs args)
     {
@@ -47,7 +47,7 @@ public sealed partial class ConnectionDialog : ContentDialog
         }
         catch (RunnerException e) { error.Text = ErrorText.Text(e.Error); args.Cancel = true; }
         catch (BackendException e) { error.Text = ErrorText.Text(new RunnerError.Backend(e)); args.Cancel = true; }
-        catch (ArgumentException) { error.Text = Strings.Get("Err_InvalidConnection"); args.Cancel = true; }
+        catch (ArgumentException e) { error.Text = Strings.Get(e.Message == nameof(DraftProblem.ApiKey) ? "Err_KeyMissing" : "Err_InvalidConnection"); args.Cancel = true; }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException or System.Security.Cryptography.CryptographicException) { error.Text = Strings.Get("Err_Storage"); args.Cancel = true; }
         finally { IsPrimaryButtonEnabled = true; deferral.Complete(); }
     }

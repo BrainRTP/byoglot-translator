@@ -145,11 +145,20 @@ public class ProviderContractTests
     [Theory]
     [InlineData("http://localhost:8080/v1", false)]
     [InlineData("http://127.0.0.1:8080/v1", false)]
-    [InlineData("http://127.0.0.2:8080/v1", true)]
+    [InlineData("http://127.0.0.2:8080/v1", false)]
     [InlineData("http://192.168.1.5:8080/v1", true)]
-    [InlineData("http://[::1]:8080/v1", true)]
+    [InlineData("http://[::1]:8080/v1", false)]
     [InlineData("http://model.local:8080/v1", true)]
-    public void CustomKeyExemptionMatchesTypeScript(string url, bool expected) => Assert.Equal(expected, ProviderEffort.NeedsKey(ProviderPreset.Custom, url));
+    public void CustomKeyExemptionIsOnlyForLoopback(string url, bool expected) => Assert.Equal(expected, ProviderEffort.NeedsKey(ProviderPreset.Custom, url));
+
+    [Theory]
+    [InlineData(ProviderPreset.Ollama, "http://localhost:11434/v1", false)]
+    [InlineData(ProviderPreset.Ollama, "http://192.168.1.5:11434/v1", false)]
+    [InlineData(ProviderPreset.Ollama, "https://models.example/v1", true)]
+    [InlineData(ProviderPreset.Lmstudio, "http://[::1]:1234/v1", false)]
+    [InlineData(ProviderPreset.Lmstudio, "http://model.local:1234/v1", false)]
+    [InlineData(ProviderPreset.Lmstudio, "https://models.example/v1", true)]
+    public void LocalPresetsNeedAKeyOnlyOutsideLoopbackAndLan(ProviderPreset preset, string url, bool expected) => Assert.Equal(expected, ProviderEffort.NeedsKey(preset, url));
 
     [Fact]
     public async Task ChatBodyKeepsUnicodeAndPlainTextUnescaped()

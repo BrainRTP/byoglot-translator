@@ -1939,6 +1939,23 @@
         }
       }
     },
+    "providers.keyNotRequired": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No key required"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ключ не нужен"
+          }
+        }
+      }
+    },
     "providers.keyMissing": {
       "extractionState": "manual",
       "localizations": {
@@ -3569,13 +3586,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Keys are not imported. New providers require their own key and consent before sending any request."
+            "value": "Keys and consent are not imported. Connections stay saved; add a key or allow requests when prompted."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ключи не импортируются. Для новых провайдеров нужны ключ и согласие перед отправкой запроса."
+            "value": "Ключи и согласие не импортируются. Подключения сохраняются; добавьте ключ или разрешите запросы, когда приложение попросит."
           }
         }
       }

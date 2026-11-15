@@ -112,7 +112,9 @@ impl<S: SettingsRepository, K: SecretStore, T: HttpTransport + Send> Translation
         let origin = crate::effort::permitted_endpoint(&connection.base_url)
             .ok_or_else(invalid_base_url)?
             .origin;
-        if !crate::effort::local_origin(&origin) && !settings.consented_origins.contains(&origin) {
+        if !crate::effort::is_loopback_origin(&origin)
+            && !settings.consented_origins.contains(&origin)
+        {
             return Err(RunnerError::ConsentNeeded { origin });
         }
         let secret = self

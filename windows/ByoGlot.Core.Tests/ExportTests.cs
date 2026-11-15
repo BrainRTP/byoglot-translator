@@ -130,6 +130,34 @@ public class ExportTests
         Assert.Null(merged.Templates.Single(t => t.Id == "study").Settings.SelectionModel);
     }
 
+    [Theory]
+    [InlineData("http://192.168.1.5:11434/v1", false)]
+    [InlineData("https://models.example/v1", true)]
+    [InlineData("https://0x7f.0.0.1:11434/v1", true)]
+    [InlineData("https://2130706433:11434/v1", true)]
+    [InlineData("https://127.1:11434/v1", true)]
+    [InlineData("https://012.0.0.1:11434/v1", true)]
+    [InlineData("https://localhost.:11434/v1", true)]
+    [InlineData("https://127.0.0.1.:11434/v1", true)]
+    public async Task ImportedConnectionsStayListedButModelsRequireConsentAndKeys(string url, bool keyMissing)
+    {
+        var file = ExportFile.Decode(Sample) with { Connections = [new("c1", ProviderPreset.Ollama, "Imported", url)] };
+        var merged = SettingsLogic.Merge(file, AppSettings.Initial("en"));
+        Assert.Equal(url, Assert.Single(merged.Connections).BaseUrl);
+        Assert.Empty(merged.ConsentedOrigins);
+        var repository = new InMemorySettingsRepository(merged);
+        var transport = new RecordingTransport();
+        var editor = new ConnectionEditor(repository, new InMemorySecretStore(), transport);
+        Assert.Equal(new RunnerError.ConsentNeeded(Origins.OriginOf(url)!), (await Assert.ThrowsAsync<RunnerException>(() => editor.ModelsAsync("c1", CancellationToken.None))).Error);
+        if (keyMissing)
+        {
+            await repository.UpdateAsync(s => s with { ConsentedOrigins = [Origins.OriginOf(url)!] });
+            Assert.IsType<RunnerError.KeyMissing>((await Assert.ThrowsAsync<RunnerException>(() => editor.ModelsAsync("c1", CancellationToken.None))).Error);
+        }
+        Assert.Empty(transport.Calls);
+        Assert.Equal(merged.Connections, (await repository.ReadAsync()).Connections);
+    }
+
     [Fact]
     public void ExportKeepsUnicodeUnescaped()
     {

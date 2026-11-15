@@ -37,6 +37,40 @@ private struct HookedSecrets: SecretStore {
 }
 
 struct ReviewRegressionTests {
+    @Test func savedProviderRetryChecksInsteadOfDeleting() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appending(path: "Sources/ByoGlotAppKit/Views/ScreenProviders.swift"), encoding: .utf8)
+        let start = try #require(source.range(of: "@ViewBuilder private var savedContent:"))
+        let end = try #require(source.range(of: "private var deleteSection:"))
+        let savedContent = source[start.upperBound..<end.lowerBound]
+        #expect(savedContent.contains("actionTitle: \"err.retry\", action: check"))
+        #expect(!savedContent.contains("deleteSavedConnection"))
+        for (language, expected) in [("en", "Retry"), ("ru", "Повторить")] {
+            let url = try #require(Bundle.module.url(forResource: language, withExtension: "lproj"))
+            let bundle = try #require(Bundle(url: url))
+            #expect(bundle.localizedString(forKey: "err.retry", value: nil, table: nil) == expected)
+        }
+    }
+
+    @Test func failedLANConsentCheckCanBeRetriedWithoutLosingTheSavedConnection() async throws {
+        let f = AppFixture()
+        try await f.connect(preset: .ollama, base: "https://192.168.1.2/v1", consent: false)
+        try f.secrets.delete(connectionId: "c1")
+        let before = try await f.settings.read()
+        await #expect(throws: RunnerError.consentNeeded(origin: "https://192.168.1.2")) { try await f.editor.models(connectionId: "c1") }
+        #expect(await f.transport.requests.isEmpty)
+        let draft = ConnectionDraft(id: "c1", preset: .ollama, name: "Provider", baseUrl: "https://192.168.1.2/v1")
+        await f.transport.configure(status: 503)
+        await #expect(throws: RunnerError.self) { try await f.editor.save(draft, consent: true) }
+        #expect(try await f.settings.read() == before)
+        await f.transport.configure()
+        #expect(try await f.editor.save(draft, consent: true).id == "c1")
+        let after = try await f.settings.read()
+        #expect(after.connections == before.connections)
+        #expect(after.consentedOrigins == ["https://192.168.1.2"])
+        #expect(await f.transport.requests.count == 2)
+    }
+
     @Test(.timeLimit(.minutes(1))) func interleavedSavesAreSerializedAndCommitSurvivesCallerCancellation() async throws {
         let f = AppFixture()
         try await f.connect()

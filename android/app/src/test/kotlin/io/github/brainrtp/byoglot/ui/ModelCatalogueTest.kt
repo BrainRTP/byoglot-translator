@@ -105,4 +105,47 @@ class ModelCatalogueTest {
             catalogue.groups.value["c"]?.error,
         )
     }
+
+    @Test
+    fun imported_connections_block_models_until_required_consent_and_keys_are_restored() = runTest {
+        for (preset in listOf(ProviderPreset.ollama, ProviderPreset.lmstudio, ProviderPreset.custom)) {
+            for (host in listOf("localhost", "127.0.0.2", "[::1]", "192.168.1.5", "provider.test")) {
+                val origin = "https://$host"
+                val connection = Connection("c", preset, "Imported", "$origin/v1")
+                val initial = AppSettings.initial("en")
+                val file = SettingsLogic.export(initial.copy(connections = listOf(connection)), "2026-11-15T00:00:00Z")
+                val imported = SettingsLogic.merge(file, initial)
+                val repository = InMemorySettingsRepository(imported)
+                val secrets = InMemorySecretStore()
+                var calls = 0
+                val transport = object : HttpTransport {
+                    override suspend fun send(request: HttpRequest, timeoutMs: Long): HttpResponse {
+                        calls++
+                        assertEquals("$origin/v1/models", request.url)
+                        return HttpResponse(200, emptyMap(), """{"data":[{"id":"m"}]}""".toByteArray())
+                    }
+                }
+                val catalogue = ModelCatalogue(ConnectionEditor(repository, secrets, transport), repository) { true }
+                if (host in listOf("192.168.1.5", "provider.test")) {
+                    catalogue.refresh()
+                    assertEquals(RunnerError.ConsentNeeded(origin), catalogue.groups.value["c"]?.error)
+                    assertEquals(0, calls)
+                    assertEquals(imported, repository.read())
+                    repository.update { it.copy(consentedOrigins = listOf(origin)) }
+                }
+                if (host == "provider.test" || (preset == ProviderPreset.custom && host == "192.168.1.5")) {
+                    catalogue.refresh()
+                    assertEquals(RunnerError.KeyMissing, catalogue.groups.value["c"]?.error)
+                    assertEquals(0, calls)
+                    secrets.set("fixture-key", "c", origin)
+                }
+                catalogue.refresh()
+                assertEquals(1, calls)
+                assertNull(catalogue.groups.value["c"]?.error)
+                assertEquals(listOf("m"), catalogue.groups.value.getValue("c").models.map { it.id })
+                assertEquals(imported.connections, repository.read().connections)
+                assertFalse(legacyPhoneConnection(connection))
+            }
+        }
+    }
 }

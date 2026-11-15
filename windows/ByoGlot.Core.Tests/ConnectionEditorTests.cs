@@ -11,6 +11,9 @@ public class ConnectionEditorTests
     [InlineData("https://api.deepseek.com", ProviderPreset.Deepseek, "", false, DraftProblem.ApiKey)]
     [InlineData("https://api.deepseek.com", ProviderPreset.Deepseek, "", true, null)]
     [InlineData("http://localhost:11434/v1", ProviderPreset.Custom, "", false, null)]
+    [InlineData("http://192.168.1.5:11434/v1", ProviderPreset.Ollama, "", false, null)]
+    [InlineData("https://models.example/v1", ProviderPreset.Ollama, "", false, DraftProblem.ApiKey)]
+    [InlineData("http://192.168.1.5:11434/v1", ProviderPreset.Custom, "", false, DraftProblem.ApiKey)]
     [InlineData("https://api.deepseek.com", ProviderPreset.Deepseek, "key", false, null)]
     public void ValidateTable(string url, ProviderPreset preset, string key, bool stored, DraftProblem? expected)
     {
@@ -52,14 +55,22 @@ public class ConnectionEditorTests
         Assert.Equal(2, (await editor.ModelsAsync(saved.Id, CancellationToken.None)).Count);
     }
 
-    [Fact]
-    public async Task SaveWithoutConsentFails()
+    [Theory]
+    [InlineData("https://api.deepseek.com")]
+    [InlineData("http://192.168.1.5:11434/v1")]
+    [InlineData("https://0x7f.0.0.1:11434/v1")]
+    [InlineData("https://2130706433:11434/v1")]
+    [InlineData("https://127.1:11434/v1")]
+    [InlineData("https://012.0.0.1:11434/v1")]
+    [InlineData("https://localhost.:11434/v1")]
+    [InlineData("https://127.0.0.1.:11434/v1")]
+    public async Task SaveWithoutConsentFails(string url)
     {
         var repository = new InMemorySettingsRepository(AppSettings.Initial("en"));
         var secrets = new InMemorySecretStore();
         var transport = new RecordingTransport();
         var editor = new ConnectionEditor(repository, secrets, transport);
-        Assert.IsType<RunnerError.ConsentNeeded>((await Assert.ThrowsAsync<RunnerException>(() => editor.SaveAsync(Draft(), false, CancellationToken.None))).Error);
+        Assert.Equal(new RunnerError.ConsentNeeded(Origins.OriginOf(url)!), (await Assert.ThrowsAsync<RunnerException>(() => editor.SaveAsync(Draft(url), false, CancellationToken.None))).Error);
         Assert.Empty((await repository.ReadAsync()).Connections);
         Assert.Empty(transport.Calls);
     }
@@ -123,31 +134,67 @@ public class ConnectionEditorTests
     }
 
     [Theory]
-    [InlineData("localhost", true)]
-    [InlineData("127.99.3.2", true)]
-    [InlineData("::1", true)]
-    [InlineData("fc00::1", true)]
-    [InlineData("fdff::1", true)]
-    [InlineData("fe80::1", true)]
-    [InlineData("febf::1", true)]
-    [InlineData("fec0::1", false)]
-    [InlineData("2001:db8::1", false)]
-    [InlineData("10.2.3.4", true)]
-    [InlineData("172.16.0.1", true)]
-    [InlineData("172.31.255.255", true)]
-    [InlineData("172.32.0.1", false)]
-    [InlineData("192.168.1.1", true)]
-    [InlineData("169.254.1.2", true)]
-    [InlineData("model.local", true)]
-    [InlineData("model.local.example", false)]
-    [InlineData("8.8.8.8", false)]
-    public void LocalHostBoundaries(string host, bool local) => Assert.Equal(local, Origins.IsLocalHost(host));
+    [InlineData("localhost", true, false)]
+    [InlineData("LOCALHOST", true, false)]
+    [InlineData("localhost.evil.com", false, false)]
+    [InlineData("localhost.", false, false)]
+    [InlineData("127.0.0.1", true, false)]
+    [InlineData("127.99.3.2", true, false)]
+    [InlineData("127.0.0.1.evil.com", false, false)]
+    [InlineData("127.0.0.1.", false, false)]
+    [InlineData("0x7f.0.0.1", false, false)]
+    [InlineData("2130706433", false, false)]
+    [InlineData("127.1", false, false)]
+    [InlineData("012.0.0.1", false, false)]
+    [InlineData("010.1.2.3", false, false)]
+    [InlineData("::1", true, false)]
+    [InlineData("[::1]", true, false)]
+    [InlineData("[::ffff:127.0.0.1]", false, false)]
+    [InlineData("fc00::1", false, true)]
+    [InlineData("fdff::1", false, true)]
+    [InlineData("fe80::1", false, true)]
+    [InlineData("febf::1", false, true)]
+    [InlineData("fec0::1", false, false)]
+    [InlineData("2001:db8::1", false, false)]
+    [InlineData("10.2.3.4", false, true)]
+    [InlineData("172.15.255.255", false, false)]
+    [InlineData("172.16.0.1", false, true)]
+    [InlineData("172.31.255.255", false, true)]
+    [InlineData("172.32.0.1", false, false)]
+    [InlineData("192.168.1.1", false, true)]
+    [InlineData("169.254.1.2", false, true)]
+    [InlineData("model.local", false, true)]
+    [InlineData("MODEL.LOCAL", false, true)]
+    [InlineData("model.local.", false, false)]
+    [InlineData("192.168.1.1.", false, false)]
+    [InlineData("model.local.example", false, false)]
+    [InlineData("8.8.8.8", false, false)]
+    public void HostClassesPreserveTheCleartextAllowlist(string host, bool loopback, bool lan)
+    {
+        Assert.Equal(loopback, Origins.IsLoopbackHost(host));
+        Assert.Equal(lan, Origins.IsLanHost(host));
+        var urlHost = host.Contains(':') && !host.StartsWith('[') ? "[" + host + "]" : host;
+        var url = "http://" + urlHost + ":11434/v1?test=1#fragment";
+        Assert.Equal(urlHost, Origins.HostOf(url));
+        Assert.Equal(loopback || lan, Origins.IsAllowedEndpoint(url));
+        Assert.True(Origins.IsAllowedEndpoint(url.Replace("http:", "https:", StringComparison.Ordinal)));
+        Assert.Equal(!loopback, ProviderEffort.NeedsKey(ProviderPreset.Custom, url));
+        Assert.Equal(!loopback && !lan, ProviderEffort.NeedsKey(ProviderPreset.Ollama, url));
+        Assert.Equal(!loopback && !lan, ProviderEffort.NeedsKey(ProviderPreset.Lmstudio, url));
+    }
 
     [Fact]
     public void DraftToStringDoesNotExposeKey() => Assert.DoesNotContain("test-key", Draft().ToString());
     [Theory]
     [InlineData(" https://api.deepseek.com/v1 ", "https://api.deepseek.com/v1")]
     [InlineData("https://api.deepseek.com/v1/?a=b#fragment", "https://api.deepseek.com/v1")]
+    [InlineData("https://0x7f.0.0.1:11434/v1", "https://0x7f.0.0.1:11434/v1")]
+    [InlineData("https://2130706433/v1", "https://2130706433/v1")]
+    [InlineData("https://127.1/v1", "https://127.1/v1")]
+    [InlineData("https://012.0.0.1/v1", "https://012.0.0.1/v1")]
+    [InlineData("https://LOCALHOST.:443/v1/", "https://localhost./v1")]
+    [InlineData("https://127.0.0.1./v1", "https://127.0.0.1./v1")]
+    [InlineData("https://[::1]:443/v1/", "https://[::1]/v1")]
     public async Task SaveNormalizesTheEndpointBeforeCheckingAndStoring(string url, string expected)
     {
         var repository = new InMemorySettingsRepository(AppSettings.Initial("en"));
@@ -167,6 +214,21 @@ public class ConnectionEditorTests
         var error = Assert.IsType<RunnerError.Backend>((await Assert.ThrowsAsync<RunnerException>(() => editor.ModelsAsync("c", CancellationToken.None))).Error);
         Assert.Equal(ErrorKind.Offline, error.Error.Kind);
         Assert.Empty(transport.Calls);
+    }
+
+    [Fact]
+    public async Task LanModelsWaitForConsentAndKeepTheStoredConnection()
+    {
+        var initial = TranslationRunnerTests.Configured("http://192.168.1.5:11434/v1", ProviderPreset.Ollama, false);
+        var repository = new InMemorySettingsRepository(initial);
+        var transport = new RecordingTransport(RecordingTransport.JsonResponse(Models));
+        var editor = new ConnectionEditor(repository, new InMemorySecretStore(), transport);
+        Assert.Equal(new RunnerError.ConsentNeeded("http://192.168.1.5:11434"), (await Assert.ThrowsAsync<RunnerException>(() => editor.ModelsAsync("c", CancellationToken.None))).Error);
+        Assert.Empty(transport.Calls);
+        Assert.Same(initial, await repository.ReadAsync());
+        await repository.UpdateAsync(s => s with { ConsentedOrigins = ["http://192.168.1.5:11434"] });
+        Assert.Single(await editor.ModelsAsync("c", CancellationToken.None));
+        Assert.False(Assert.Single(transport.Calls).Request.Headers.ContainsKey("authorization"));
     }
 
     [Theory]

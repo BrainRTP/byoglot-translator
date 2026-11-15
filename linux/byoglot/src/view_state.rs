@@ -248,6 +248,19 @@ mod tests {
             ("http://192.168.1.4/v1", "http://192.168.1.4"),
             ("http://box.local/v1", "http://box.local"),
             ("http://[fd00::1]/v1", "http://[fd00::1]"),
+            ("https://010.1.2.3/v1", "https://010.1.2.3"),
+            ("https://172.016.0.1/v1", "https://172.016.0.1"),
+            ("https://0x7f.0.0.1/v1", "https://0x7f.0.0.1"),
+            ("https://2130706433/v1", "https://2130706433"),
+            ("https://127.1/v1", "https://127.1"),
+            (
+                "https://localhost.evil.com/v1",
+                "https://localhost.evil.com",
+            ),
+            (
+                "https://127.0.0.1.evil.com/v1",
+                "https://127.0.0.1.evil.com",
+            ),
         ] {
             assert_eq!(remote_origin(url), Some(origin.into()));
         }

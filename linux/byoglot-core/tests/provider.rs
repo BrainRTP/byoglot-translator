@@ -173,7 +173,15 @@ fn local_hosts_and_origins() {
 
 #[tokio::test]
 async fn provider_refuses_insecure_remote_requests_and_allows_lan() {
-    for base_url in ["http://evil.example/v1", "broken url"] {
+    for base_url in [
+        "http://evil.example/v1",
+        "http://010.1.2.3/v1",
+        "http://172.016.0.1/v1",
+        "http://0x7f.0.0.1/v1",
+        "http://2130706433/v1",
+        "http://127.1/v1",
+        "broken url",
+    ] {
         let mut c = connection();
         c.base_url = base_url.into();
         let transport = RecordingTransport::models();
@@ -203,6 +211,29 @@ async fn provider_refuses_insecure_remote_requests_and_allows_lan() {
                 .is_ok()
         );
         assert_eq!(transport.requests.lock().unwrap().len(), 1);
+    }
+}
+#[test]
+fn noncanonical_ipv4_and_lookalike_names_are_external() {
+    for host in [
+        "010.1.2.3",
+        "172.016.0.1",
+        "0x7f.0.0.1",
+        "2130706433",
+        "127.1",
+        "localhost.evil.com",
+        "127.0.0.1.evil.com",
+    ] {
+        assert!(!is_loopback_host(host), "{host}");
+        assert!(!is_lan_host(host), "{host}");
+        assert!(!is_local_host(host), "{host}");
+        for preset in [
+            ProviderPreset::Ollama,
+            ProviderPreset::Lmstudio,
+            ProviderPreset::Custom,
+        ] {
+            assert!(needs_key(preset, &format!("https://{host}/v1")), "{host}");
+        }
     }
 }
 #[test]

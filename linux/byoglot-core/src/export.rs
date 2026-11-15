@@ -51,6 +51,24 @@ impl ExportFile {
             return Err(ExportError::Format);
         }
         let file: Self = serde_json::from_str(json)?;
+        fn unknown_fields(value: &serde_json::Value, encoded: &serde_json::Value) -> bool {
+            match value {
+                serde_json::Value::Object(fields) => fields.iter().any(|(key, value)| {
+                    encoded
+                        .get(key)
+                        .is_none_or(|encoded| unknown_fields(value, encoded))
+                }),
+                serde_json::Value::Array(values) => values.iter().enumerate().any(|(i, value)| {
+                    encoded
+                        .get(i)
+                        .is_none_or(|encoded| unknown_fields(value, encoded))
+                }),
+                _ => false,
+            }
+        }
+        if unknown_fields(&value, &serde_json::to_value(&file)?) {
+            return Err(ExportError::Format);
+        }
         if file.format != "byoglot-export" || file.version != 1 {
             return Err(ExportError::Format);
         }

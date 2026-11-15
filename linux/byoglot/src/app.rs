@@ -160,7 +160,7 @@ pub fn run() -> glib::ExitCode {
                         .application(&app)
                         .title("ByoGlot")
                         .build();
-                    window.set_content(Some(&gtk::Label::new(Some(tr(Msg::ErrOffline)))));
+                    window.set_content(Some(&gtk::Label::new(Some(tr(Msg::ErrStorage)))));
                     window.present();
                     state.pending.borrow_mut().clear();
                     state.hold.borrow_mut().take();

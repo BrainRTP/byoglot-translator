@@ -43,6 +43,7 @@ impl Services {
         #[cfg(feature = "gui")]
         let startup_path = path.with_file_name("startup.json");
         let settings = Arc::new(FileSettingsRepository::new(path, language));
+        settings.try_read().map_err(|_| failed())?;
         let secrets = Arc::new(FallbackSecretStore::lazy());
         let transport = ReqwestTransport::new(runtime.clone()).map_err(|_| failed())?;
         Ok(Arc::new(Self {
@@ -72,10 +73,18 @@ impl Services {
         input: byoglot_core::RunnerInput,
     ) -> Result<byoglot_core::RunnerOutput, RunnerError> {
         let services = self.clone();
-        let mut task = crate::net::AbortOnDrop(
-            self.runtime
-                .spawn(async move { services.runner.translate(input).await }),
-        );
+        let mut task = crate::net::AbortOnDrop(self.runtime.spawn(async move {
+            tokio::time::timeout(
+                std::time::Duration::from_secs(180),
+                services.runner.translate(input),
+            )
+            .await
+            .map_err(|_| {
+                RunnerError::from(byoglot_core::BackendError::new(
+                    byoglot_core::ErrorKind::Offline,
+                ))
+            })?
+        }));
         (&mut task.0).await.map_err(|_| failed())?
     }
 
@@ -383,6 +392,46 @@ mod tests {
             base_url: url,
             api_key: "new-key".into(),
         }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn total_deadline_includes_waiting_for_settings_before_http() {
+        let path =
+            std::env::temp_dir().join(format!("byoglot-deadline-{}.json", std::process::id()));
+        let service = services(path.clone());
+        let settings = service.settings.clone();
+        let (started, ready) = tokio::sync::oneshot::channel();
+        let (release, resume) = std::sync::mpsc::channel();
+        let writer = std::thread::spawn(move || {
+            settings
+                .try_update(|s| {
+                    started.send(()).unwrap();
+                    resume.recv_timeout(Duration::from_secs(5)).unwrap();
+                    s
+                })
+                .unwrap();
+        });
+        ready.await.unwrap();
+        let working = service.clone();
+        let task = tokio::spawn(async move {
+            working
+                .translate(crate::view_state::editor_input(
+                    "hello".into(),
+                    None,
+                    "en".into(),
+                ))
+                .await
+        });
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(180)).await;
+        let result = task.await;
+        release.send(()).unwrap();
+        writer.join().unwrap();
+        assert_eq!(
+            result.unwrap(),
+            Err(byoglot_core::BackendError::new(byoglot_core::ErrorKind::Offline).into())
+        );
+        std::fs::remove_file(path).unwrap();
     }
 
     #[tokio::test]

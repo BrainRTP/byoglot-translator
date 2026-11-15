@@ -14,7 +14,7 @@ export function withConnectionPolicy(
   async function call<T>(run: () => Promise<T>): Promise<T> {
     const url = rec.kind === "provider" ? rec.baseUrl : rec.url;
     if (rec.kind === "provider") {
-      if (!rec.apiKey.trim() && needsKey(rec.preset, url)) throw new BackendError("provider_auth");
+      if (!rec.apiKey.trim() && needsKey(rec.preset, url)) throw new BackendError("missing_key");
     } else if (!rec.password.trim() && !isLocalOrigin(url) && !isLanOrigin(url)) {
       throw new BackendError("unauthorized");
     }

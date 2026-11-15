@@ -16,8 +16,8 @@ describe("isAndroid", () => {
     expect(await isAndroid()).toBe(false);
   });
 
-  it("returns false when platform detection fails", async () => {
+  it("uses Android restrictions when platform detection fails", async () => {
     vi.spyOn(fakeBrowser.runtime, "getPlatformInfo").mockRejectedValue(new Error("unavailable"));
-    expect(await isAndroid()).toBe(false);
+    expect(await isAndroid()).toBe(true);
   });
 });

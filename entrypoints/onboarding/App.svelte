@@ -308,6 +308,9 @@
     {:else if f.kind === "incompatible"}
       <b>{tr("error.incompatible.title")}</b>
       <div>{tr("error.incompatible")}</div>
+    {:else if f.kind === "https_required"}
+      <b>{tr("error.https_required.title")}</b>
+      <div>{tr("error.https_required")}</div>
     {:else}
       <b>{tr("onboarding.badLink.title")}</b>
       <div>{tr("onboarding.badLink")}</div>

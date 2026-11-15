@@ -12,7 +12,7 @@ Language profiles are not copied here. They live in `lib/translate/profiles/<cod
 
 Language prompt names use `languages.json`: `auto` selects its `auto` text, known codes use `names[code]`, and off-list codes, including region codes such as `pt-BR`, use the code itself. Prompt language names come only from this fixed table, without a locale-dependent display-name lookup. The `codes` array preserves picker order.
 
-Provider responses that do not match the expected JSON shape have kind `incompatible` and the fixed detail `unexpected response shape`, independent of the validator library. The provider backend logs the full validator message with `console.warn` for endpoint diagnostics.
+Provider responses that do not match the expected JSON shape have kind `incompatible` and the fixed detail `unexpected response shape`, independent of the validator library. The provider backend logs the full validator message with `console.warn` for endpoint diagnostics. `CommonBackendErrorKind` pins the shared backend errors in `errors.json`; extension connection checks additionally use `https_required`, `permission_required` and `missing_key` for local policy refusals.
 
 Provider completion content accepts a string, null or an array of chunks; only chunks with `type: "text"` contribute their `text`, joined in order, and an array without text chunks is an empty completion. A null model name falls back to its id. OpenAI has no automatic default model; Mistral uses the first model whose `capabilities.completion_chat` is not false, or no default if every model is explicitly non-chat.
 
@@ -33,7 +33,7 @@ The export format contains portable globals, templates, profile overrides, site 
 | `limits.json`                    | Batch, editor, selection, context, timeout and profile limits | `DEFAULT_LIMITS`, `GENERATE_TIMEOUT_MS`, `MAX_PROFILE_TEXT`, `MAX_SELECTION`, `MAX_CONTEXT`, `MAX_EDITOR_TEXT` |
 | `native-bridge-v1.json`          | Native bridge requests and replies, protocol version 1        | `nativeFetch`, `nativeSecrets` (Safari adapter, Task 3)                                                        |
 | `builtin-template.json`          | Builtin template and pre-prompt                               | `builtinTemplate`                                                                                              |
-| `errors.json`                    | Backend error kinds and fatal classification                  | `BackendErrorKind`, `isFatal`                                                                                  |
+| `errors.json`                    | Backend error kinds and fatal classification                  | `CommonBackendErrorKind`, `isFatal`                                                                            |
 | `fixtures/prompt-page.json`      | Page translation prompts                                      | `buildPagePrompt`                                                                                              |
 | `fixtures/prompt-selection.json` | Browser selection prompts                                     | `buildSelectionPrompt`                                                                                         |
 | `fixtures/prompt-text.json`      | Native text prompts                                           | `buildTextPrompt`                                                                                              |

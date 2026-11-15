@@ -384,6 +384,7 @@
 
   function onFailureAction() {
     if (failure?.action === "connect") openOnboarding();
+    else if (failure?.action === "settings") openOptions();
     else if (failure?.action === "chooseModel") focusPicker();
     else onRetry();
   }
@@ -391,9 +392,11 @@
   const failureLabel = $derived(
     failure?.action === "connect"
       ? tr("popup.connectAgain")
-      : failure?.action === "chooseModel"
-        ? tr("popup.chooseModel")
-        : tr("common.retry"),
+      : failure?.action === "settings"
+        ? tr("common.settings")
+        : failure?.action === "chooseModel"
+          ? tr("popup.chooseModel")
+          : tr("common.retry"),
   );
 </script>
 

@@ -23,7 +23,14 @@ export const en = {
   "error.offline.title": "opencode is not running",
   "error.offline": "Start the server in a terminal and retry.",
   "error.unauthorized.title": "Connection access required",
-  "error.unauthorized": "Reconnect in Settings to grant browser access or update the credentials.",
+  "error.unauthorized": "Connect or reconnect opencode with the correct credentials.",
+  "error.https_required.title": "HTTPS is required",
+  "error.https_required":
+    "Use an HTTPS address. HTTP is allowed only for desktop LAN servers or loopback.",
+  "error.permission_required.title": "Browser access required",
+  "error.permission_required": "Reconnect opencode to grant browser access to its address.",
+  "error.missing_key.title": "API key required",
+  "error.missing_key": "Enter an API key in Settings and save this provider.",
   "error.rate_limit.title": "Provider limit reached",
   "error.rate_limit": "Resets in {time}. You can choose another model in settings.",
   "error.rate_limit_unknown": "Try again later. You can choose another model in settings.",
@@ -313,8 +320,9 @@ export const en = {
   "provider.offline.title": "Cannot reach the provider",
   "provider.offline": "Check the base URL and your network, then retry.",
   "provider.incompatible.title": "Unexpected provider response",
-  "provider.incompatible":
-    "Check the API address and HTTPS. HTTP is allowed only for desktop LAN servers or loopback.",
+  "provider.incompatible": "The server does not look OpenAI-compatible. Check the base URL.",
+  "provider.permission_required":
+    "Edit and save this provider in Settings to grant browser access.",
   "provider.auth.title": "The provider rejected the key",
   "provider.auth": "Enter or update the key in Settings and retry.",
   "provider.offlineBody": 'Check the base URL and your network, then press "Retry".',

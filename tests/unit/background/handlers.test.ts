@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { fakeBrowser } from "wxt/testing/fake-browser";
-import { createBackendProvider } from "../../../lib/background/connection";
+import { createBackendProvider, withConnectionPolicy } from "../../../lib/background/connection";
 import {
   createHandlers,
   type HandlerDeps,
@@ -1685,7 +1685,7 @@ describe("connection operations", () => {
     });
     expect(res.status).toMatchObject({
       state: "error",
-      kind: "provider_auth",
+      kind: "missing_key",
       backend: "provider",
     });
     expect(info).not.toHaveBeenCalled();
@@ -1789,6 +1789,85 @@ describe("connection operations", () => {
     expect(removeOrigin).not.toHaveBeenCalled();
   });
 
+  it("revokes unused opencode access on replacement and removal, including optional loopback grants", async () => {
+    const { handlers, removeOrigin } = multi();
+    for (const url of [
+      "https://external.example",
+      "http://192.168.1.5",
+      "https://localhost",
+      "http://127.42.1.2",
+      "http://[::1]",
+    ]) {
+      await handlers.connectManual({ ...conn, url });
+      removeOrigin.mockClear();
+      await handlers.connectManual({ ...conn, url: "https://replacement.example" });
+      expect(removeOrigin).toHaveBeenCalledWith(url);
+      await handlers.connectManual({ ...conn, url });
+      removeOrigin.mockClear();
+      const id = (await handlers.connections()).find((rec) => rec.kind === "opencode")
+        ?.id as string;
+      await handlers.removeConnection(id);
+      expect(removeOrigin).toHaveBeenCalledExactlyOnceWith(url);
+    }
+  });
+
+  it("keeps shared access until the last provider or opencode connection is removed", async () => {
+    const { handlers, removeOrigin } = multi();
+    const url = "https://shared.example";
+    const provider = await handlers.saveProvider({ ...deepseek, baseUrl: `${url}/v1` });
+    await handlers.connectManual({ ...conn, url });
+    const id = (await handlers.connections()).find((rec) => rec.kind === "opencode")?.id as string;
+    await handlers.removeConnection(id);
+    expect(removeOrigin).not.toHaveBeenCalled();
+    await handlers.connectManual({ ...conn, url });
+    await handlers.connectManual({ ...conn, url: "https://replacement.example" });
+    expect(removeOrigin).not.toHaveBeenCalled();
+    await handlers.removeConnection(provider.connections[0]?.id as string);
+    expect(removeOrigin).toHaveBeenCalledExactlyOnceWith(url);
+  });
+
+  it("releases onboarding access after a local opencode refusal without sending a request", async () => {
+    const info = vi.fn(async () => ({ version: "2.1.0" }));
+    const { handlers, removeOrigin } = setup(fakeBackend(), {
+      createBackend: (rec) => withConnectionPolicy(rec, fakeBackend({ info })),
+    });
+    vi.spyOn(browser.permissions, "contains").mockImplementation(async () => true);
+    for (const url of ["http://external.example", "https://external.example"]) {
+      const status = await handlers.connectManual({ ...conn, url, password: "" });
+      expect(status).toMatchObject({ state: "error", kind: "unauthorized" });
+      expect(removeOrigin).toHaveBeenLastCalledWith(url);
+    }
+    expect(await handlers.connectManual({ ...conn, url: "http://external.example" })).toMatchObject(
+      {
+        state: "error",
+        kind: "https_required",
+        backend: "opencode",
+      },
+    );
+    expect(removeOrigin).toHaveBeenLastCalledWith("http://external.example");
+    expect(info).not.toHaveBeenCalled();
+    expect(await saved()).toEqual([]);
+  });
+
+  it("keeps access used by a saved provider when opencode is refused", async () => {
+    const { handlers, removeOrigin } = multi();
+    await handlers.saveProvider(deepseek);
+    await handlers.connectManual({ ...conn, url: deepseek.baseUrl, password: "" });
+    expect(removeOrigin).not.toHaveBeenCalled();
+  });
+
+  it("reports HTTPS separately when a provider transport is refused", async () => {
+    const { handlers, info } = multi();
+    const res = await handlers.saveProvider({ ...deepseek, baseUrl: "http://external.example/v1" });
+    expect(res.status).toMatchObject({
+      state: "error",
+      kind: "https_required",
+      backend: "provider",
+    });
+    expect(info).not.toHaveBeenCalled();
+    expect(await saved()).toEqual([]);
+  });
+
   it("refuses external keyless presets and a saved empty key before checking models", async () => {
     const { handlers, info } = multi();
     for (const preset of ["ollama", "lmstudio"] as const) {
@@ -1797,7 +1876,7 @@ describe("connection operations", () => {
         preset,
         baseUrl: "https://external.example/v1",
       });
-      expect(res.status).toMatchObject({ state: "error", kind: "provider_auth" });
+      expect(res.status).toMatchObject({ state: "error", kind: "missing_key" });
     }
     await connectionsStore.setAll([
       {
@@ -1814,7 +1893,7 @@ describe("connection operations", () => {
       id: "saved",
       baseUrl: "https://external.example/v1",
     });
-    expect(res.status).toMatchObject({ state: "error", kind: "provider_auth" });
+    expect(res.status).toMatchObject({ state: "error", kind: "missing_key" });
     expect(info).not.toHaveBeenCalled();
     expect(await saved()).toHaveLength(1);
   });
@@ -1860,7 +1939,7 @@ describe("connection operations", () => {
   it("a new provider without a key is refused when the preset needs one", async () => {
     const { handlers, info } = multi();
     const res = await handlers.saveProvider({ ...deepseek, apiKey: "" });
-    expect(res.status).toMatchObject({ state: "error", kind: "provider_auth" });
+    expect(res.status).toMatchObject({ state: "error", kind: "missing_key" });
     expect(info).not.toHaveBeenCalled();
     expect(await saved()).toEqual([]);
   });

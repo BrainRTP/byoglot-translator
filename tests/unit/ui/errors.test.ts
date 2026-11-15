@@ -43,7 +43,9 @@ describe("describeError for the popup", () => {
   });
 
   it("unauthorized sends the user to onboarding", () => {
-    expect(describeError("unauthorized", "popup").action).toBe("connect");
+    const view = describeError("unauthorized", "popup");
+    expect(view.action).toBe("connect");
+    expect(view.body).not.toMatch(/browser|permission/i);
   });
 
   it("incompatible and provider errors are retryable", () => {
@@ -112,5 +114,38 @@ describe("describeError for a provider connection", () => {
 
   it("opencode texts stay the default", () => {
     expect(describeError("offline", "card", undefined, now).title).toBe("opencode is not running");
+  });
+
+  it.each(["en", "ru"] as const)(
+    "%s separates incompatible responses from transport refusals",
+    (lang) => {
+      setUiLang(lang);
+      for (const surface of ["popup", "card"] as const) {
+        const incompatible = describeError("incompatible", surface, undefined, now, "provider");
+        expect(incompatible.body).toContain("OpenAI");
+        expect(incompatible.body).not.toContain("HTTPS");
+        for (const backend of ["provider", "opencode"] as const) {
+          const transport = describeError("https_required", surface, undefined, now, backend);
+          expect(transport.title).toContain("HTTPS");
+          expect(transport.body).not.toContain("2.x");
+        }
+        expect(describeError("incompatible", surface).body).toContain("2.x");
+      }
+    },
+  );
+
+  it("missing browser access opens Settings for a saved provider", () => {
+    const view = describeError("permission_required", "popup", undefined, now, "provider");
+    expect(view.action).toBe("settings");
+    expect(view.body).toContain("Edit and save this provider in Settings");
+    expect(describeError("permission_required", "popup").action).toBe("connect");
+  });
+
+  it("a missing key says it is missing and opens Settings", () => {
+    expect(describeError("missing_key", "popup", undefined, now, "provider")).toMatchObject({
+      title: "API key required",
+      body: "Enter an API key in Settings and save this provider.",
+      action: "settings",
+    });
   });
 });

@@ -122,7 +122,7 @@ describe("host and key policy", () => {
       () => backend.generate("private text", model),
       () => backend.generateWithMetadata?.("private text", model),
     ]) {
-      await expect(run()).rejects.toMatchObject({ kind: "unauthorized" });
+      await expect(run()).rejects.toMatchObject({ kind: "permission_required" });
     }
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(contains).toHaveBeenCalledWith({ origins: [originPattern(provider.baseUrl)] });
@@ -130,7 +130,7 @@ describe("host and key policy", () => {
     await backend.listModels();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     contains.mockImplementation(async () => false);
-    await expect(backend.listModels()).rejects.toMatchObject({ kind: "unauthorized" });
+    await expect(backend.listModels()).rejects.toMatchObject({ kind: "permission_required" });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
@@ -155,7 +155,7 @@ describe("host and key policy", () => {
       return withConnectionPolicy(record, createProviderBackend(record, fetchImpl));
     });
     await expect((await getBackend()).listModels()).rejects.toMatchObject({
-      kind: "provider_auth",
+      kind: "missing_key",
     });
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(await connectionsStore.getAll()).toEqual([rec]);
@@ -168,7 +168,16 @@ describe("host and key policy", () => {
     const fetchImpl = vi.fn(async () => new Response());
     await expect(
       withConnectionPolicy(rec, createProviderBackend(rec, fetchImpl)).listModels(),
-    ).rejects.toMatchObject({ kind: "incompatible" });
+    ).rejects.toMatchObject({ kind: "https_required" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("blocks LAN HTTP when the platform cannot be determined", async () => {
+    vi.mocked(fakeBrowser.runtime.getPlatformInfo).mockRejectedValue(new Error("unavailable"));
+    const fetchImpl = vi.fn(async () => new Response());
+    await expect(
+      withConnectionPolicy(provider, createProviderBackend(provider, fetchImpl)).listModels(),
+    ).rejects.toMatchObject({ kind: "https_required" });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 

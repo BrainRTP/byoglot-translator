@@ -17,7 +17,7 @@ export type Connection = OpencodeData;
 
 export type TextGeneration = { text: string; truncated?: boolean };
 
-export type BackendErrorKind =
+export type CommonBackendErrorKind =
   | "offline"
   | "unauthorized"
   | "rate_limit"
@@ -27,6 +27,12 @@ export type BackendErrorKind =
   | "incompatible"
   | "no_model"
   | "aborted";
+
+export type BackendErrorKind =
+  | CommonBackendErrorKind
+  | "https_required"
+  | "permission_required"
+  | "missing_key";
 
 export interface TranslationBackend {
   info(signal?: AbortSignal): Promise<ServerInfo>;

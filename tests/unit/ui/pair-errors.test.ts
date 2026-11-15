@@ -19,6 +19,11 @@ describe("pairErrorView", () => {
     expect(pairErrorView("incompatible", "link").kind).toBe("incompatible");
   });
 
+  it("a transport refusal keeps the HTTPS message in both modes", () => {
+    expect(pairErrorView("https_required", "manual").kind).toBe("https_required");
+    expect(pairErrorView("https_required", "link").kind).toBe("https_required");
+  });
+
   it("anything else is an unrecognized link", () => {
     expect(pairErrorView("bad_response", "link").kind).toBe("badLink");
     expect(pairErrorView("provider_error", "manual").kind).toBe("badLink");

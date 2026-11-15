@@ -53,7 +53,15 @@ export function translatorError(result: Extract<SelectionResult, { error: string
       hint: undefined,
     }),
     options:
-      !!result.timeout || ["unauthorized", "provider_auth", "no_model"].includes(result.error),
+      !!result.timeout ||
+      [
+        "unauthorized",
+        "provider_auth",
+        "no_model",
+        "https_required",
+        "permission_required",
+        "missing_key",
+      ].includes(result.error),
   };
 }
 

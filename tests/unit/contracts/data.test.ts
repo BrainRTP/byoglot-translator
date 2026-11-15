@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isFatal } from "../../../lib/opencode/errors";
-import type { BackendErrorKind } from "../../../lib/opencode/types";
+import type { CommonBackendErrorKind } from "../../../lib/opencode/types";
 import { PRESETS } from "../../../lib/provider/presets";
 import { MAX_CONTEXT, MAX_EDITOR_TEXT, MAX_SELECTION } from "../../../lib/selection/trigger";
 import { builtinTemplate } from "../../../lib/settings/defaults";
@@ -22,11 +22,11 @@ const kinds = [
   "incompatible",
   "no_model",
   "aborted",
-] as const satisfies BackendErrorKind[];
+] as const satisfies CommonBackendErrorKind[];
 const allKinds = Object.fromEntries(kinds.map((kind) => [kind, true])) as Record<
   (typeof kinds)[number],
   true
-> satisfies Record<BackendErrorKind, true>;
+> satisfies Record<CommonBackendErrorKind, true>;
 
 describe("contract data", () => {
   checkData("languages.json", {

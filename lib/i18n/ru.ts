@@ -25,8 +25,15 @@ export const ru = {
   "error.offline.title": "opencode не запущен",
   "error.offline": "Запустите сервер в терминале и повторите.",
   "error.unauthorized.title": "Нужен доступ к подключению",
-  "error.unauthorized":
-    "Подключитесь заново в настройках, чтобы разрешить доступ браузера или обновить данные доступа.",
+  "error.unauthorized": "Подключите opencode с верными данными доступа.",
+  "error.https_required.title": "Нужен HTTPS",
+  "error.https_required":
+    "Используйте адрес HTTPS. HTTP доступен только для LAN на компьютере и loopback.",
+  "error.permission_required.title": "Нужен доступ браузера",
+  "error.permission_required":
+    "Подключите opencode заново, чтобы разрешить браузеру доступ к его адресу.",
+  "error.missing_key.title": "Нужен API-ключ",
+  "error.missing_key": "Введите API-ключ в настройках и сохраните провайдера.",
   "error.rate_limit.title": "Лимит провайдера исчерпан",
   "error.rate_limit": "Сброс через {time}. Можно выбрать другую модель в настройках.",
   "error.rate_limit_unknown": "Повторите позже. Можно выбрать другую модель в настройках.",
@@ -314,8 +321,9 @@ export const ru = {
   "provider.offline.title": "Не удается связаться с провайдером",
   "provider.offline": "Проверьте адрес API и сеть, затем повторите.",
   "provider.incompatible.title": "Неожиданный ответ провайдера",
-  "provider.incompatible":
-    "Проверьте адрес API и HTTPS. HTTP доступен только для LAN на компьютере и loopback.",
+  "provider.incompatible": "Сервер не похож на OpenAI-совместимый. Проверьте адрес API.",
+  "provider.permission_required":
+    "Отредактируйте и сохраните провайдера в настройках, чтобы разрешить доступ браузера.",
   "provider.auth.title": "Провайдер отклонил ключ",
   "provider.auth": "Введите или обновите ключ в настройках и повторите.",
   "provider.offlineBody": "Проверьте адрес API и сеть, затем нажмите «Повторить».",

@@ -7,6 +7,7 @@ import {
   normalizeBaseUrl,
   originInUse,
   originOf,
+  originPattern,
   toView,
 } from "../connections/list";
 import type { ConnectionKind, ConnectionRecord, ConnectionView } from "../connections/types";
@@ -390,7 +391,10 @@ export function createHandlers(deps: HandlerDeps) {
   }
 
   async function revokeOrigin(list: ConnectionRecord[], origin: string): Promise<void> {
-    if (isLocalOrigin(origin) || originInUse(list, origin)) return;
+    const pattern = originPattern(origin);
+    // These two grants are required by the manifest and cannot be revoked.
+    if (pattern === "http://localhost/*" || pattern === "http://127.0.0.1/*") return;
+    if (originInUse(list, origin)) return;
     await deps.removeOrigin(origin);
   }
 
@@ -459,8 +463,21 @@ export function createHandlers(deps: HandlerDeps) {
 
   async function saveOpencode(conn: Connection): Promise<Status> {
     const list = await connectionsStore.getAll();
+    const previous = list.find((rec) => rec.kind === "opencode");
     await activate(opencodeRecord(conn, list), list);
+    if (previous) {
+      try {
+        await revokeOrigin(await connectionsStore.getAll(), originOf(previous.url));
+      } catch {}
+    }
     return status({ fresh: true });
+  }
+
+  async function opencodeFailure(url: string, error: unknown): Promise<Status> {
+    try {
+      await revokeOrigin(await connectionsStore.getAll(), originOf(url));
+    } catch {}
+    return errorStatus(url, error, "opencode");
   }
 
   async function saveProvider(
@@ -475,7 +492,7 @@ export function createHandlers(deps: HandlerDeps) {
     let baseUrl: string;
     try {
       const url = new URL(i.baseUrl);
-      if (!validProviderUrl(i.baseUrl, await isAndroid())) throw new Error("scheme");
+      if (!validProviderUrl(i.baseUrl, await isAndroid())) return refuse("https_required");
       origin = url.origin;
       baseUrl = normalizeBaseUrl(i.baseUrl);
     } catch {
@@ -492,7 +509,7 @@ export function createHandlers(deps: HandlerDeps) {
 
     let apiKey = i.apiKey;
     if (apiKey === "" && existing && existingOrigin === origin) apiKey = existing.apiKey;
-    if (!apiKey.trim() && needsKey(i.preset, baseUrl)) return refuse("provider_auth");
+    if (!apiKey.trim() && needsKey(i.preset, baseUrl)) return refuse("missing_key");
 
     const candidate: ConnectionRecord = {
       kind: "provider",
@@ -656,7 +673,7 @@ export function createHandlers(deps: HandlerDeps) {
         try {
           url = parsePairingLink(link).origin;
         } catch {}
-        return errorStatus(url, error, "opencode");
+        return opencodeFailure(url, error);
       }
     },
 
@@ -665,10 +682,10 @@ export function createHandlers(deps: HandlerDeps) {
         const url = new URL(conn.url);
         if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("scheme");
         if (!conn.password.trim() && !isLocalOrigin(conn.url) && !isLanOrigin(conn.url)) {
-          return errorStatus(conn.url, new BackendError("unauthorized"), "opencode");
+          return opencodeFailure(conn.url, new BackendError("unauthorized"));
         }
       } catch {
-        return errorStatus(conn.url, new BackendError("incompatible"), "opencode");
+        return opencodeFailure(conn.url, new BackendError("incompatible"));
       }
       try {
         const list = await connectionsStore.getAll();
@@ -676,7 +693,7 @@ export function createHandlers(deps: HandlerDeps) {
           .createBackend(opencodeRecord(conn, list))
           .info(AbortSignal.timeout(CONNECT_TIMEOUT_MS));
       } catch (error) {
-        return errorStatus(conn.url, error, "opencode");
+        return opencodeFailure(conn.url, error);
       }
       return saveOpencode(conn);
     },
@@ -705,11 +722,12 @@ export function createHandlers(deps: HandlerDeps) {
       resetModels();
       if ((await connectionsStore.getActiveId()) === id) await connectionsStore.setActiveId(null);
       await connectionsStore.setAll(next);
-      if (removed.kind === "provider") {
-        try {
-          await revokeOrigin(next, originOf(removed.baseUrl));
-        } catch {}
-      }
+      try {
+        await revokeOrigin(
+          next,
+          originOf(removed.kind === "provider" ? removed.baseUrl : removed.url),
+        );
+      } catch {}
       return views(next);
     },
 

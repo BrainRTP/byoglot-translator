@@ -460,7 +460,7 @@ pub mod gui {
             let services = self.services.clone();
             let driver = Rc::downgrade(self);
             *self.translation.borrow_mut() = Some(glib::spawn_future_local(async move {
-                let output = services.translate(input).await;
+                let output = services.translate(input, None).await;
                 if let Some(driver) = driver.upgrade()
                     && driver.controller.borrow().accept(generation)
                 {

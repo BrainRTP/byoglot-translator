@@ -87,6 +87,13 @@ impl RequestState {
     pub fn cancel(&mut self) {
         self.active = None;
     }
+    pub fn invalidate_for_edit(&mut self, programmatic: bool) -> bool {
+        if programmatic {
+            return false;
+        }
+        self.cancel();
+        true
+    }
     pub fn finish(&mut self, request: u64) -> bool {
         if self.active != Some(request) {
             return false;
@@ -172,6 +179,17 @@ mod tests {
         let cancelled = state.begin();
         state.cancel();
         assert!(!state.finish(cancelled));
+    }
+    #[test]
+    fn programmatic_picker_refresh_does_not_cancel_or_clear_a_result() {
+        let mut state = RequestState::default();
+        let request = state.begin();
+        assert!(!state.invalidate_for_edit(true));
+        assert!(state.finish(request));
+        assert!(!state.invalidate_for_edit(true));
+        let edited = state.begin();
+        assert!(state.invalidate_for_edit(false));
+        assert!(!state.finish(edited));
     }
     #[test]
     fn builtin_templates_cannot_be_changed_or_deleted() {

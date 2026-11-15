@@ -138,14 +138,17 @@ pub fn build(
     });
     let state = Rc::new(RefCell::new(RequestState::default()));
     let task = Rc::new(RefCell::new(None::<glib::JoinHandle<()>>));
+    let loading = Rc::new(Cell::new(true));
     let invalidate = {
         let state = state.clone();
         let task = task.clone();
         let button = translate.downgrade();
         let result = result.downgrade();
         let copy = copy.downgrade();
-        Rc::new(move || {
-            state.borrow_mut().cancel();
+        Rc::new(move |programmatic| {
+            if !state.borrow_mut().invalidate_for_edit(programmatic) {
+                return;
+            }
             if let Some(task) = task.borrow_mut().take() {
                 task.abort();
             }
@@ -161,15 +164,15 @@ pub fn build(
         })
     };
     let changed = invalidate.clone();
-    input.buffer().connect_changed(move |_| changed());
+    input.buffer().connect_changed(move |_| changed(false));
     for row in [&source, &target, &template] {
         let changed = invalidate.clone();
-        row.connect_selected_notify(move |_| changed());
+        let loading = loading.clone();
+        row.connect_selected_notify(move |_| changed(loading.get()));
     }
     let source_codes = Rc::new(source_codes);
     let target_codes = Rc::new(RefCell::new(target_codes));
     let templates = Rc::new(RefCell::new(Vec::<Template>::new()));
-    let loading = Rc::new(Cell::new(true));
     let template_row = template.downgrade();
     for (row, is_source) in [(source.clone(), true), (target.clone(), false)] {
         let source_codes = source_codes.clone();
@@ -280,20 +283,12 @@ pub fn build(
         copy.set_visible(false);
         button.set_label(tr(Msg::Cancel));
         *running.borrow_mut() = Some(glib::spawn_future_local(async move {
-            let output = match services
-                .change(move |mut s| {
-                    s.globals.source_lang = source;
-                    s
-                })
-                .await
-            {
-                Ok(_) => {
-                    services
-                        .translate(editor_input(text, template_id, request_target))
-                        .await
-                }
-                Err(problem) => Err(problem),
-            };
+            let output = services
+                .translate(
+                    editor_input(text, template_id, request_target),
+                    Some(source),
+                )
+                .await;
             if !state.borrow_mut().finish(request) {
                 return;
             }
@@ -312,7 +307,7 @@ pub fn build(
         }));
     });
     let root = scroll(&content);
-    root.connect_unrealize(move |_| invalidate());
+    root.connect_unrealize(move |_| invalidate(false));
     let weak_source = source.downgrade();
     let weak_target = target.downgrade();
     root.connect_map(move |_| {

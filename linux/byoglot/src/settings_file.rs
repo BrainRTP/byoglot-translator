@@ -36,23 +36,6 @@ impl FileSettingsRepository {
         {
             return Ok(settings);
         }
-        // Keep the original and refuse writes until the user repairs it.
-        let backup = self.path.with_extension("json.bad");
-        let mut options = fs::OpenOptions::new();
-        options.write(true).create_new(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
-        }
-        match options.open(backup) {
-            Ok(mut file) => {
-                file.write_all(&bytes)?;
-                file.sync_all()?;
-            }
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => (),
-            Err(error) => return Err(error),
-        }
         Err(io::Error::new(
             io::ErrorKind::InvalidData,
             "invalid settings or schema version",
@@ -62,6 +45,31 @@ impl FileSettingsRepository {
     pub fn try_read(&self) -> io::Result<AppSettings> {
         let _guard = self.lock.lock().unwrap();
         self.load()
+    }
+
+    pub fn reset_invalid(&self) -> io::Result<PathBuf> {
+        let _guard = self.lock.lock().unwrap();
+        match self.load() {
+            Err(error) if error.kind() == io::ErrorKind::InvalidData => (),
+            Err(error) => return Err(error),
+            Ok(_) => return Err(io::Error::other("settings are not invalid")),
+        }
+        let mut backup = self.path.with_extension("json.bad");
+        let mut number = 0;
+        loop {
+            // A hard link preserves the file without replacing any earlier backup.
+            match fs::hard_link(&self.path, &backup) {
+                Ok(()) => {
+                    fs::remove_file(&self.path)?;
+                    return Ok(backup);
+                }
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+                    number += 1;
+                    backup = self.path.with_extension(format!("json.bad.{number}"));
+                }
+                Err(error) => return Err(error),
+            }
+        }
     }
 
     pub fn try_update(

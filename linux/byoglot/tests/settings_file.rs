@@ -52,9 +52,12 @@ async fn corrupt_or_future_settings_are_preserved_and_cannot_be_overwritten() {
     let path = temp.0.join("settings.json");
     let mut future = AppSettings::initial(None);
     future.schema_version = 2;
+    let mut unknown_enum = serde_json::to_value(AppSettings::initial(None)).unwrap();
+    unknown_enum["templates"][0]["settings"]["displayMode"] = "future-mode".into();
     for bytes in [
         "broken".to_string(),
         serde_json::to_string(&future).unwrap(),
+        unknown_enum.to_string(),
     ] {
         fs::write(&path, &bytes).unwrap();
         let repo = temp.repo();
@@ -62,21 +65,27 @@ async fn corrupt_or_future_settings_are_preserved_and_cannot_be_overwritten() {
         assert!(matches!(
             byoglot::services::Services::new(path.clone(), None, tokio::runtime::Handle::current())
                 .await,
-            Err(byoglot_core::RunnerError::Storage)
+            Err(error) if error.kind() == std::io::ErrorKind::InvalidData
         ));
         assert!(repo.try_update(|s| s).is_err());
         assert_eq!(fs::read_to_string(&path).unwrap(), bytes);
+        let backup = repo.reset_invalid().unwrap();
+        assert_eq!(fs::read_to_string(&backup).unwrap(), bytes);
         assert_eq!(
-            fs::read_to_string(path.with_extension("json.bad")).unwrap(),
-            bytes
+            repo.try_read().unwrap(),
+            AppSettings::initial(Some("ru_RU"))
         );
+        assert!(!path.exists());
         fs::write(&path, "different corruption").unwrap();
         assert!(repo.try_update(|s| s).is_err());
+        let next_backup = repo.reset_invalid().unwrap();
+        assert_ne!(next_backup, backup);
         assert_eq!(
-            fs::read_to_string(path.with_extension("json.bad")).unwrap(),
-            bytes
+            fs::read_to_string(next_backup).unwrap(),
+            "different corruption"
         );
-        fs::remove_file(path.with_extension("json.bad")).unwrap();
+        assert_eq!(fs::read_to_string(backup).unwrap(), bytes);
+        assert!(repo.reset_invalid().is_err());
     }
 }
 

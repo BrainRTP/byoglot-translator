@@ -88,6 +88,28 @@ describe("validateProviderForm", () => {
     expect(validateProviderForm(form, existing)).toEqual({ ok: true });
   });
 
+  it("requires HTTPS on Android except loopback", () => {
+    const form = { ...deepseek, apiKey: "key", baseUrl: "http://192.168.1.5/v1" };
+    expect(validateProviderForm(form)).toEqual({ ok: true });
+    expect(validateProviderForm(form, undefined, true)).toMatchObject({
+      ok: false,
+      field: "baseUrl",
+    });
+    expect(
+      validateProviderForm({ ...form, baseUrl: "http://127.42.1.2/v1" }, undefined, true),
+    ).toEqual({ ok: true });
+    expect(validateProviderForm({ ...form, baseUrl: "http://[::1]/v1" }, undefined, true)).toEqual({
+      ok: true,
+    });
+    expect(
+      validateProviderForm({ ...form, baseUrl: "https://192.168.1.5/v1" }, undefined, true),
+    ).toEqual({ ok: true });
+    expect(validateProviderForm({ ...form, baseUrl: "http://external.example/v1" })).toMatchObject({
+      ok: false,
+      field: "baseUrl",
+    });
+  });
+
   it("rejects non-http urls and garbage", () => {
     expect(validateProviderForm({ ...deepseek, baseUrl: "ftp://x", apiKey: "k" })).toEqual({
       ok: false,

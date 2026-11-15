@@ -285,7 +285,8 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
       box.setAttribute("role", "alert");
       box.append(h(doc, "div", `et ${view.tone}`, view.title), h(doc, "div", undefined, view.body));
       if (view.hint) box.append(h(doc, "div", "mono cmd", view.hint));
-      const settings = view.action === "chooseModel" ? deps.openSettings : undefined;
+      const settings =
+        view.action === "chooseModel" || view.action === "settings" ? deps.openSettings : undefined;
       box.append(
         buttons(
           settings

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import type { ConnectionView, ProviderPreset } from "../connections/types";
   import type { ProviderInput, Status } from "../messaging/protocol";
   import { needsKey } from "../provider/presets";
@@ -6,6 +7,7 @@
   import { describeError } from "./errors";
   import { requestOrigin } from "./host-permission";
   import { tr } from "./i18n.svelte";
+  import { isAndroid } from "./platform";
   import { statusFailure } from "./popup-logic";
 
   const PRESETS: ProviderPreset[] = ["deepseek", "openrouter", "openai", "mistral", "ollama", "lmstudio", "custom"];
@@ -33,13 +35,16 @@
   let denied = $state("");
   let failed = $state<{ title: string; body: string } | null>(null);
   let previous = first;
+  let android = $state(false);
+  let platformKnown = $state(false);
+  onMount(() => { void isAndroid().then((value) => { android = value; platformKnown = true; }); });
 
   const keyRequired = $derived(needsKey(preset, baseUrl));
   const keyHint = $derived(
     existing?.hasKey ? tr("conn.form.keyKeep") : keyRequired ? "" : tr("conn.form.keyOptional"),
   );
 
-  const cleartext = $derived(cleartextSecret(baseUrl, apiKey, existing?.hasKey === true));
+  const cleartext = $derived(!android && cleartextSecret(baseUrl, apiKey, existing?.hasKey === true));
 
   function resetFeedback() {
     invalid = null;
@@ -60,7 +65,7 @@
 
   async function submit(event: Event) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || !platformKnown) return;
     resetFeedback();
     const input: ProviderInput = {
       ...(existing && { id: existing.id }),
@@ -69,7 +74,7 @@
       baseUrl: baseUrl.trim(),
       apiKey: apiKey.trim(),
     };
-    const check = validateProviderForm({ preset, name: input.name, baseUrl: input.baseUrl, apiKey: input.apiKey }, existing);
+    const check = validateProviderForm({ preset, name: input.name, baseUrl: input.baseUrl, apiKey: input.apiKey }, existing, android);
     if (!check.ok) {
       invalid = check.field;
       return;
@@ -153,7 +158,7 @@
   {/if}
 
   <div class="btns">
-    <button class="btn pri" type="submit" disabled={busy}>
+    <button class="btn pri" type="submit" disabled={busy || !platformKnown}>
       {#if busy}<span class="spin"></span>{tr("conn.form.saving")}{:else}{tr("conn.form.save")}{/if}
     </button>
     {#if oncancel}

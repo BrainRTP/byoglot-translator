@@ -1,3 +1,4 @@
+import { normalizeBaseUrl } from "../connections/list";
 import { createOpencodeBackend } from "./backend";
 import { BackendError, fromFetchFailure } from "./errors";
 import { connectSchema } from "./schemas";
@@ -11,7 +12,7 @@ export function parsePairingLink(input: string): { origin: string; code: string 
   const [link, code] = match ?? [];
   if (!link || !code) throw new BackendError("bad_response", { detail: "no pairing link found" });
   try {
-    return { origin: new URL(link).origin, code };
+    return { origin: normalizeBaseUrl(link.slice(0, link.indexOf("/auth/connect/"))), code };
   } catch (error) {
     throw new BackendError("bad_response", { detail: "invalid pairing link", cause: error });
   }

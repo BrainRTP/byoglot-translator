@@ -7,6 +7,7 @@ describe("openTranslator", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("focuses the existing translator tab and its window", async () => {
+    vi.spyOn(fakeBrowser.runtime, "getPlatformInfo").mockResolvedValue({ os: "mac" } as never);
     vi.spyOn(fakeBrowser.tabs, "query").mockResolvedValue([{ id: 17, windowId: 4 }] as never);
     const update = vi.spyOn(fakeBrowser.tabs, "update").mockResolvedValue({} as never);
     const focus = vi.spyOn(fakeBrowser.windows, "update").mockResolvedValue({} as never);

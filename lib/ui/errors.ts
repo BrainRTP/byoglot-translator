@@ -3,7 +3,7 @@ import { formatRetryAfter, type MessageKey, resolveLang, t } from "../i18n";
 import type { SelectionErrorKind } from "../messaging/protocol";
 
 export type ErrorSurface = "popup" | "card";
-export type ErrorAction = "retry" | "chooseModel" | "connect";
+export type ErrorAction = "retry" | "chooseModel" | "connect" | "settings";
 
 export type ErrorPresentation = {
   tone: "er" | "wn";
@@ -18,6 +18,9 @@ export type PresentableKind = Exclude<SelectionErrorKind, "aborted">;
 const TITLES: Record<PresentableKind, MessageKey> = {
   offline: "error.offline.title",
   unauthorized: "error.unauthorized.title",
+  https_required: "error.https_required.title",
+  permission_required: "error.permission_required.title",
+  missing_key: "error.missing_key.title",
   rate_limit: "error.rate_limit.title",
   provider_auth: "error.provider_auth.title",
   provider_error: "error.provider_error.title",
@@ -30,6 +33,9 @@ const TITLES: Record<PresentableKind, MessageKey> = {
 const BODIES: Record<PresentableKind, Record<ErrorSurface, MessageKey>> = {
   offline: { popup: "popup.offlineBody", card: "error.offline" },
   unauthorized: { popup: "error.unauthorized", card: "error.unauthorized" },
+  https_required: { popup: "error.https_required", card: "error.https_required" },
+  permission_required: { popup: "error.permission_required", card: "error.permission_required" },
+  missing_key: { popup: "error.missing_key", card: "error.missing_key" },
   rate_limit: { popup: "popup.rateLimit", card: "error.rate_limit" },
   provider_auth: { popup: "popup.providerAuthBody", card: "error.provider_auth" },
   provider_error: { popup: "error.provider_error", card: "error.provider_error" },
@@ -47,6 +53,9 @@ const HINTS: Partial<Record<PresentableKind, string>> = {
 const ACTIONS: Record<PresentableKind, ErrorAction> = {
   offline: "retry",
   unauthorized: "connect",
+  https_required: "connect",
+  permission_required: "connect",
+  missing_key: "settings",
   rate_limit: "chooseModel",
   provider_auth: "retry",
   provider_error: "retry",
@@ -66,6 +75,10 @@ const PROVIDER_BODIES: Partial<Record<PresentableKind, Record<ErrorSurface, Mess
   offline: { popup: "provider.offlineBody", card: "provider.offline" },
   incompatible: { popup: "provider.incompatible", card: "provider.incompatible" },
   provider_auth: { popup: "provider.auth", card: "provider.auth" },
+  permission_required: {
+    popup: "provider.permission_required",
+    card: "provider.permission_required",
+  },
 };
 
 export function resetClock(timestamp: number): string {
@@ -102,6 +115,9 @@ export function describeError(
     title: source ? `${t(title)} (${source})` : t(title),
     body: kind === "rate_limit" ? rateLimitBody(surface, retryAfterMs, now) : t(bodyKey),
     hint: provider ? undefined : HINTS[kind],
-    action: ACTIONS[kind],
+    action:
+      provider && (kind === "permission_required" || kind === "https_required")
+        ? "settings"
+        : ACTIONS[kind],
   };
 }

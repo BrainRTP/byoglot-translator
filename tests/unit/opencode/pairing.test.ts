@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import { isLanOrigin, isLocalOrigin } from "../../../lib/connections/list";
 import { pair, parsePairingLink } from "../../../lib/opencode/pairing";
+import { validProviderUrl } from "../../../lib/ui/connection-logic";
 
 const code = "gwTw8cvzypk1g0Ltb4ckkA";
 const link = `http://127.0.0.1:49374/auth/connect/${code}`;
@@ -22,6 +24,17 @@ describe("parsePairingLink", () => {
   it("parses a bare link", () => {
     expect(parsePairingLink(link)).toEqual({ origin: "http://127.0.0.1:49374", code });
   });
+
+  it.each(["010.1.2.3", "172.016.0.1", "012.1.2.3", "0x7f.0.0.1", "2130706433", "127.1"])(
+    "keeps %s external through pairing-link parsing",
+    (host) => {
+      const { origin } = parsePairingLink(`http://${host}:49374/auth/connect/${code}`);
+      expect(origin).toBe(`http://${host}:49374`);
+      expect(isLocalOrigin(origin)).toBe(false);
+      expect(isLanOrigin(origin)).toBe(false);
+      expect(validProviderUrl(origin)).toBe(false);
+    },
+  );
 
   it("accepts surrounding whitespace", () => {
     expect(parsePairingLink(`  \n${link}\t\n`)).toEqual({ origin: "http://127.0.0.1:49374", code });

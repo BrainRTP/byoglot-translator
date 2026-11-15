@@ -1,6 +1,6 @@
-import { isLocalOrigin, originOf } from "../connections/list";
+import { isLanOrigin, isLocalOrigin, originOf } from "../connections/list";
 import type { ConnectionView, ProviderPreset } from "../connections/types";
-import { needsKey } from "../provider/presets";
+import { needsKey, PRESETS } from "../provider/presets";
 
 export type ProviderForm = {
   preset: ProviderPreset;
@@ -13,18 +13,30 @@ export type FormValidation =
   | { ok: true }
   | { ok: false; field: "baseUrl" | "apiKey"; reason: "invalid" | "required" };
 
-const PRESETS: Record<ProviderPreset, { baseUrl: string; name: string; needsKey: boolean }> = {
-  deepseek: { baseUrl: "https://api.deepseek.com", name: "DeepSeek", needsKey: true },
-  openrouter: { baseUrl: "https://openrouter.ai/api/v1", name: "OpenRouter", needsKey: true },
-  openai: { baseUrl: "https://api.openai.com/v1", name: "OpenAI", needsKey: true },
-  mistral: { baseUrl: "https://api.mistral.ai/v1", name: "Mistral", needsKey: true },
-  ollama: { baseUrl: "http://localhost:11434/v1", name: "Ollama", needsKey: false },
-  lmstudio: { baseUrl: "http://localhost:1234/v1", name: "LM Studio", needsKey: false },
-  custom: { baseUrl: "", name: "Custom", needsKey: true },
+const NAMES: Record<ProviderPreset, string> = {
+  deepseek: "DeepSeek",
+  openrouter: "OpenRouter",
+  openai: "OpenAI",
+  mistral: "Mistral",
+  ollama: "Ollama",
+  lmstudio: "LM Studio",
+  custom: "Custom",
 };
 
 export function presetDefaults(preset: ProviderPreset) {
-  return { ...PRESETS[preset] };
+  return { ...PRESETS[preset], name: NAMES[preset] };
+}
+
+export function validProviderUrl(baseUrl: string, android = false): boolean {
+  try {
+    const url = new URL(baseUrl.trim());
+    return (
+      url.protocol === "https:" ||
+      (url.protocol === "http:" && (isLocalOrigin(baseUrl) || (!android && isLanOrigin(baseUrl))))
+    );
+  } catch {
+    return false;
+  }
 }
 
 function parseHttpOrigin(baseUrl: string): string | null {
@@ -40,9 +52,12 @@ function parseHttpOrigin(baseUrl: string): string | null {
 export function validateProviderForm(
   form: ProviderForm,
   existing?: ConnectionView,
+  android = false,
 ): FormValidation {
   const origin = parseHttpOrigin(form.baseUrl);
-  if (origin === null) return { ok: false, field: "baseUrl", reason: "invalid" };
+  if (origin === null || !validProviderUrl(form.baseUrl, android)) {
+    return { ok: false, field: "baseUrl", reason: "invalid" };
+  }
   if (form.apiKey.trim() !== "" || !needsKey(form.preset, form.baseUrl)) return { ok: true };
   const keepsKey = existing?.hasKey === true && parseHttpOrigin(existing.url) === origin;
   return keepsKey ? { ok: true } : { ok: false, field: "apiKey", reason: "required" };
@@ -52,7 +67,7 @@ export function cleartextSecret(baseUrl: string, secret: string, hasKey = false)
   if (secret.trim() === "" && !hasKey) return false;
   try {
     const url = new URL(baseUrl.trim());
-    return url.protocol === "http:" && !isLocalOrigin(url.origin);
+    return url.protocol === "http:" && !isLocalOrigin(baseUrl);
   } catch {
     return false;
   }

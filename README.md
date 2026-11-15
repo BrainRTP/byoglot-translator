@@ -33,7 +33,7 @@ Most AI translators either lock you into their own subscription or ask for an AP
 
 ## Requirements
 
-- One of the two: opencode 2.x running as a background service (`opencode service start`; opencode 1.x is not supported), or an API key for an OpenAI-compatible provider. Ollama and LM Studio need no key.
+- One of the two: opencode 2.x running as a background service (`opencode service start`; opencode 1.x is not supported), or an API key for an OpenAI-compatible provider. Ollama and LM Studio need no key on loopback or LAN hosts; external hosts need a key.
 - Chrome, Edge, Brave, Arc or another Chromium browser, or Firefox, with Manifest V3.
 - For development: Node.js 24 or newer and pnpm 12 (via corepack).
 
@@ -59,17 +59,19 @@ A connection page opens on first install. Pick "opencode" or "My provider". You 
 1. Run `opencode pair` in a terminal. It prints a one-time link like `http://127.0.0.1:<port>/auth/connect/<code>`, valid for 5 minutes.
 2. Paste the link (or the whole command output) on the connection page and click "Connect".
 
-Manual mode is for an opencode server you started yourself with a password, on another port of this computer: enter the URL (`http://127.0.0.1:<port>` or `http://localhost:<port>`), username and password. Remote servers are not supported, because the extension's host permissions cover only `127.0.0.1` and `localhost`.
+Manual mode supports opencode on this computer, on a LAN, or at an external HTTPS address. Enter its URL, username and password. The password may be empty only on loopback or LAN; an external host requires a password. LAN and external hosts require browser access permission before any request, including the connection check.
 
 ### My provider
 
 Use this when you have no opencode but have an API key. The extension calls the `chat/completions` and `models` endpoints of an OpenAI-compatible API. Provider redirects are not followed.
 
 1. Choose a preset: DeepSeek, OpenRouter, OpenAI, Mistral, Ollama, LM Studio or Custom URL. The preset fills in the base URL, and you can edit it.
-2. Paste the API key. Ollama and LM Studio do not need one.
+2. Paste the API key. Ollama and LM Studio need no key on loopback or LAN, but need one on external hosts. Custom URL needs a key on LAN and external hosts; other presets always need one.
 3. Click "Save". The extension checks the provider's `/models` list and saves the connection only if the check passes.
 
-When you add a provider, the browser asks for access to that provider's site. The extension does not ask for access to all sites at install time. `localhost` and `127.0.0.1` need no request, so local Ollama and LM Studio work on any port. If you refuse, the connection is not saved. When you delete a provider, the access is released unless another connection uses the same site.
+When you add a provider, the browser asks for access to that provider's site. The extension does not ask for access to all sites at install time. `localhost` and `127.0.0.1` need no request, so local Ollama and LM Studio work on any port. Loopback also includes all of `127.0.0.0/8` and IPv6 `::1`; the browser may ask for access to addresses outside the install-time grants. LAN hosts require browser permission, including for `/models` and key checks. If you refuse, the connection is not saved. When you delete a connection or replace the opencode address, its optional access is released unless another saved connection uses the same site. A failed opencode connection attempt also releases unused access, including access granted before a local policy refusal.
+
+LAN means `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, names ending in `.local`, and IPv6 `fc00::/7` or `fe80::/10`. IPv4 literals must use four decimal octets without leading zeros; short, octal, hexadecimal and integer forms count as external hosts. Desktop connections allow HTTP only for loopback and LAN. Firefox Android provider addresses require HTTPS, except loopback; the same restriction applies when platform detection fails. Saved connections are never deleted by this policy: a missing key, missing browser permission or disallowed transport blocks requests before anything is sent, with a separate message for each cause. Edit and save a provider in Settings to supply its key or grant access; the recovery button opens Settings. Reconnect opencode to update its password or access. Portable imports contain no keys or permission grants and follow the same request checks.
 
 The key is stored unencrypted in the extension's `storage.local`, like the opencode token. It never reaches web pages or content scripts, and the settings page does not show it back: leave the field empty when editing to keep the old key. If you change the base URL to another site, enter the key again.
 

@@ -55,11 +55,13 @@ public class ExportTests
     {
         var file = ExportFile.Decode(Sample);
         var study = file.Templates.Single(t => t.Id == "study");
-        file = file with { Templates = [.. file.Templates, study with { Id = "unknown", Settings = study.Settings with { PageModel = new("custom", "bad", ConnectionId: "missing"), SelectionModel = new("custom", "bad", ConnectionId: "missing") } }] };
+        file = file with { Templates = [.. file.Templates, study with { Id = "unknown", Builtin = true, Settings = study.Settings with { PageModel = new("custom", "bad", ConnectionId: "missing"), SelectionModel = new("custom", "bad", ConnectionId: "missing") } }] };
         var existing = new Connection("c1", ProviderPreset.Custom, "keep", "http://localhost");
         var into = AppSettings.Initial("en") with { Connections = [existing], ProfileOverrides = new Dictionary<string, ProfileOverride> { ["ru"] = new("old", "old", 0) }, SiteRules = [new("r1", "old", "old")] };
         var merged = SettingsLogic.Merge(file, into);
         Assert.Single(merged.Templates, t => t.Id == Contracts.BuiltinTemplate.Id);
+        Assert.Single(merged.Templates, t => t.Builtin);
+        Assert.False(merged.Templates.Single(t => t.Id == "unknown").Builtin);
         Assert.Null(merged.Templates.Single(t => t.Id == "unknown").Settings.PageModel);
         Assert.Null(merged.Templates.Single(t => t.Id == "unknown").Settings.SelectionModel);
         Assert.Equal(existing, Assert.Single(merged.Connections));

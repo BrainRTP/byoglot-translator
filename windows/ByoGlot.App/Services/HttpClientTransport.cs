@@ -24,7 +24,7 @@ public sealed class HttpClientTransport : IHttpTransport, IDisposable
                     if (!message.Headers.TryAddWithoutValidation(header.Key, header.Value)) message.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value);
                 using var response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);
                 var status = (int)response.StatusCode;
-                if (status is 301 or 302 or 303 or 307 or 308 && response.Headers.Location is { } location && redirects < 5)
+                if (status is 301 or 302 or 307 or 308 && response.Headers.Location is { } location && redirects < 5)
                 {
                     var target = new Uri(new Uri(url), location).AbsoluteUri;
                     // A different origin has never received consent for this request.

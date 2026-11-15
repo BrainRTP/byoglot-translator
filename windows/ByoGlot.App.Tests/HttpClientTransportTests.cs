@@ -81,6 +81,14 @@ public sealed class HttpClientTransportTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
         context.Response.Abort();
     }
+    [Fact] public async Task ASeeOtherRedirectNeverReplaysThePost()
+    {
+        using var server = new Server();
+        using var transport = new HttpClientTransport();
+        var pending = transport.SendAsync(Request(server.Url), TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await Reply(await server.Accept(), 303, location: server.Url + "next");
+        Assert.Equal(303, (await pending).Status);
+    }
     [Fact] public async Task TimesOut()
     {
         using var server = new Server();

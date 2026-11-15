@@ -20,6 +20,7 @@ public class ContractsTests
     {
         Assert.Equal(4000, Contracts.Limits.MaxChars);
         Assert.Equal(180000, Contracts.Limits.GenerateTimeoutMs);
+        Assert.Equal(JsonNode.Parse(File.ReadAllText(Path.Combine(ContractsFolder.Dir, "limits.json")))!["maxSelection"]!.GetValue<int>(), InputLimits.Quick);
         Assert.Equal("https://api.deepseek.com", Contracts.Presets[ProviderPreset.Deepseek].BaseUrl);
         var presets = JsonNode.Parse(File.ReadAllText(Path.Combine(ContractsFolder.Dir, "presets.json")))!;
         TestJson.Equal(presets["favoriteModel"], Contracts.FavoriteModel);

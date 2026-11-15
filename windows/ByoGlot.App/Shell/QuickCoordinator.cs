@@ -41,7 +41,11 @@ public sealed class QuickCoordinator
         if (id != nextRequest) return;
         template = selected;
         appName = "";
-        Apply(new QuickEvent.Clipboard(ClipboardAccess.Read(InputLimits.Quick), id));
+        using var cancellation = new CancellationTokenSource();
+        ClipboardRead value;
+        try { value = await ClipboardThread.Run<ClipboardRead>(() => ClipboardAccess.Read(InputLimits.Quick), new ClipboardRead.Empty(), cancellation.Token).WaitAsync(TimeSpan.FromMilliseconds(ClipboardCopy.OperationTimeoutMs)); }
+        catch (TimeoutException) { cancellation.Cancel(); value = new ClipboardRead.Empty(); }
+        if (id == nextRequest) Apply(new QuickEvent.Clipboard(value, id));
     }
     public void Dismiss() { Begin(); Apply(new QuickEvent.Dismissed()); }
     private void Apply(QuickEvent action)
@@ -60,7 +64,7 @@ public sealed class QuickCoordinator
         }
         catch (OperationCanceledException) { }
         catch (RunnerException error) { if (id == nextRequest) Apply(new QuickEvent.FailedWith(error.Error, id)); }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { if (id == nextRequest) Apply(new QuickEvent.FailedWith(new RunnerError.Backend(new BackendException(ErrorKind.Offline)), id)); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { if (id == nextRequest) Apply(new QuickEvent.FailedWith(new RunnerError.Storage(), id)); }
         finally { if (id == nextRequest) pending = null; }
     }
 }

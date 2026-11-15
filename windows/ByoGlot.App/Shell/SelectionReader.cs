@@ -39,10 +39,11 @@ public sealed class SelectionReader(Func<bool> fallbackAllowed, ClipboardListene
         var thread = new Thread(() =>
         {
             IUIAutomation? automation = null; IUIAutomationElement? element = null; IUIAutomationTextPattern? pattern = null; IUIAutomationTextRangeArray? ranges = null;
-            bool initialized;
-            unsafe { initialized = PInvoke.CoInitializeEx(null, COINIT.COINIT_APARTMENTTHREADED).Succeeded; }
+            var initialized = false;
             try
             {
+                unsafe { initialized = PInvoke.CoInitializeEx(null, COINIT.COINIT_APARTMENTTHREADED).Succeeded; }
+                if (!initialized) { completion.TrySetResult((null, false, false)); return; }
                 automation = (IUIAutomation)new CUIAutomation();
                 element = automation.GetFocusedElement();
                 if (element.CurrentIsPassword) { completion.TrySetResult((null, true, true)); return; }
@@ -66,11 +67,14 @@ public sealed class SelectionReader(Func<bool> fallbackAllowed, ClipboardListene
                 }
                 completion.TrySetResult((text.ToString(), false, true));
             }
-            catch (COMException) { completion.TrySetResult((null, false, false)); }
+            catch (Exception) { completion.TrySetResult((null, false, false)); }
             finally
             {
-                foreach (var value in new object?[] { ranges, pattern, element, automation }) if (value is not null) Marshal.ReleaseComObject(value);
-                if (initialized) PInvoke.CoUninitialize();
+                foreach (var value in new object?[] { ranges, pattern, element, automation })
+                    try { if (value is not null) Marshal.ReleaseComObject(value); }
+                    catch (Exception) { }
+                try { if (initialized) PInvoke.CoUninitialize(); }
+                catch (Exception) { }
                 AutomationGate.Release();
             }
         }) { IsBackground = true, Name = "ByoGlot selection" };

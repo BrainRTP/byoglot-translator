@@ -43,6 +43,45 @@ public sealed class MainStateTests
         Assert.IsType<TranslatePhase.Idle>(state.Phase);
     }
     [Fact] public async Task TheBuiltinTemplateCannotBeDeleted() => await Assert.ThrowsAsync<InvalidOperationException>(() => State(new()).DeleteTemplateAsync(Contracts.BuiltinTemplate.Id));
+    [Fact] public async Task CancelClearsACompletedResult()
+    {
+        var state = State(new());
+        await state.TranslateAsync("hello", null);
+        Assert.IsType<TranslatePhase.Done>(state.Phase);
+        state.Cancel();
+        Assert.IsType<TranslatePhase.Idle>(state.Phase);
+    }
+    [Theory]
+    [InlineData("io")]
+    [InlineData("access")]
+    [InlineData("unexpected")]
+    public async Task SettingsFailuresLeaveWorkingWithoutRepeatingARequest(string kind)
+    {
+        Exception error = kind switch { "io" => new IOException(), "access" => new UnauthorizedAccessException(), _ => new InvalidOperationException() };
+        var transport = new RecordingTransport();
+        var state = State(transport, new UnavailableSettings(error));
+        await state.TranslateAsync("hello", null);
+        var failed = Assert.IsType<TranslatePhase.Failed>(state.Phase);
+        if (kind != "unexpected") Assert.IsType<RunnerError.Storage>(failed.Error);
+        Assert.Empty(transport.Calls);
+    }
+    [Fact] public async Task ACancelledRequestCannotReplaceANewerResultWithAStorageFailure()
+    {
+        var first = new TaskCompletionSource<HttpResponseData>();
+        var calls = 0;
+        var state = State(new RecordingTransport { Handler = (_, _) => ++calls == 1 ? first.Task : Task.FromResult(RecordingTransport.JsonResponse("{\"choices\":[{\"message\":{\"content\":\"second\"}}]}")) });
+        var pending = state.TranslateAsync("first", null);
+        state.Cancel();
+        await state.TranslateAsync("second", null);
+        first.SetException(new IOException());
+        await pending;
+        Assert.Equal("second", Assert.IsType<TranslatePhase.Done>(state.Phase).Output.Text);
+    }
+    private sealed class UnavailableSettings(Exception error) : ISettingsRepository
+    {
+        public Task<AppSettings> ReadAsync() => throw error;
+        public Task<AppSettings> UpdateAsync(Func<AppSettings, AppSettings> change) => throw error;
+    }
     [Fact] public async Task ThePickerTargetWinsAfterChoosingATemplate()
     {
         var template = new Template("german", "German", false, new(TargetLang: "de"));

@@ -40,7 +40,7 @@ public partial class App : Application
             (Strings.Get("Quit"), Quit)
         });
         Main.AppWindow.Closing += (_, args) => { args.Cancel = true; Main.AppWindow.Hide(); };
-        Main.Activate();
+        if (AppInstance.GetCurrent().GetActivatedEventArgs().Kind != ExtendedActivationKind.StartupTask) Main.Activate();
     }
     private async Task CaptureAsync(bool selection)
     {

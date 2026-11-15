@@ -8,6 +8,7 @@ public abstract record RunnerError
     public sealed record ConsentNeeded(string Origin) : RunnerError;
     public sealed record TooLong(int Limit) : RunnerError;
     public sealed record Empty : RunnerError;
+    public sealed record Storage : RunnerError;
     public sealed record Backend(BackendException Error) : RunnerError;
 }
 public sealed class RunnerException(RunnerError error) : Exception

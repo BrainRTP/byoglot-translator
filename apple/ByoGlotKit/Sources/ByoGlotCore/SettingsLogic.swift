@@ -14,6 +14,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var profileOverrides: [String: ProfileOverride]
     public var siteRules: [SiteRule]
     public var connections: [Connection]
+    private var unknownConnections: [JSONValue] = []
     public var activeConnectionId: String?
     public var consentedOrigins: [String]
     public var theme: ThemeChoice
@@ -51,6 +52,8 @@ public struct AppSettings: Codable, Hashable, Sendable {
         case schemaVersion, revision, globals, templates, profileOverrides, siteRules, connections, activeConnectionId, consentedOrigins, theme, resultAnimation, autoTranslate, mainModel, externalModel, fallbackModel
     }
 
+    private enum ConnectionCodingKeys: CodingKey { case preset }
+
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
@@ -59,15 +62,46 @@ public struct AppSettings: Codable, Hashable, Sendable {
         templates = try c.decode([Template].self, forKey: .templates)
         profileOverrides = try c.decodeIfPresent([String: ProfileOverride].self, forKey: .profileOverrides) ?? [:]
         siteRules = try c.decodeIfPresent([SiteRule].self, forKey: .siteRules) ?? []
-        connections = try c.decodeIfPresent([Connection].self, forKey: .connections) ?? []
+        connections = []
+        if c.contains(.connections), try !c.decodeNil(forKey: .connections) {
+            var entries = try c.nestedUnkeyedContainer(forKey: .connections)
+            while !entries.isAtEnd {
+                let entry = try entries.superDecoder()
+                let fields = try entry.container(keyedBy: ConnectionCodingKeys.self)
+                let preset = try fields.decode(String.self, forKey: .preset)
+                if ProviderPreset(rawValue: preset) != nil { connections.append(try Connection(from: entry)) }
+                else { unknownConnections.append(try JSONValue(from: entry)) }
+            }
+        }
         activeConnectionId = try c.decodeIfPresent(String.self, forKey: .activeConnectionId)
         consentedOrigins = try c.decodeIfPresent([String].self, forKey: .consentedOrigins) ?? []
-        theme = try c.decodeIfPresent(ThemeChoice.self, forKey: .theme) ?? .system
+        theme = ThemeChoice(rawValue: try c.decodeIfPresent(String.self, forKey: .theme) ?? "system") ?? .system
         resultAnimation = ResultAnimation(rawValue: try c.decodeIfPresent(String.self, forKey: .resultAnimation) ?? "fade") ?? .fade
         autoTranslate = try c.decodeIfPresent(Bool.self, forKey: .autoTranslate) ?? true
         mainModel = try c.decodeIfPresent(ModelRef.self, forKey: .mainModel)
         externalModel = try c.decodeIfPresent(ModelRef.self, forKey: .externalModel)
         fallbackModel = try c.decodeIfPresent(ModelRef.self, forKey: .fallbackModel)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(schemaVersion, forKey: .schemaVersion)
+        try c.encode(revision, forKey: .revision)
+        try c.encode(globals, forKey: .globals)
+        try c.encode(templates, forKey: .templates)
+        try c.encode(profileOverrides, forKey: .profileOverrides)
+        try c.encode(siteRules, forKey: .siteRules)
+        var entries = c.nestedUnkeyedContainer(forKey: .connections)
+        for connection in connections { try entries.encode(connection) }
+        for connection in unknownConnections { try entries.encode(connection) }
+        try c.encodeIfPresent(activeConnectionId, forKey: .activeConnectionId)
+        try c.encode(consentedOrigins, forKey: .consentedOrigins)
+        try c.encode(theme, forKey: .theme)
+        try c.encode(resultAnimation, forKey: .resultAnimation)
+        try c.encode(autoTranslate, forKey: .autoTranslate)
+        try c.encodeIfPresent(mainModel, forKey: .mainModel)
+        try c.encodeIfPresent(externalModel, forKey: .externalModel)
+        try c.encodeIfPresent(fallbackModel, forKey: .fallbackModel)
     }
 }
 

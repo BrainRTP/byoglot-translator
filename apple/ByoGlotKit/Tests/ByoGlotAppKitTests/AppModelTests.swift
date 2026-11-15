@@ -19,7 +19,7 @@ private actor ModelStream {
         let output = RunnerOutput(text: text, sourceLang: input.sourceLang ?? "auto", targetLang: input.targetLang ?? "en", model: input.model ?? ModelRef(providerID: "custom", id: "model"), detectedSourceLang: detected)
         continuations[input.requestId]?.yield(RunnerStreamOutput(requestId: chunkId ?? input.requestId, output: output, complete: complete, incomplete: false, finishReason: complete ? "stop" : nil, usage: nil, delivery: delivery))
     }
-    func fail(_ index: Int) { continuations[inputs[index].requestId]?.finish(throwing: RunnerError.backend(BackendError(kind: .providerError, status: 503))) }
+    func fail(_ index: Int, error: RunnerError = .backend(BackendError(kind: .providerError, status: 503))) { continuations[inputs[index].requestId]?.finish(throwing: error) }
     var count: Int { inputs.count }
 }
 
@@ -127,7 +127,7 @@ private actor ModelStream {
     await model.updateSettings { $0.theme = .dark; $0.externalModel = ModelRef(providerID: "custom", id: "other", connectionId: "c1") }
     if let pinned = model.model { model.chooseModel(pinned) }
     await model.updateSettings { state in state.mainModel = ModelRef(providerID: "custom", id: "model", variant: "none", connectionId: "c1") }
-    await model.setDefaultModel(connectionId: "c1", model: ModelRef(providerID: "custom", id: "another-default", connectionId: "c1"))
+    await model.setDefaultModel(connectionId: "c1", model: ModelInfo(providerID: "custom", id: "another-default", name: "Another", variants: ["none", "high"], contextLimit: 0, outputLimit: 0))
     await model.updateSettings { state in
         state.connections[0].name = "Renamed provider"
         state.profileOverrides["unused"] = ProfileOverride(text: "Unused instructions", base: "", savedAt: 1)
@@ -300,6 +300,88 @@ private actor ModelStream {
     try await Task.sleep(for: .milliseconds(60))
     #expect(await stream.count == 2)
     model.stop()
+}
+
+@MainActor @Test(arguments: [RunnerError.interrupted, .backend(BackendError(kind: .rateLimit, status: 429)), .backend(BackendError(kind: .offline))])
+func foregroundDoesNotRepeatStoppedOrFailedRequests(_ error: RunnerError) async throws {
+    let f = AppFixture(); let stream = ModelStream()
+    let model = try await makeModel(f, stream, auto: true, delay: .milliseconds(20))
+    model.edit("Hello", pasted: true)
+    try await eventually { await stream.count == 1 }
+    if error == .interrupted { model.stop() }
+    else { await stream.fail(0, error: error); try await eventually { model.error != nil } }
+    model.sceneChanged(.inactive)
+    model.sceneChanged(.active)
+    await model.refresh()
+    try await Task.sleep(for: .milliseconds(60))
+    #expect(await stream.count == 1)
+    #expect(model.error == error && !model.running)
+}
+
+@MainActor @Test func stopAfterBackgroundExpirationCancelsTheForegroundRetry() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let background = FakeBackgroundTask()
+    let model = try await makeModel(f, stream, auto: true, delay: .milliseconds(20), backgroundTask: background)
+    model.edit("Hello", pasted: true)
+    try await eventually { await stream.count == 1 }
+    model.sceneChanged(.background)
+    background.expire()
+    model.stop()
+    model.sceneChanged(.active)
+    try await Task.sleep(for: .milliseconds(60))
+    #expect(await stream.count == 1 && !background.active)
+}
+
+@MainActor @Test func refreshWhileChoosingAModelDoesNotRepeatTheRequest() async throws {
+    let f = AppFixture(); let stream = ModelStream()
+    let model = try await makeModel(f, stream, auto: true, delay: .milliseconds(20))
+    let descriptor = open(f.directory.appending(path: "settings.lock").path, O_RDWR)
+    #expect(descriptor >= 0)
+    defer { close(descriptor) }
+    #expect(flock(descriptor, LOCK_EX) == 0)
+    let refresh = Task { await model.refresh() }
+    try await Task.sleep(for: .milliseconds(30))
+    model.edit("Hello")
+    let chosen = ModelRef(providerID: "custom", id: "second", connectionId: "c1")
+    model.chooseModel(chosen)
+    try await eventually { await stream.count == 1 }
+    #expect(flock(descriptor, LOCK_UN) == 0)
+    await refresh.value
+    try await Task.sleep(for: .milliseconds(60))
+    #expect(model.running && model.model == chosen)
+    #expect(await stream.count == 1)
+    await stream.emit(0, text: "done", complete: true)
+    try await eventually { model.complete }
+    model.stop()
+}
+
+@MainActor @Test func defaultModelKeepsTheSelectionEffortFromItsCapabilities() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    for variants in [["none", "high"], ["none"]] {
+        let info = ModelInfo(providerID: "custom", id: "chosen", name: "Chosen", variants: variants, contextLimit: 0, outputLimit: 0)
+        await model.setDefaultModel(connectionId: "c1", model: info)
+        let connection = try #require(try await f.settings.read().connections.first)
+        #expect(connection.pageModel == ModelRef(providerID: "custom", id: "chosen", variant: "none", connectionId: "c1"))
+        #expect(connection.selectionModel?.variant == (variants.contains("high") ? "high" : "none"))
+    }
+}
+
+@MainActor @Test func swapDoesNotOverwriteTextEditedDuringTheSettingsWrite() async throws {
+    let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
+    model.edit("Hello"); model.translate()
+    try await eventually { await stream.count == 1 }
+    await stream.emit(0, text: "Hallo", complete: true, detected: "en")
+    try await eventually { model.complete }
+    let descriptor = open(f.directory.appending(path: "settings.lock").path, O_RDWR)
+    #expect(descriptor >= 0)
+    defer { close(descriptor) }
+    #expect(flock(descriptor, LOCK_EX) == 0)
+    let swap = Task { await model.swap() }
+    try await eventually { model.sourceLang == "ru" }
+    model.edit("New input")
+    #expect(flock(descriptor, LOCK_UN) == 0)
+    #expect(await swap.value == nil)
+    #expect(model.inputText == "New input" && model.result.isEmpty)
+    #expect(await stream.count == 1)
 }
 
 @MainActor @Test func parameterTemplateUpdateWritesOnlyEditedFieldsAndNeverThePrompt() async throws {

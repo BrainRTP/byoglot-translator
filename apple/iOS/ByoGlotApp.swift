@@ -63,8 +63,6 @@ private struct RootView: View {
             .task {
                 await model.refresh()
                 if model.loaded && model.settings.connections.isEmpty { showSettings(.providers) }
-                else if tab == "providers" { showSettings(.providers) }
-                else if tab == "templates" { showSettings(.templates) }
                 network.start(model: model)
             }
             .onChange(of: phase) { _, value in

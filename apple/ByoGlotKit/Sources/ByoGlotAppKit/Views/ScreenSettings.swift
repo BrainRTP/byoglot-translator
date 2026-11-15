@@ -151,8 +151,8 @@ public struct ScreenModelSettings: View {
 public struct ScreenLanguagePrompt: View {
     @Bindable var model: AppModel
     @Environment(\.dismiss) private var dismiss
-    @SceneStorage("prompt.id") private var draftID = ""
-    @SceneStorage("prompt.draft") private var draft = ""
+    @State private var draftID = ""
+    @State private var draft = ""
     @SceneStorage("prompt.profileSheet") private var profiles = false
     @State private var resetting = false
     @State private var discarding = false

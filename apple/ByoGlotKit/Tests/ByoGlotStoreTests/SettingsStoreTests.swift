@@ -49,6 +49,77 @@ struct SettingsStoreTests {
         #expect(next.consentedOrigins == changed.consentedOrigins)
     }
 
+    @Test func futureThemeAndPresetDoNotHideKnownSettings() async throws {
+        let directory = directory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = SettingsStore(directory: directory)
+        let original = try await store.read()
+        var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as? [String: Any])
+        object["theme"] = "future-theme"
+        let known: [String: Any] = ["id": "known", "preset": "custom", "name": "Known", "baseUrl": "https://provider.example/v1"]
+        let future: [String: Any] = ["id": "future", "preset": "future-provider", "name": "Future", "baseUrl": "https://future.example/v1", "selectionModel": ["providerID": "future-provider", "id": "model", "connectionId": "future"], "metadata": ["enabled": true, "values": [1, NSNull(), "keep"]]]
+        let another = ["preset": "another-provider"]
+        object["connections"] = [future, known, another]
+        object["activeConnectionId"] = "future"
+        object["consentedOrigins"] = ["https://future.example"]
+        object["externalModel"] = future["selectionModel"]
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let file = directory.appending(path: "settings.json")
+        try data.write(to: file)
+        let loaded = try await store.read()
+        #expect(loaded.theme == .system)
+        #expect(loaded.connections == [Connection(id: "known", preset: .custom, name: "Known", baseUrl: "https://provider.example/v1")])
+        #expect(loaded.templates == original.templates && loaded.globals == original.globals)
+        #expect(try Data(contentsOf: file) == data)
+        #expect(SettingsLogic.bindModel(try #require(loaded.externalModel), settings: loaded) == nil)
+        _ = try await store.update { $0.theme = .dark }
+        let changed = try await store.update { $0.globals.targetLang = "de" }
+        #expect(try await SettingsStore(directory: directory).read() == changed)
+        #expect(changed.theme == .dark && changed.globals.targetLang == "de")
+        #expect(changed.connections == loaded.connections)
+        #expect(changed.activeConnectionId == loaded.activeConnectionId)
+        #expect(changed.consentedOrigins == loaded.consentedOrigins)
+        #expect(changed.externalModel == loaded.externalModel)
+        let persisted = try JSONDecoder().decode([String: JSONValue].self, from: Data(contentsOf: file))
+        let records = try JSONDecoder().decode([JSONValue].self, from: JSONSerialization.data(withJSONObject: [known, future, another]))
+        #expect(persisted["connections"] == .array(records))
+        var malformed = known
+        malformed["baseUrl"] = 42
+        object["connections"] = [malformed]
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(AppSettings.self, from: JSONSerialization.data(withJSONObject: object)) }
+        object["connections"] = [known]
+        object["theme"] = 42
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(AppSettings.self, from: JSONSerialization.data(withJSONObject: object)) }
+    }
+
+    @Test(arguments: ["future-display-mode", "replace", "bilingual"])
+    func templateDisplayModesDoNotHideOtherSettings(_ mode: String) async throws {
+        let directory = directory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = SettingsStore(directory: directory)
+        var original = try await store.read()
+        original.templates.append(Template(id: "custom", name: "Custom", builtin: false, settings: TemplateSettings(prePrompt: "Keep", targetLang: "de", visibleOnly: false)))
+        var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as? [String: Any])
+        var templates = try #require(object["templates"] as? [[String: Any]])
+        var settings = try #require(templates[1]["settings"] as? [String: Any])
+        settings["displayMode"] = mode
+        templates[1]["settings"] = settings
+        object["templates"] = templates
+        try JSONSerialization.data(withJSONObject: object).write(to: directory.appending(path: "settings.json"))
+        var expected = original
+        expected.templates[1].settings.displayMode = DisplayMode(rawValue: mode)
+        #expect(try await store.read() == expected)
+        let changed = try await store.update { $0.theme = .dark }
+        expected.theme = .dark
+        expected.revision += 1
+        #expect(changed == expected)
+        #expect(try await SettingsStore(directory: directory).read() == expected)
+        settings["displayMode"] = 42
+        templates[1]["settings"] = settings
+        object["templates"] = templates
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(AppSettings.self, from: JSONSerialization.data(withJSONObject: object)) }
+    }
+
     @Test func twoStoresOnOneDirectoryDoNotLoseUpdates() async throws {
         let directory = directory()
         defer { try? FileManager.default.removeItem(at: directory) }

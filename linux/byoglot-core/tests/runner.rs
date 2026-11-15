@@ -107,27 +107,42 @@ async fn no_model_precedes_consent_and_key_checks() {
     assert_eq!(run(s, None, input()).await.0, Err(RunnerError::NoModel));
 }
 #[tokio::test]
-async fn remote_origin_needs_consent_and_local_origin_does_not() {
-    let mut s = settings();
-    s.consented_origins.clear();
-    assert_eq!(
-        run(s.clone(), None, input()).await.0,
-        Err(RunnerError::ConsentNeeded {
-            origin: "https://api.deepseek.com".into()
-        })
-    );
-    s.connections[0].preset = ProviderPreset::Custom;
-    s.connections[0].base_url = "http://192.168.1.2/v1".into();
-    assert_eq!(
-        run(s.clone(), None, input()).await.0,
-        Err(RunnerError::KeyMissing)
-    );
-    assert!(
-        run(s, Some(("key", "http://192.168.1.2")), input())
-            .await
-            .0
-            .is_ok()
-    );
+async fn only_loopback_skips_consent() {
+    for (base_url, needs_consent) in [
+        ("http://localhost/v1", false),
+        ("http://127.0.0.1/v1", false),
+        ("http://127.0.0.2/v1", false),
+        ("http://[::1]/v1", false),
+        ("http://192.168.1.2/v1", true),
+        ("http://box.local/v1", true),
+        ("http://[fd00::1]/v1", true),
+        ("https://example.com/v1", true),
+    ] {
+        let mut s = settings();
+        s.consented_origins.clear();
+        s.connections[0].preset = ProviderPreset::Ollama;
+        s.connections[0].base_url = base_url.into();
+        let origin = origin_of(base_url).unwrap();
+        let (result, transport) = run(s.clone(), None, input()).await;
+        if needs_consent {
+            assert_eq!(
+                result,
+                Err(RunnerError::ConsentNeeded {
+                    origin: origin.clone()
+                })
+            );
+            assert!(transport.requests.lock().unwrap().is_empty());
+            s.consented_origins.push(origin.clone());
+            if needs_key(ProviderPreset::Ollama, base_url) {
+                let (result, transport) = run(s.clone(), None, input()).await;
+                assert_eq!(result, Err(RunnerError::KeyMissing));
+                assert!(transport.requests.lock().unwrap().is_empty());
+            }
+            assert!(run(s, Some(("key", &origin)), input()).await.0.is_ok());
+        } else {
+            assert!(result.is_ok(), "{base_url}");
+        }
+    }
 }
 #[tokio::test]
 async fn missing_or_wrong_origin_key_is_rejected() {

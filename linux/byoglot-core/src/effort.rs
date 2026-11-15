@@ -1,6 +1,6 @@
-use crate::{ProviderPreset, contracts};
+use crate::ProviderPreset;
 use serde_json::{Map, Value, json};
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 pub fn effort_variants(
     preset: ProviderPreset,
@@ -34,12 +34,16 @@ pub fn effort_params(preset: ProviderPreset, variant: Option<&str>) -> Map<Strin
     }
 }
 pub fn needs_key(preset: ProviderPreset, base_url: &str) -> bool {
-    if preset == ProviderPreset::Custom
-        && endpoint(base_url).is_some_and(|url| url.host == "localhost" || url.host == "127.0.0.1")
-    {
-        return false;
+    let Some(url) = endpoint(base_url) else {
+        return true;
+    };
+    match preset {
+        ProviderPreset::Custom => !is_loopback_host(&url.host),
+        ProviderPreset::Ollama | ProviderPreset::Lmstudio => {
+            !(is_loopback_host(&url.host) || is_lan_host(&url.host))
+        }
+        _ => true,
     }
-    contracts::presets()[&preset].needs_key
 }
 
 pub(crate) struct Endpoint {
@@ -119,26 +123,34 @@ pub(crate) fn permitted_endpoint(url: &str) -> Option<Endpoint> {
 pub fn origin_of(base_url: &str) -> Option<String> {
     endpoint(base_url).map(|url| url.origin)
 }
-pub(crate) fn local_origin(url: &str) -> bool {
-    endpoint(url).is_some_and(|url| is_local_host(&url.host))
+pub fn is_loopback_origin(url: &str) -> bool {
+    endpoint(url).is_some_and(|url| is_loopback_host(&url.host))
+}
+pub fn is_loopback_host(host: &str) -> bool {
+    let host = host.trim_start_matches('[').trim_end_matches(']');
+    host.eq_ignore_ascii_case("localhost")
+        || host.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback())
 }
 pub fn is_local_host(host: &str) -> bool {
+    let host = host.trim_end_matches('.');
+    is_loopback_host(host) || is_lan_host(host)
+}
+pub fn is_lan_host(host: &str) -> bool {
     let host = host
         .trim_start_matches('[')
         .trim_end_matches(']')
         .trim_end_matches('.')
         .to_ascii_lowercase();
-    if host == "localhost" || host.ends_with(".local") {
+    if host.ends_with(".local") {
         return true;
     }
     if let Ok(ip) = host.parse::<Ipv6Addr>() {
         let first = ip.segments()[0];
-        return ip == Ipv6Addr::LOCALHOST || first & 0xfe00 == 0xfc00 || first & 0xffc0 == 0xfe80;
+        return first & 0xfe00 == 0xfc00 || first & 0xffc0 == 0xfe80;
     }
     if let Ok(ip) = host.parse::<Ipv4Addr>() {
         let [a, b, _, _] = ip.octets();
-        return a == 127
-            || a == 10
+        return a == 10
             || (a == 172 && (16..=31).contains(&b))
             || (a == 192 && b == 168)
             || (a == 169 && b == 254);

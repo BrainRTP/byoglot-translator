@@ -4,6 +4,24 @@ import Testing
 
 struct HTTPDestinationPolicyTests {
     @Test(arguments: [
+        "010.1.2.3", "010.0.0.1", "172.016.0.1", "172.017.0.1", "127.000.0.1",
+        "0x7f.0.0.1", "0x0a.0.0.1", "2130706433", "167772161", "127.1", "10.1",
+        "localhost.evil.com", "127.0.0.1.evil.com",
+    ])
+    func ambiguousIPv4AndLookalikeNamesAreExternal(_ host: String) throws {
+        let url = try #require(URL(string: "https://\(host)/v1"))
+        let parsedHost = try #require(url.host)
+        for candidate in [host, parsedHost] {
+            #expect(!HTTPDestinationPolicy.isLoopback(candidate))
+            #expect(!HTTPDestinationPolicy.isLocalOrLAN(candidate))
+        }
+        for preset in [ProviderPreset.custom, .ollama, .lmstudio] {
+            #expect(ProviderEffort.needsKey(preset: preset, baseUrl: url.absoluteString))
+        }
+        #expect(!HTTPDestinationPolicy.permits(try #require(URL(string: "http://\(host)/v1"))))
+    }
+
+    @Test(arguments: [
         "localhost", "127.0.0.1", "127.255.255.254", "10.0.0.1", "10.255.255.254",
         "172.16.0.1", "172.31.255.254", "192.168.0.1", "169.254.0.1", "model.local",
         "[::1]", "[0:0:0:0:0:0:0:1]", "[fc00::1]", "[fdff::1]", "[fe80::1]", "[febf::1]",

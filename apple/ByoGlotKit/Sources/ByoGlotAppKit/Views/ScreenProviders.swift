@@ -156,7 +156,7 @@ private struct ProviderKeyScreen: View {
         if let connection {
             let keyMissing = !hasKey && ProviderEffort.needsKey(preset: connection.preset, baseUrl: connection.baseUrl)
             if let failure {
-                Banner(title: AppStrings.text("err.generic"), message: AppStrings.error(failure), actionTitle: "err.retry", action: deleteSavedConnection)
+                Banner(title: AppStrings.text("err.generic"), message: AppStrings.error(failure), actionTitle: "err.retry", action: check)
             }
             Label(AppStrings.text(hasKey ? "key.ok" : keyMissing ? "providers.keyMissing" : "providers.keyNotRequired"), systemImage: keyMissing ? "exclamationmark.circle" : "checkmark.circle.fill")
                 .foregroundStyle(keyMissing ? ByoColor.error : ByoColor.success)

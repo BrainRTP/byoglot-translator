@@ -34,19 +34,21 @@ struct TranslationRunnerTests {
         await #expect(throws: RunnerError.noModel) { try await runner.translate(RunnerInput(text: "hi", limit: 2)) }
     }
 
-    @Test func consentIsRequiredForRemoteButNotLocalOrLAN() async throws {
+    @Test func consentIsRequiredOutsideLoopback() async throws {
         let f = AppFixture()
-        try await f.connect(consent: false)
-        await #expect(throws: RunnerError.consentNeeded(origin: "https://provider.example")) { try await f.runner.translate(RunnerInput(text: "hi", limit: 10)) }
+        for host in ["provider.example", "192.168.1.2", "server.local"] {
+            try await f.connect(base: "https://\(host)/v1", consent: false)
+            await #expect(throws: RunnerError.consentNeeded(origin: "https://\(host)")) { try await f.runner.translate(RunnerInput(text: "hi", limit: 10)) }
+        }
         #expect(await f.transport.requests.isEmpty)
-        for host in ["localhost", "192.168.1.2", "server.local"] {
+        for host in ["localhost", "127.0.0.1", "127.0.0.2", "[::1]"] {
             try await f.connect(base: "http://\(host)/v1", consent: false)
             _ = try await f.runner.translate(RunnerInput(text: "hi", limit: 10))
         }
         try await f.connect(base: "http://localhost/v1", consent: false)
         try f.secrets.delete(connectionId: "c1")
         _ = try await f.runner.translate(RunnerInput(text: "hi", limit: 10))
-        try await f.connect(base: "http://192.168.1.2/v1", consent: false)
+        try await f.connect(base: "http://192.168.1.2/v1", consent: true)
         try f.secrets.delete(connectionId: "c1")
         await #expect(throws: RunnerError.keyMissing) { try await f.runner.translate(RunnerInput(text: "hi", limit: 10)) }
     }

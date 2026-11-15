@@ -120,4 +120,41 @@ struct ConnectionEditorTests {
         #expect(decoded.theme == .system && decoded.autoTranslate)
         #expect(decoded.mainModel == nil && decoded.externalModel == nil && decoded.fallbackModel == nil)
     }
+
+    @Test(arguments: [false, true])
+    func savedAndImportedKeylessPresetsKeepConnectionsAndBlockUnauthorizedRequests(_ imported: Bool) async throws {
+        for (base, needsKey) in [("https://192.168.1.2/v1", false), ("https://provider.example/v1", true)] {
+            let f = AppFixture()
+            if imported {
+                var file = SettingsLogic.export(try await f.settings.read(), now: .now)
+                file.connections = [ExportConnection(id: "c1", preset: .ollama, name: "Imported", baseUrl: base)]
+                let decoded = try ExportFile.decode(JSONEncoder().encode(file))
+                _ = try await f.settings.update { $0 = SettingsLogic.merge(decoded, into: $0) }
+            } else {
+                try await f.connect(preset: .ollama, base: base, consent: false)
+                try f.secrets.delete(connectionId: "c1")
+            }
+            let before = try await f.settings.read()
+            let origin = try #require(originOf(base))
+            let input = RunnerInput(text: "hello", limit: 100, model: ModelRef(providerID: "ollama", id: "model", connectionId: "c1"))
+            let expected = RunnerError.consentNeeded(origin: origin)
+            await #expect(throws: expected) { try await f.editor.models(connectionId: "c1") }
+            await #expect(throws: expected) { try await f.runner.translate(input) }
+            await #expect(throws: expected) {
+                for try await _ in f.runner.stream(input) { Issue.record("Unauthorized connection produced a translation") }
+            }
+            #expect(await f.transport.requests.isEmpty)
+            #expect(try await f.settings.read() == before)
+            _ = try await f.settings.update { $0.consentedOrigins.append(origin) }
+            if needsKey {
+                await #expect(throws: RunnerError.keyMissing) { try await f.editor.models(connectionId: "c1") }
+                await #expect(throws: RunnerError.keyMissing) { try await f.runner.translate(input) }
+                #expect(await f.transport.requests.isEmpty)
+            } else {
+                #expect(try await f.editor.models(connectionId: "c1").map(\.id) == ["model"])
+                #expect(try await f.runner.translate(input).text == "translated")
+            }
+            #expect(try await f.settings.read().connections == before.connections)
+        }
+    }
 }

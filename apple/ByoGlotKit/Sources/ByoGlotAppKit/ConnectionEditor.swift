@@ -75,8 +75,8 @@ public actor ConnectionEditor {
             try await acquireMutation()
             defer { releaseMutation() }
             guard let origin = originOf(draft.baseUrl), let url = URL(string: origin), urlPolicy.permits(url) else { throw RunnerError.backend(BackendError(kind: .providerError)) }
-            let local = HTTPDestinationPolicy.isLocalOrLAN(url.host ?? "")
-            if !local && !consent { throw RunnerError.consentNeeded(origin: origin) }
+            let loopback = HTTPDestinationPolicy.isLoopback(url.host ?? "")
+            if !loopback && !consent { throw RunnerError.consentNeeded(origin: origin) }
             let state = try await settings.read()
             let old = state.connections.first { $0.id == draft.id }
             let id = old?.id ?? UUID().uuidString
@@ -101,7 +101,7 @@ public actor ConnectionEditor {
                     if let index = settings.connections.firstIndex(where: { $0.id == id }) { settings.connections[index] = saved }
                     else { settings.connections.append(saved) }
                     settings.activeConnectionId = id
-                    if !local && !settings.consentedOrigins.contains(origin) { settings.consentedOrigins.append(origin) }
+                    if !loopback && !settings.consentedOrigins.contains(origin) { settings.consentedOrigins.append(origin) }
                 }
             }.value
             await modelCapabilities.record(listed.models, connection: saved, secret: secret)
@@ -173,7 +173,7 @@ public actor ConnectionEditor {
             let state = try await settings.read()
             guard let connection = state.connections.first(where: { $0.id == connectionId }) else { throw RunnerError.noConnection }
             guard let origin = originOf(connection.baseUrl), let url = URL(string: origin), urlPolicy.permits(url) else { throw RunnerError.backend(BackendError(kind: .providerError)) }
-            if !HTTPDestinationPolicy.isLocalOrLAN(url.host ?? ""), !state.consentedOrigins.contains(origin) { throw RunnerError.consentNeeded(origin: origin) }
+            if !HTTPDestinationPolicy.isLoopback(url.host ?? ""), !state.consentedOrigins.contains(origin) { throw RunnerError.consentNeeded(origin: origin) }
             let secret = try secrets.secret(connectionId: connectionId, origin: origin)
             if (secret?.isEmpty ?? true) && ProviderEffort.needsKey(preset: connection.preset, baseUrl: connection.baseUrl) { throw RunnerError.keyMissing }
             let models = try await ProviderClient(connection: connection, secret: secret, transport: transport).listModels()

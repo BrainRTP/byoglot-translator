@@ -53,11 +53,12 @@ public sealed class MainStateTests
     }
     [Theory]
     [InlineData("io")]
+    [InlineData("invalid-data")]
     [InlineData("access")]
     [InlineData("unexpected")]
     public async Task SettingsFailuresLeaveWorkingWithoutRepeatingARequest(string kind)
     {
-        Exception error = kind switch { "io" => new IOException(), "access" => new UnauthorizedAccessException(), _ => new InvalidOperationException() };
+        Exception error = kind switch { "io" => new IOException(), "invalid-data" => new InvalidDataException(), "access" => new UnauthorizedAccessException(), _ => new InvalidOperationException() };
         var transport = new RecordingTransport();
         var state = State(transport, new UnavailableSettings(error));
         await state.TranslateAsync("hello", null);

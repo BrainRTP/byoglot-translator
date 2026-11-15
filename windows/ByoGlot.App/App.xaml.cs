@@ -45,7 +45,8 @@ public partial class App : Application
     private async Task CaptureAsync(bool selection)
     {
         try { if (selection) await quick.SelectionAsync(); else await quick.ClipboardAsync(); }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException) { quick.Dismiss(); }
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException) { quick.ShowStorageError(); }
+        catch (System.Runtime.InteropServices.COMException) { quick.Dismiss(); }
     }
     public bool SetHotKey(HotKey key)
     {

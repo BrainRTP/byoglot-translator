@@ -26,7 +26,7 @@ public sealed class QuickCoordinator
         var id = Begin();
         string? selected;
         try { selected = await window.SetTemplatesAsync(template); }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { if (id == nextRequest) ShowStorageError(); return; }
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException) { if (id == nextRequest) ShowStorageError(); return; }
         if (id != nextRequest) return;
         template = selected;
         var captureTask = reader.ReadAsync();
@@ -41,7 +41,7 @@ public sealed class QuickCoordinator
         var id = Begin();
         string? selected;
         try { selected = await window.SetTemplatesAsync(template); }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { if (id == nextRequest) ShowStorageError(); return; }
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException) { if (id == nextRequest) ShowStorageError(); return; }
         if (id != nextRequest) return;
         template = selected;
         appName = "";
@@ -52,7 +52,7 @@ public sealed class QuickCoordinator
         if (id == nextRequest) Apply(new QuickEvent.Clipboard(value, id));
     }
     public void Dismiss() { Begin(); Apply(new QuickEvent.Dismissed()); }
-    private void ShowStorageError() { Begin(); State = new QuickState.Message("Err_Storage"); window.Render(State); }
+    public void ShowStorageError() { Begin(); State = new QuickState.Message("Err_Storage"); window.Render(State); }
     private void Apply(QuickEvent action)
     {
         var reduced = QuickReducer.Reduce(State, action); State = reduced.State;
@@ -69,7 +69,7 @@ public sealed class QuickCoordinator
         }
         catch (OperationCanceledException) { }
         catch (RunnerException error) { if (id == nextRequest) Apply(new QuickEvent.FailedWith(error.Error, id)); }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { if (id == nextRequest) Apply(new QuickEvent.FailedWith(new RunnerError.Storage(), id)); }
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException) { if (id == nextRequest) Apply(new QuickEvent.FailedWith(new RunnerError.Storage(), id)); }
         finally { if (id == nextRequest) pending = null; }
     }
 }

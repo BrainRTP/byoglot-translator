@@ -35,6 +35,14 @@ test("opens the translator from options, translates at 320px, and reuses its tab
     "[ru] Hello from the translator",
   );
   await expect(translator.getByRole("button", { name: "Copy", exact: true })).toBeEnabled();
+  await expect(translate).toBeDisabled();
+  await input.fill("Hello from the translator!");
+  await expect(translate).toBeEnabled();
+  await input.fill("Hello from the translator");
+  await expect(translate).toBeDisabled();
+  await expect(translator.getByLabel("Translation", { exact: true })).toContainText(
+    "[ru] Hello from the translator",
+  );
   await expect(translator.getByRole("status")).toContainText("does not report whether");
   const requests = mock.requests.filter(
     (request) => request.path === "/api/experimental/generate/text",
@@ -67,6 +75,37 @@ test("opens the translator from options, translates at 320px, and reuses its tab
   expect(JSON.stringify(storage)).not.toContain("Hello from the translator");
   await translator.reload();
   await expect(input).toHaveValue("");
+});
+
+test("refreshes edited and deleted templates without losing editor text", async ({ paired }) => {
+  const page = await paired.context.newPage();
+  await page.goto(`chrome-extension://${paired.id}/translator.html`);
+  const input = page.getByRole("textbox", { name: "Text to translate", exact: true });
+  await input.fill("Keep this text");
+  const builtin = { id: "builtin-default", name: "Plain", builtin: true, settings: {} };
+  const custom = { id: "custom", name: "Custom", builtin: false, settings: { targetLang: "de" } };
+  await paired.worker.evaluate(
+    (templates) => chrome.storage.local.set({ templates }),
+    [builtin, custom],
+  );
+  const picker = page.getByLabel("Template");
+  await expect(picker.locator("option")).toHaveCount(2);
+  await picker.selectOption("custom");
+  const translate = page.getByRole("button", { name: "Translate", exact: true });
+  await translate.click();
+  await expect(translate).toBeDisabled();
+  await paired.worker.evaluate(
+    (templates) => chrome.storage.local.set({ templates }),
+    [builtin, { ...custom, name: "Edited", settings: { targetLang: "ja" } }],
+  );
+  await expect(picker.locator("option:checked")).toHaveText("Edited");
+  await expect(page.getByLabel("Target language")).toHaveValue("ja");
+  await expect(translate).toBeEnabled();
+  await expect(input).toHaveValue("Keep this text");
+  await paired.worker.evaluate((templates) => chrome.storage.local.set({ templates }), [builtin]);
+  await expect(picker).toHaveValue("builtin-default");
+  await expect(picker.locator("option")).toHaveCount(1);
+  await expect(input).toHaveValue("Keep this text");
 });
 
 test("keeps truncated output visible with a warning", async ({ ext }) => {

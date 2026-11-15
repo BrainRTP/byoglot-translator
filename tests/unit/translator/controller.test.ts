@@ -122,6 +122,82 @@ describe("translator defaults", () => {
 });
 
 describe("translator request identity", () => {
+  it("reuses the last result for unchanged inputs and after reverting edits", async () => {
+    const { controller, translate } = setup();
+    translate.mockResolvedValue({ ...answer("Saved"), truncated: false });
+    await controller.translate();
+    await controller.translate();
+    for (const patch of [
+      { text: "Hello!" },
+      { sourceLang: "de" },
+      { targetLang: "ja" },
+      { templateId: "other" },
+    ]) {
+      const before = { ...controller.state };
+      controller.update(patch);
+      expect(controller.state.completion).toBeNull();
+      controller.update({
+        text: before.text,
+        sourceLang: before.sourceLang,
+        targetLang: before.targetLang,
+        templateId: before.templateId,
+      });
+      expect(controller.state.result).toBe("Saved");
+      expect(controller.state.completion).toBe("complete");
+      await controller.translate();
+    }
+    expect(translate).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidates saved results when the selected template changes or is removed", async () => {
+    const { controller, translate } = setup();
+    const builtin = builtinTemplate();
+    controller.refreshTemplates([builtin]);
+    translate.mockResolvedValue(answer("First"));
+    await controller.translate();
+    controller.refreshTemplates([{ ...builtin, name: "Renamed" }]);
+    expect(controller.state.result).toBe("First");
+    const edited = { ...builtin, settings: { prePrompt: "New prompt", targetLang: "ja" } };
+    controller.refreshTemplates([edited]);
+    expect(controller.state.result).toBe("");
+    expect(controller.state.targetLang).toBe("ja");
+    await controller.translate();
+    expect(translate).toHaveBeenCalledTimes(2);
+    controller.refreshTemplates([{ ...edited, id: "replacement", builtin: true }]);
+    expect(controller.state.templateId).toBe("replacement");
+    expect(controller.state.result).toBe("");
+  });
+
+  it("cancels an in-flight request when its template changes", async () => {
+    const { controller, translate } = setup();
+    const template = builtinTemplate();
+    controller.refreshTemplates([template]);
+    const old = deferred();
+    translate.mockReturnValue(old.promise);
+    const pending = controller.translate();
+    controller.refreshTemplates([{ ...template, settings: { prePrompt: "Changed" } }]);
+    old.resolve(answer("Old prompt"));
+    await pending;
+    expect(controller.state.result).toBe("");
+    expect(controller.state.running).toBe(false);
+  });
+
+  it("does not restore a result after its template was edited while another was selected", async () => {
+    const { controller, translate } = setup();
+    const builtin = builtinTemplate();
+    const other = { ...builtin, id: "other" };
+    controller.refreshTemplates([builtin, other]);
+    translate.mockResolvedValue(answer("Old instructions"));
+    await controller.translate();
+    controller.chooseTemplate(other);
+    const edited = { ...builtin, settings: { prePrompt: "New instructions" } };
+    controller.refreshTemplates([edited, other]);
+    controller.chooseTemplate(edited);
+    expect(controller.state.result).toBe("");
+    await controller.translate();
+    expect(translate).toHaveBeenCalledTimes(2);
+  });
+
   it("cancels the exact request and ignores its late answer", async () => {
     const { controller, translate, cancel } = setup();
     const old = deferred();

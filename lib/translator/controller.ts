@@ -72,6 +72,17 @@ export function createTranslator(
     error: null,
   };
   let active: string | null = null;
+  let templates: Template[] = [];
+  let last: { key: string; result: string; completion: TranslatorState["completion"] } | null =
+    null;
+  const inputKey = () =>
+    JSON.stringify([
+      state.text,
+      state.sourceLang,
+      state.targetLang,
+      state.templateId,
+      templates.find((template) => template.id === state.templateId)?.settings,
+    ]);
 
   function publish(patch: Partial<TranslatorState>) {
     state = { ...state, ...patch };
@@ -87,7 +98,17 @@ export function createTranslator(
 
   function update(patch: Partial<TranslatorInput>) {
     cancel();
-    publish({ ...patch, result: "", completion: null, error: null });
+    state = { ...state, ...patch };
+    const saved = last?.key === inputKey() ? last : null;
+    publish({ result: saved?.result ?? "", completion: saved?.completion ?? null, error: null });
+  }
+
+  function chooseTemplate(template: Template | undefined) {
+    if (template)
+      update({
+        templateId: template.id,
+        targetLang: template.settings.targetLang ?? state.targetLang,
+      });
   }
 
   return {
@@ -95,17 +116,27 @@ export function createTranslator(
       return state;
     },
     update,
-    chooseTemplate(template: Template | undefined) {
-      if (template)
-        update({
-          templateId: template.id,
-          targetLang: template.settings.targetLang ?? state.targetLang,
-        });
+    chooseTemplate,
+    refreshTemplates(next: Template[]) {
+      const previous = templates.find((template) => template.id === state.templateId);
+      templates = next;
+      const selected = next.find((template) => template.id === state.templateId);
+      if (selected && JSON.stringify(selected.settings) === JSON.stringify(previous?.settings))
+        return;
+      last = null;
+      chooseTemplate(
+        selected ?? next.find((template) => template.builtin) ?? next[0] ?? builtinTemplate(),
+      );
     },
     cancel,
     async translate() {
       cancel();
       if (textProblem(state.text)) return;
+      const key = inputKey();
+      if (last?.key === key) {
+        publish({ result: last.result, completion: last.completion, error: null });
+        return;
+      }
       const requestId = crypto.randomUUID();
       active = requestId;
       publish({ running: true, result: "", completion: null, error: null });
@@ -132,6 +163,7 @@ export function createTranslator(
               }
             : { error: translatorError(result) },
         );
+        if ("text" in result) last = { key, result: state.result, completion: state.completion };
       } catch {
         if (active === requestId) publish({ error: translatorError({ error: "offline" }) });
       } finally {

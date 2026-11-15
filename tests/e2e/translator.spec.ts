@@ -2,6 +2,33 @@ import { seedProvider } from "./extension";
 import { expect, test } from "./fixtures";
 import { startMockProvider } from "./mock-provider";
 
+test("keeps an initial load error through failed focus refreshes and restores saved languages on recovery", async ({
+  paired,
+}) => {
+  const page = await paired.context.newPage();
+  await page.addInitScript(() => {
+    const send = chrome.runtime.sendMessage.bind(chrome.runtime);
+    let failures = 0;
+    chrome.runtime.sendMessage = ((msg: { type?: string }, cb: (r: unknown) => void) => {
+      if (msg?.type !== "globals" || failures++ >= 2) return send(msg, cb);
+      Object.defineProperty(chrome.runtime, "lastError", {
+        configurable: true,
+        get: () => ({ message: "e2e" }),
+      });
+      cb(undefined);
+      Reflect.deleteProperty(chrome.runtime, "lastError");
+    }) as never;
+  });
+  await page.goto(`chrome-extension://${paired.id}/translator.html`);
+  const retry = page.getByRole("button", { name: "Retry", exact: true });
+  await expect(retry).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(retry).toBeVisible();
+  await expect(page.getByLabel("Target language")).toHaveCount(0);
+  await retry.click();
+  await expect(page.getByLabel("Target language")).toHaveValue("ru");
+});
+
 test("opens the translator from options, translates at 320px, and reuses its tab", async ({
   paired,
   mock,
@@ -108,6 +135,56 @@ test("refreshes edited and deleted templates without losing editor text", async 
   await expect(input).toHaveValue("Keep this text");
 });
 
+test("ignores an older template refresh after the latest response", async ({ paired }) => {
+  const page = await paired.context.newPage();
+  await page.addInitScript(() => {
+    const state = window as unknown as {
+      holdTemplates: boolean;
+      responses: { callback(response: unknown): void; response: unknown }[];
+    };
+    state.holdTemplates = false;
+    state.responses = [];
+    const send = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = ((
+      msg: { type?: string },
+      callback: (response: unknown) => void,
+    ) => {
+      if (msg?.type !== "templates" || !state.holdTemplates) return send(msg, callback);
+      return send(msg, (response) => state.responses.push({ callback, response }));
+    }) as never;
+  });
+  await page.goto(`chrome-extension://${paired.id}/translator.html`);
+  const picker = page.getByLabel("Template");
+  await expect(picker).toBeVisible();
+  await page.evaluate(() => {
+    (window as unknown as { holdTemplates: boolean }).holdTemplates = true;
+  });
+  const builtin = { id: "builtin-default", name: "Plain", builtin: true, settings: {} };
+  await paired.worker.evaluate(
+    (templates) => chrome.storage.local.set({ templates }),
+    [builtin, { ...builtin, id: "old", builtin: false }],
+  );
+  await page.waitForFunction(
+    () => (window as unknown as { responses: unknown[] }).responses.length === 1,
+  );
+  await paired.worker.evaluate((templates) => chrome.storage.local.set({ templates }), [builtin]);
+  await page.waitForFunction(
+    () => (window as unknown as { responses: unknown[] }).responses.length === 2,
+  );
+  for (const index of [1, 0]) {
+    await page.evaluate((i) => {
+      const held = (
+        window as unknown as {
+          responses: { callback(response: unknown): void; response: unknown }[];
+        }
+      ).responses[i];
+      if (!held) throw new Error("missing refresh");
+      held.callback(held.response);
+    }, index);
+    await expect(picker.locator("option")).toHaveCount(1);
+  }
+});
+
 test("keeps truncated output visible with a warning", async ({ ext }) => {
   const provider = await startMockProvider({ mode: "length" });
   try {
@@ -119,6 +196,7 @@ test("keeps truncated output visible with a warning", async ({ ext }) => {
     await expect(page.getByLabel("Translation", { exact: true })).toContainText("[ru] A long text");
     await expect(page.getByRole("status")).toContainText("translation was cut off");
     await expect(page.getByRole("button", { name: "Copy", exact: true })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Translate", exact: true })).toBeEnabled();
   } finally {
     await provider.stop();
   }

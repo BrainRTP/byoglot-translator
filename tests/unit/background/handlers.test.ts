@@ -632,7 +632,7 @@ describe("background handlers", () => {
         },
         { url: browser.runtime.getURL("/translator.html") },
       );
-      expect(result).toMatchObject({ error: "incompatible" });
+      expect(result).toMatchObject({ error: "unknown_template" });
       expect(translateText).not.toHaveBeenCalled();
     });
 
@@ -671,7 +671,7 @@ describe("background handlers", () => {
     });
 
     it.each(["close", "navigate", "loading"])(
-      "aborts all jobs in a tab on %s and preserves other tabs",
+      "cancels only on close, not tab updates (%s), and preserves other tabs",
       async (action) => {
         const { handlers, translateText, translateSelection } = setup();
         await globalsItem.setValue({ ...DEFAULT_GLOBALS, selectionModel });
@@ -719,14 +719,18 @@ describe("background handlers", () => {
             action === "navigate" ? "https://example.com/another-page" : undefined,
           );
         if (action === "loading") expect(await tabSettings(5).getValue()).not.toBeNull();
-        expect(translateText.mock.calls[0]?.[1].aborted).toBe(true);
-        expect(selectionSignal.aborted).toBe(true);
+        expect(translateText.mock.calls[0]?.[1].aborted).toBe(action === "close");
+        expect(selectionSignal.aborted).toBe(action === "close");
         expect(
           translateSelection.mock.calls.find(([input]) => input.text === "Other")?.[1].aborted,
         ).toBe(false);
         release();
-        expect(await editor).toMatchObject({ error: "aborted" });
-        expect(await selection).toMatchObject({ error: "aborted" });
+        expect(await editor).toMatchObject(
+          action === "close" ? { error: "aborted" } : { text: "late" },
+        );
+        expect(await selection).toMatchObject(
+          action === "close" ? { error: "aborted" } : { text: "selection" },
+        );
         await other;
       },
     );

@@ -80,6 +80,7 @@ export default defineContentScript({
       activeRequests.clear();
       for (const id of ids) void sendMessage("cancelSelection", id).catch(() => {});
     };
+    window.addEventListener("pagehide", cancelAll);
     const selectionUi = mountSelectionUi(document, {
       translate: (text, context, templateId, window) => {
         const requestId = crypto.randomUUID();

@@ -1,5 +1,5 @@
 import type { PortToBackground, PortToContent } from "../messaging/page-port";
-import { type createTranslationService, GENERATE_TIMEOUT_MS } from "../translate/service";
+import type { createTranslationService } from "../translate/service";
 import { type Handlers, type Sender, toBackendError } from "./handlers";
 
 export interface PagePort {
@@ -24,7 +24,7 @@ export function attachPagePort(port: PagePort, handlers: Handlers, service: Serv
     const { jobId } = msg;
     jobs.get(jobId)?.abort();
     const controller = new AbortController();
-    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(GENERATE_TIMEOUT_MS)]);
+    const signal = controller.signal;
     jobs.set(jobId, controller);
     try {
       const job = await handlers.pageJob(port.sender ?? {}, msg, signal);

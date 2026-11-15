@@ -852,7 +852,7 @@ export function createHandlers(deps: HandlerDeps) {
         const e = toBackendError(error, signal);
         const source = (await errorSource(used))(e);
         return {
-          error: e.kind,
+          error: e.detail === "unknown template" ? "unknown_template" : e.kind,
           retryAfterMs: e.retryAfterMs,
           backend: kind,
           ...(editor && e.detail === "timeout" && { timeout: true }),
@@ -890,11 +890,14 @@ export function createHandlers(deps: HandlerDeps) {
     async pageJob(
       sender: Sender,
       req: { segments: Segment[]; page: { title: string; hostname: string } },
-      signal = AbortSignal.timeout(GENERATE_TIMEOUT_MS),
+      signal = new AbortController().signal,
     ): Promise<PageJob> {
+      const requestedAt = Date.now();
+      signal = AbortSignal.any([signal, AbortSignal.timeout(GENERATE_TIMEOUT_MS)]);
       const hostname = hostnameOf(sender.tab?.url) || req.page.hostname;
       const { view, model } = await requireModel(sender.tab?.id, hostname, "pageModel", signal);
       return {
+        requestedAt,
         segments: req.segments,
         settings: view.settings,
         model,
@@ -914,12 +917,6 @@ export function createHandlers(deps: HandlerDeps) {
     },
 
     async tabNavigated(tabId: number, url?: string): Promise<void> {
-      for (const [id, job] of selectionJobs) {
-        if (job.tabId === tabId) {
-          job.controller.abort();
-          selectionJobs.delete(id);
-        }
-      }
       if (!url) return;
       const next = hostnameOf(url);
       const previous = await tabHostItem(tabId).getValue();

@@ -9,6 +9,7 @@ import { createSemaphore } from "./semaphore";
 export type Segment = { id: string; text: string };
 export type SegmentResult = { id: string; text: string; cached: boolean };
 export type PageJob = {
+  requestedAt?: number;
   segments: Segment[];
   settings: EffectiveSettings;
   model: ModelRef;
@@ -67,7 +68,16 @@ export function createTranslationService(deps: {
   const limits: Limits = { ...DEFAULT_LIMITS, ...deps.limits };
   const semaphore = createSemaphore(limits.concurrency);
 
-  async function generate(prompt: string, model: ModelRef, signal: AbortSignal) {
+  async function generate(
+    prompt: string,
+    model: ModelRef,
+    signal: AbortSignal,
+    requestedAt = Date.now(),
+  ) {
+    signal = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(Math.max(0, GENERATE_TIMEOUT_MS - (Date.now() - requestedAt))),
+    ]);
     try {
       return await semaphore.run(async () => {
         const backend = await deps.getBackend();
@@ -124,7 +134,10 @@ export function createTranslationService(deps: {
         if (error.kind !== "aborted") cb.onFatal(error);
       };
 
-      const attempt = async (batch: Segment[]): Promise<Set<string> | null> => {
+      const attempt = async (
+        batch: Segment[],
+        requestedAt?: number,
+      ): Promise<Set<string> | null> => {
         if (stopped()) return null;
         const input = Object.fromEntries(batch.map((s) => [s.id, s.text]));
         const prompt = buildPagePrompt({
@@ -138,7 +151,7 @@ export function createTranslationService(deps: {
         });
         let raw: string;
         try {
-          raw = await generate(prompt, model, controller.signal);
+          raw = await generate(prompt, model, controller.signal, requestedAt);
         } catch (e) {
           const error = toBackendError(e, controller.signal);
           if (isFatal(error.kind)) {
@@ -160,7 +173,8 @@ export function createTranslationService(deps: {
       };
 
       const runBatch = async (batch: Segment[]) => {
-        let failed = await attempt(batch);
+        // Initial batches include model discovery; each retry starts its own deadline.
+        let failed = await attempt(batch, job.requestedAt);
         if (!failed || failed.size === 0) return;
         const regroup = batch.filter((s) => failed?.has(s.id));
         failed = await attempt(regroup);

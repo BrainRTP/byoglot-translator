@@ -1,5 +1,6 @@
+import type { ConnectionView } from "../connections/types";
 import { t } from "../i18n";
-import type { ProtocolMap, SelectionResult } from "../messaging/protocol";
+import type { LanguageProfileView, ProtocolMap, SelectionResult } from "../messaging/protocol";
 import { BUILTIN_TEMPLATE_ID, builtinTemplate } from "../settings/defaults";
 import type { GlobalSettings, Template } from "../settings/types";
 import { describeError, type ErrorPresentation } from "../ui/errors";
@@ -73,6 +74,7 @@ export function createTranslator(
   };
   let active: string | null = null;
   let templates: Template[] = [];
+  let requestSettings = "";
   let last: { key: string; result: string; completion: TranslatorState["completion"] } | null =
     null;
   const inputKey = () =>
@@ -82,6 +84,7 @@ export function createTranslator(
       state.targetLang,
       state.templateId,
       templates.find((template) => template.id === state.templateId)?.settings,
+      requestSettings,
     ]);
 
   function publish(patch: Partial<TranslatorState>) {
@@ -117,6 +120,23 @@ export function createTranslator(
     },
     update,
     chooseTemplate,
+    refreshSettings(
+      globals: GlobalSettings,
+      connection: ConnectionView | undefined,
+      profiles: LanguageProfileView[],
+    ) {
+      const next = JSON.stringify([
+        globals.selectionModel,
+        globals.languagePromptEnabled,
+        globals.languageProfile,
+        profiles.map(({ id, text }) => [id, text]),
+        connection,
+      ]);
+      if (next === requestSettings) return;
+      requestSettings = next;
+      last = null;
+      update({});
+    },
     refreshTemplates(next: Template[]) {
       const previous = templates.find((template) => template.id === state.templateId);
       templates = next;
@@ -163,7 +183,8 @@ export function createTranslator(
               }
             : { error: translatorError(result) },
         );
-        if ("text" in result) last = { key, result: state.result, completion: state.completion };
+        if ("text" in result && !result.truncated)
+          last = { key, result: state.result, completion: state.completion };
       } catch {
         if (active === requestId) publish({ error: translatorError({ error: "offline" }) });
       } finally {

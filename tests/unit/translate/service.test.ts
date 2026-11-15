@@ -603,6 +603,62 @@ describe("translatePage fatal errors", () => {
 });
 
 describe("translatePage abort", () => {
+  it("gives each page retry a fresh deadline while initial batches include model setup", async () => {
+    let now = 30_000;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    const deadlines: number[] = [];
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+      deadlines.push(ms);
+      return new AbortController().signal;
+    });
+    try {
+      const fake = fakeBackend(async (prompt, _signal, call) => {
+        now += 100_000;
+        return call < 2 ? "{}" : echoAnswer(prompt);
+      });
+      const rec = recorder();
+      await service(fake).translatePage(
+        { ...job(segs(2)), requestedAt: 0 },
+        rec.cb,
+        new AbortController().signal,
+      );
+      expect(now).toBe(430_000);
+      expect(deadlines).toEqual([150_000, 180_000, 180_000, 180_000]);
+      expect(new Set(fake.signals).size).toBe(4);
+      expect(rec.flat()).toHaveLength(2);
+      expect(rec.fatal).toEqual([]);
+    } finally {
+      timeout.mockRestore();
+      clock.mockRestore();
+    }
+  });
+
+  it("expires a page request in the semaphore queue before contacting the provider", async () => {
+    const deadline = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(deadline.signal);
+    const gate = deferred();
+    const fake = fakeBackend(() => gate.promise);
+    const svc = service(fake, undefined, { concurrency: 1 });
+    const blocker = svc.translateText(
+      { text: "Blocker", settings, model, languagePrompt: "" },
+      new AbortController().signal,
+    );
+    try {
+      await until(() => fake.prompts.length === 1);
+      const rec = recorder();
+      const pending = svc.translatePage(job(segs(1)), rec.cb, new AbortController().signal);
+      await until(() => timeout.mock.calls.length === 1);
+      deadline.abort(new DOMException("timed out", "TimeoutError"));
+      await pending;
+      expect(rec.fatal).toEqual([expect.objectContaining({ kind: "offline", detail: "timeout" })]);
+      expect(fake.prompts).toHaveLength(1);
+    } finally {
+      gate.resolve("Released");
+      await blocker;
+      timeout.mockRestore();
+    }
+  });
+
   it("passes the signal on, starts nothing new and stays silent after abort", async () => {
     const gates: ReturnType<typeof deferred<string>>[] = [];
     const fake = fakeBackend((p, signal) => {

@@ -68,10 +68,12 @@ export type ProfileOp =
 
 export type RuleOp = { type: "upsert"; rule: SiteRule } | { type: "delete"; id: string };
 
+export type SelectionErrorKind = BackendErrorKind | "unknown_template";
+
 export type SelectionResult =
   | { text: string; sourceLang: string; targetLang: string; model: ModelRef; truncated?: boolean }
   | {
-      error: BackendErrorKind;
+      error: SelectionErrorKind;
       retryAfterMs?: number;
       backend?: ConnectionKind;
       source?: string;

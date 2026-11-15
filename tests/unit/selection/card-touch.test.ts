@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createCard, sheetRect } from "../../../lib/selection/card";
+import { createCard, type SelectionTranslation, sheetRect } from "../../../lib/selection/card";
+import { builtinTemplate } from "../../../lib/settings/defaults";
 
 it("pins the card to the bottom edge with 8px margins", () => {
   expect(sheetRect(320, 640, 200)).toEqual({ left: 8, top: 432, width: 304, height: 200 });
@@ -56,5 +57,32 @@ describe("touch card viewport changes", () => {
     window.dispatchEvent(new Event("resize"));
     expect(position()).toEqual({ left: "8px", top: "312px", width: "344px", height: "480px" });
     expect(translate).toHaveBeenCalledTimes(1);
+  });
+
+  it("explains a deleted template and refreshes the pinned card picker before retry", async () => {
+    const builtin = builtinTemplate();
+    const custom = { ...builtin, id: "removed", builtin: false, name: "Custom" };
+    const listTemplates = vi
+      .fn()
+      .mockResolvedValueOnce([builtin, custom])
+      .mockResolvedValue([builtin]);
+    const translate = vi
+      .fn<() => Promise<SelectionTranslation>>()
+      .mockResolvedValue({ text: "First" });
+    card = createCard(root, { translate, listTemplates, currentTemplateId: async () => custom.id });
+    const req = { text: "text", context: "", anchor: { left: 10, right: 90, top: 10, bottom: 30 } };
+    card.open(req);
+    await vi.waitFor(() => expect(root.querySelectorAll("option")).toHaveLength(2));
+    card.setMode("pinned");
+    const select = root.querySelector("select") as HTMLSelectElement;
+    select.value = "removed";
+    translate.mockResolvedValueOnce({ error: "unknown_template", backend: "provider" });
+    card.add(req);
+    await vi.waitFor(() => expect(root.querySelectorAll("option")).toHaveLength(1));
+    expect(root.querySelector("[role=alert]")?.textContent).toContain("Template no longer exists");
+    expect(root.textContent).not.toContain("OpenAI-compatible");
+    expect(select.value).toBe(builtin.id);
+    card.add(req);
+    expect(translate.mock.calls.at(-1)).toEqual(["text", "", builtin.id, "pinned"]);
   });
 });

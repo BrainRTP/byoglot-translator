@@ -39,6 +39,8 @@ export const ru = {
   "error.incompatible": "Нужен opencode 2.x. Обновите opencode и повторите.",
   "error.no_model.title": "Модель не выбрана",
   "error.no_model": "Выберите модель в настройках.",
+  "error.unknown_template.title": "Шаблон больше не существует",
+  "error.unknown_template": "Выберите доступный шаблон и повторите перевод.",
   "selection.translate": "Перевести выделенный текст",
   "selection.dialog": "Перевод выделенного текста",
   "selection.template": "Шаблон",

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { ConnectionView } from "../../../lib/connections/types";
 import type { SelectionResult } from "../../../lib/messaging/protocol";
 import { MAX_EDITOR_TEXT } from "../../../lib/selection/limits";
 import { builtinTemplate, DEFAULT_GLOBALS } from "../../../lib/settings/defaults";
@@ -122,6 +123,78 @@ describe("translator defaults", () => {
 });
 
 describe("translator request identity", () => {
+  it("invalidates results and in-flight requests when the model, effort, connection or language prompt changes", async () => {
+    const { controller, translate, cancel } = setup();
+    let globals = {
+      ...DEFAULT_GLOBALS,
+      selectionModel: { providerID: "p", id: "first", variant: "high" },
+    };
+    let connection: ConnectionView = {
+      id: "first",
+      kind: "provider",
+      name: "Local",
+      url: "http://localhost:1234",
+      active: true,
+      hasKey: false,
+    };
+    let profiles = [
+      { id: "ru", text: "Original", builtin: "Original", modified: false, outdated: false },
+    ];
+    controller.refreshSettings(globals, connection, profiles);
+    translate.mockResolvedValue({ ...answer("Saved"), truncated: false });
+    for (const change of [
+      () => {
+        globals = { ...globals, selectionModel: { ...globals.selectionModel, id: "second" } };
+      },
+      () => {
+        globals = { ...globals, selectionModel: { ...globals.selectionModel, variant: "low" } };
+      },
+      () => {
+        connection = { ...connection, id: "second" };
+      },
+      () => {
+        globals = { ...globals, languageProfile: "ru" };
+      },
+      () => {
+        globals = { ...globals, languagePromptEnabled: !globals.languagePromptEnabled };
+      },
+      () => {
+        profiles = profiles.map((profile) => ({ ...profile, text: "Updated" }));
+      },
+    ]) {
+      await controller.translate();
+      controller.refreshSettings(globals, { ...connection }, [...profiles]);
+      expect(controller.state.result).toBe("Saved");
+      change();
+      controller.refreshSettings(globals, connection, profiles);
+      expect(controller.state.result).toBe("");
+      expect(controller.state.completion).toBeNull();
+      controller.update({ text: "Hello!" });
+      controller.update({ text: "Hello" });
+      expect(controller.state.result).toBe("");
+    }
+    const old = deferred();
+    translate.mockReturnValue(old.promise);
+    const pending = controller.translate();
+    controller.refreshSettings(globals, { ...connection, id: "third" }, profiles);
+    expect(cancel).toHaveBeenCalledWith(translate.mock.lastCall?.[0].requestId);
+    old.resolve(answer("Stale model"));
+    await pending;
+    expect(controller.state.result).toBe("");
+  });
+
+  it("allows retrying truncated output without editing the text", async () => {
+    const { controller, translate } = setup();
+    translate
+      .mockResolvedValueOnce({ ...answer("Partial"), truncated: true })
+      .mockResolvedValueOnce({ ...answer("Full"), truncated: false });
+    await controller.translate();
+    expect(controller.state.completion).toBe("truncated");
+    await controller.translate();
+    expect(translate).toHaveBeenCalledTimes(2);
+    expect(controller.state.result).toBe("Full");
+  });
+
   it("reuses the last result for unchanged inputs and after reverting edits", async () => {
     const { controller, translate } = setup();
     translate.mockResolvedValue({ ...answer("Saved"), truncated: false });
@@ -257,6 +330,12 @@ describe("translator request identity", () => {
 });
 
 describe("translator errors", () => {
+  it("shows an unknown template error for the editor without opencode advice", () => {
+    const error = translatorError({ error: "unknown_template", backend: "opencode" });
+    expect(error?.title).toBe("Template no longer exists");
+    expect(error?.body).toBe("Choose an available template and retry.");
+    expect(error?.hint).toBeUndefined();
+  });
   it("shows a timeout and allows retrying the same text", async () => {
     const { controller, translate } = setup();
     translate

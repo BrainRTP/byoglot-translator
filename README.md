@@ -79,7 +79,7 @@ For fast selection translation pick a light model with effort `none`, for exampl
 
 ## Ways to translate
 
-Pages, selection cards and the translator page share templates and models. The persistent translation cache is used for pages only. Each translation request has one 180-second deadline, including model initialization and time in the queue.
+Pages, selection cards and the translator page share templates and models. The persistent translation cache is used for pages only. Each provider request has a 180-second deadline, including model initialization and time in the queue. Each page batch and retry gets its own deadline, so a whole page can take longer.
 
 ### Page
 

@@ -91,8 +91,7 @@ export function registerBackground(deps: BackgroundDeps): void {
     void handlers.tabRemoved(tabId);
   });
   browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
-    // Navigation URLs can be hidden without the tabs permission.
-    if (changeInfo.url || changeInfo.status === "loading") {
+    if (changeInfo.url) {
       void handlers.tabNavigated(tabId, changeInfo.url);
     }
   });

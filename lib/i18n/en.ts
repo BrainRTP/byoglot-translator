@@ -37,6 +37,8 @@ export const en = {
   "error.incompatible": "opencode 2.x is required. Update opencode and retry.",
   "error.no_model.title": "No model chosen",
   "error.no_model": "Choose a model in settings.",
+  "error.unknown_template.title": "Template no longer exists",
+  "error.unknown_template": "Choose an available template and retry.",
   "selection.translate": "Translate selected text",
   "selection.dialog": "Translation of the selected text",
   "selection.template": "Template",

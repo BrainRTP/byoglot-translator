@@ -1,5 +1,6 @@
 package io.github.brainrtp.byoglot.quick
 
+import androidx.datastore.core.CorruptionException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.brainrtp.byoglot.core.*
@@ -81,17 +82,23 @@ internal constructor(
         get() = !confirmed
 
     init {
-        workScope.launch {
-            val settings = repository.read()
-            mutableSettings.value = settings
-            mutableParameters.value =
-                parameters.value.copy(
-                    sourceLang = settings.globals.sourceLang,
-                    targetLang = settings.globals.targetLang,
-                )
-            applyTemplate(settings.globals.defaultTemplateId)
-            if (confirmed) translate()
+        workScope.launch { refresh() }
+    }
+
+    suspend fun refresh() {
+        val settings = try {
+            repository.read()
+        } catch (_: CorruptionException) {
+            return
         }
+        mutableSettings.value = settings
+        mutableParameters.value =
+            parameters.value.copy(
+                sourceLang = settings.globals.sourceLang,
+                targetLang = settings.globals.targetLang,
+            )
+        applyTemplate(settings.globals.defaultTemplateId)
+        if (confirmed) translate()
     }
 
     private fun applyTemplate(id: String) {

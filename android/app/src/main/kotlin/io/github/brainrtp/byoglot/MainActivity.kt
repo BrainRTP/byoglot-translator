@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
                 },
             )[MainViewModel::class.java]
         model = vm
-        val destination = mainDestination(intent::getStringExtra)
+        val destination = mainDestination(caller?.getPackage(), packageName, intent::getStringExtra)
         val export =
             registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) {
                 uri ->
@@ -108,6 +108,7 @@ class MainActivity : ComponentActivity() {
         val version = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
         setContent {
             val appSettings by vm.settings.collectAsState()
+            val corruptSettings by container.settings.corrupt.collectAsState()
             LaunchedEffect(vm) { network.changes.collect(vm::setNetworkAvailable) }
             ByoglotTheme(appSettings?.theme ?: io.github.brainrtp.byoglot.core.ThemeChoice.system) {
                 val background = ByoTheme.colors.bg
@@ -116,6 +117,13 @@ class MainActivity : ComponentActivity() {
                         if (background.luminance() < .5f) SystemBarStyle.dark(background.toArgb())
                         else SystemBarStyle.light(background.toArgb(), background.toArgb())
                     enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                }
+                if (corruptSettings) {
+                    SettingsRecoveryScreen {
+                        container.settings.resetCorruptSettings()
+                        vm.refresh()
+                    }
+                    return@ByoglotTheme
                 }
                 AppNavigation(
                     vm,
@@ -174,8 +182,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        setIntent(intent)
-        val destination = mainDestination(intent::getStringExtra)
+        setIntent(intent, currentCaller)
+        val destination = mainDestination(currentCaller.getPackage(), packageName, intent::getStringExtra)
         model.receiveQuickRequest(destination)
         if (destination == "network") requestLocalNetwork()
     }

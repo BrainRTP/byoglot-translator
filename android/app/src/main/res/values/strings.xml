@@ -1,4 +1,7 @@
 <resources>
+    <string name="settings_corrupt">Settings could not be loaded</string>
+    <string name="settings_recovery">Reset settings to continue. The damaged file will be kept on disk for recovery. API keys will be kept.</string>
+    <string name="reset_settings">Reset settings</string>
     <string name="app_name">ByoGlot</string>
     <string name="quick_label">Translate with ByoGlot</string>
     <string name="template">Template</string>

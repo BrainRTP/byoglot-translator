@@ -46,6 +46,11 @@ class TranslationCacheFlowTest {
             main.setText("  hello ")
             assertEquals("answer 3", main.translation.first { it.complete }.output?.text)
             assertEquals(3, fixture.calls.get())
+            main.setText("")
+            assertNull(main.translation.value.output)
+            main.paste("hello")
+            assertEquals("answer 3", main.translation.first { it.complete }.output?.text)
+            assertEquals(3, fixture.calls.get())
         }
     }
 

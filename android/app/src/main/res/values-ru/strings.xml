@@ -1,4 +1,7 @@
 <resources>
+    <string name="settings_corrupt">Не удалось загрузить настройки</string>
+    <string name="settings_recovery">Сбросьте настройки, чтобы продолжить. Поврежденный файл останется на диске для восстановления. API-ключи сохранятся.</string>
+    <string name="reset_settings">Сбросить настройки</string>
     <string name="app_name">ByoGlot</string>
     <string name="quick_label">Перевести в ByoGlot</string>
     <string name="template">Шаблон</string>

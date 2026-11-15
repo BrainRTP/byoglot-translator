@@ -1,5 +1,6 @@
 package io.github.brainrtp.byoglot.ui
 
+import androidx.datastore.core.CorruptionException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.brainrtp.byoglot.core.*
@@ -109,6 +110,11 @@ class MainViewModel(
     private fun requestInputs(): MainRequestInputs? =
         settings.value?.let { mainRequestInputs(text.value, parameters.value, it) }
 
+    private fun hasCurrentResult(): Boolean =
+        requestInputs() == lastRequestInputs && translation.value.let {
+            it.complete && !it.incomplete && it.error == null && it.output != null
+        }
+
     private fun changedInputs(before: MainRequestInputs?, immediate: Boolean = false) {
         if (before == requestInputs()) return
         cancel()
@@ -117,7 +123,11 @@ class MainViewModel(
     }
 
     suspend fun refresh() {
-        val state = repository.read()
+        val state = try {
+            repository.read()
+        } catch (_: CorruptionException) {
+            return
+        }
         val previous = mutableSettings.value
         val before = requestInputs()
         mutableSettings.value = state
@@ -127,7 +137,7 @@ class MainViewModel(
         else if (before != requestInputs()) changedInputs(before)
         else if (previous.autoTranslate != state.autoTranslate) {
             autoJob?.cancel()
-            if (state.autoTranslate && requestInputs() != lastRequestInputs) schedule()
+            if (state.autoTranslate && !hasCurrentResult()) schedule()
         }
     }
 
@@ -194,7 +204,7 @@ class MainViewModel(
     }
 
     private fun translateChoice() {
-        if (text.value.isNotBlank() && requestInputs() != lastRequestInputs) translate()
+        if (text.value.isNotBlank() && !hasCurrentResult()) translate()
     }
 
     fun setPrePrompt(value: String) {
@@ -256,7 +266,7 @@ class MainViewModel(
     fun setText(text: String) {
         if (text == mutableText.value) return
         mutableText.value = text
-        if (requestInputs() == lastRequestInputs) {
+        if (hasCurrentResult()) {
             autoJob?.cancel()
             return
         }
@@ -275,7 +285,7 @@ class MainViewModel(
         autoJob?.cancel()
         if (
             mutableSettings.value?.autoTranslate == true &&
-                requestInputs() != lastRequestInputs &&
+                !hasCurrentResult() &&
                 mutableText.value.isNotBlank() &&
                 !InputCounter.editor(mutableText.value).overLimit
         ) {

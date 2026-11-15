@@ -54,7 +54,7 @@ class ReviewRegressionTest {
                 "destination" to "connections",
             )
         val reads = mutableListOf<String>()
-        val destination = mainDestination { key ->
+        val destination = mainDestination("own.package", "own.package") { key ->
             reads += key
             extras[key]
         }
@@ -78,6 +78,17 @@ class ReviewRegressionTest {
         assertEquals("", vm.text.value)
         assertEquals(0, calls)
         assertEquals("connections", vm.navigation.value?.destination)
+    }
+
+    @Test
+    fun navigation_extras_are_only_read_for_our_own_caller() {
+        for (caller in listOf(null, "other.package")) {
+            assertNull(mainDestination(caller, "own.package") { error("Untrusted extra read") })
+        }
+        for (destination in listOf("translate", "settings", "connections", "network")) {
+            assertEquals(destination, mainDestination("own.package", "own.package") { destination })
+        }
+        assertNull(mainDestination("own.package", "own.package") { "unknown" })
     }
 
     @Test

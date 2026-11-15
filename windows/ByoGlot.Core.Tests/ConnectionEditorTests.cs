@@ -58,6 +58,12 @@ public class ConnectionEditorTests
     [Theory]
     [InlineData("https://api.deepseek.com")]
     [InlineData("http://192.168.1.5:11434/v1")]
+    [InlineData("https://0x7f.0.0.1:11434/v1")]
+    [InlineData("https://2130706433:11434/v1")]
+    [InlineData("https://127.1:11434/v1")]
+    [InlineData("https://012.0.0.1:11434/v1")]
+    [InlineData("https://localhost.:11434/v1")]
+    [InlineData("https://127.0.0.1.:11434/v1")]
     public async Task SaveWithoutConsentFails(string url)
     {
         var repository = new InMemorySettingsRepository(AppSettings.Initial("en"));
@@ -130,9 +136,20 @@ public class ConnectionEditorTests
     [Theory]
     [InlineData("localhost", true, false)]
     [InlineData("LOCALHOST", true, false)]
+    [InlineData("localhost.evil.com", false, false)]
+    [InlineData("localhost.", false, false)]
     [InlineData("127.0.0.1", true, false)]
     [InlineData("127.99.3.2", true, false)]
+    [InlineData("127.0.0.1.evil.com", false, false)]
+    [InlineData("127.0.0.1.", false, false)]
+    [InlineData("0x7f.0.0.1", false, false)]
+    [InlineData("2130706433", false, false)]
+    [InlineData("127.1", false, false)]
+    [InlineData("012.0.0.1", false, false)]
+    [InlineData("010.1.2.3", false, false)]
     [InlineData("::1", true, false)]
+    [InlineData("[::1]", true, false)]
+    [InlineData("[::ffff:127.0.0.1]", false, false)]
     [InlineData("fc00::1", false, true)]
     [InlineData("fdff::1", false, true)]
     [InlineData("fe80::1", false, true)]
@@ -147,15 +164,23 @@ public class ConnectionEditorTests
     [InlineData("192.168.1.1", false, true)]
     [InlineData("169.254.1.2", false, true)]
     [InlineData("model.local", false, true)]
+    [InlineData("MODEL.LOCAL", false, true)]
+    [InlineData("model.local.", false, false)]
+    [InlineData("192.168.1.1.", false, false)]
     [InlineData("model.local.example", false, false)]
     [InlineData("8.8.8.8", false, false)]
     public void HostClassesPreserveTheCleartextAllowlist(string host, bool loopback, bool lan)
     {
         Assert.Equal(loopback, Origins.IsLoopbackHost(host));
         Assert.Equal(lan, Origins.IsLanHost(host));
-        var url = "http://" + (host.Contains(':') ? "[" + host + "]" : host);
+        var urlHost = host.Contains(':') && !host.StartsWith('[') ? "[" + host + "]" : host;
+        var url = "http://" + urlHost + ":11434/v1?test=1#fragment";
+        Assert.Equal(urlHost, Origins.HostOf(url));
         Assert.Equal(loopback || lan, Origins.IsAllowedEndpoint(url));
         Assert.True(Origins.IsAllowedEndpoint(url.Replace("http:", "https:", StringComparison.Ordinal)));
+        Assert.Equal(!loopback, ProviderEffort.NeedsKey(ProviderPreset.Custom, url));
+        Assert.Equal(!loopback && !lan, ProviderEffort.NeedsKey(ProviderPreset.Ollama, url));
+        Assert.Equal(!loopback && !lan, ProviderEffort.NeedsKey(ProviderPreset.Lmstudio, url));
     }
 
     [Fact]
@@ -163,6 +188,13 @@ public class ConnectionEditorTests
     [Theory]
     [InlineData(" https://api.deepseek.com/v1 ", "https://api.deepseek.com/v1")]
     [InlineData("https://api.deepseek.com/v1/?a=b#fragment", "https://api.deepseek.com/v1")]
+    [InlineData("https://0x7f.0.0.1:11434/v1", "https://0x7f.0.0.1:11434/v1")]
+    [InlineData("https://2130706433/v1", "https://2130706433/v1")]
+    [InlineData("https://127.1/v1", "https://127.1/v1")]
+    [InlineData("https://012.0.0.1/v1", "https://012.0.0.1/v1")]
+    [InlineData("https://LOCALHOST.:443/v1/", "https://localhost./v1")]
+    [InlineData("https://127.0.0.1./v1", "https://127.0.0.1./v1")]
+    [InlineData("https://[::1]:443/v1/", "https://[::1]/v1")]
     public async Task SaveNormalizesTheEndpointBeforeCheckingAndStoring(string url, string expected)
     {
         var repository = new InMemorySettingsRepository(AppSettings.Initial("en"));

@@ -61,6 +61,27 @@ public class TranslationRunnerTests
         Assert.Empty(transport.Calls);
     }
 
+    [Theory]
+    [InlineData("https://0x7f.0.0.1:11434/v1")]
+    [InlineData("https://2130706433:11434/v1")]
+    [InlineData("https://127.1:11434/v1")]
+    [InlineData("https://012.0.0.1:11434/v1")]
+    [InlineData("https://localhost.:11434/v1")]
+    [InlineData("https://127.0.0.1.:11434/v1")]
+    public async Task NoncanonicalHostsNeedConsentAndAKeyBeforeTranslation(string url)
+    {
+        var initial = Configured(url, ProviderPreset.Ollama, false);
+        var repository = new InMemorySettingsRepository(initial);
+        var transport = new RecordingTransport();
+        var runner = new TranslationRunner(repository, new InMemorySecretStore(), transport);
+        var origin = Origins.OriginOf(url)!;
+        Assert.Equal(new RunnerError.ConsentNeeded(origin), (await Assert.ThrowsAsync<RunnerException>(() => runner.TranslateAsync(new("hi", 5000), CancellationToken.None))).Error);
+        await repository.UpdateAsync(s => s with { ConsentedOrigins = [origin] });
+        Assert.IsType<RunnerError.KeyMissing>((await Assert.ThrowsAsync<RunnerException>(() => runner.TranslateAsync(new("hi", 5000), CancellationToken.None))).Error);
+        Assert.Empty(transport.Calls);
+        Assert.Equal(initial.Connections, (await repository.ReadAsync()).Connections);
+    }
+
     [Fact]
     public async Task LocalNetworkNeedsConsentEvenWithAStoredCustomKey()
     {

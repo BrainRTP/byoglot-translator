@@ -33,7 +33,7 @@ public sealed partial class ConnectionDialog : ContentDialog
     {
         var origin = Origins.OriginOf(url.Text);
         consent.Content = Strings.Format("Consent_Text", origin ?? "");
-        consent.Visibility = origin is not null && !Origins.IsLoopbackHost(new Uri(origin).Host) ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
+        consent.Visibility = origin is not null && !Origins.IsLoopbackHost(Origins.HostOf(url.Text)) ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
     }
     private async void Save(ContentDialog sender, ContentDialogButtonClickEventArgs args)
     {

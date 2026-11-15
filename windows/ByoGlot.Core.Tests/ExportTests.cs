@@ -133,6 +133,12 @@ public class ExportTests
     [Theory]
     [InlineData("http://192.168.1.5:11434/v1", false)]
     [InlineData("https://models.example/v1", true)]
+    [InlineData("https://0x7f.0.0.1:11434/v1", true)]
+    [InlineData("https://2130706433:11434/v1", true)]
+    [InlineData("https://127.1:11434/v1", true)]
+    [InlineData("https://012.0.0.1:11434/v1", true)]
+    [InlineData("https://localhost.:11434/v1", true)]
+    [InlineData("https://127.0.0.1.:11434/v1", true)]
     public async Task ImportedConnectionsStayListedButModelsRequireConsentAndKeys(string url, bool keyMissing)
     {
         var file = ExportFile.Decode(Sample) with { Connections = [new("c1", ProviderPreset.Ollama, "Imported", url)] };

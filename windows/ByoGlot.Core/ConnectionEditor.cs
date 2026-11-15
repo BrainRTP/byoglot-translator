@@ -33,7 +33,7 @@ public sealed class ConnectionEditor(ISettingsRepository settings, ISecretStore 
         var changedOrigin = old is not null && Origins.OriginOf(old.BaseUrl) != origin;
         var hasKey = old is not null && !changedOrigin && await secrets.HasAsync(old.Id);
         if (Validate(draft, hasKey) is { } problem) throw new ArgumentException(problem.ToString());
-        if (!Origins.IsLoopbackHost(new Uri(origin).Host) && !consent && !state.ConsentedOrigins.Contains(origin))
+        if (!Origins.IsLoopbackHost(Origins.HostOf(draft.BaseUrl)) && !consent && !state.ConsentedOrigins.Contains(origin))
             throw new RunnerException(new RunnerError.ConsentNeeded(origin));
         var id = old?.Id ?? draft.Id ?? Guid.NewGuid().ToString();
         string? key = JsText.Trim(draft.ApiKey);
@@ -104,7 +104,7 @@ public sealed class ConnectionEditor(ISettingsRepository settings, ISecretStore 
         var connection = state.Connections.FirstOrDefault(c => c.Id == connectionId) ?? throw new RunnerException(new RunnerError.NoConnection());
         var origin = Origins.OriginOf(connection.BaseUrl) ?? throw new ArgumentException(nameof(DraftProblem.BaseUrl));
         if (!Origins.IsAllowedEndpoint(connection.BaseUrl)) throw new RunnerException(new RunnerError.Backend(new BackendException(ErrorKind.Offline)));
-        if (!Origins.IsLoopbackHost(new Uri(origin).Host) && !state.ConsentedOrigins.Contains(origin)) throw new RunnerException(new RunnerError.ConsentNeeded(origin));
+        if (!Origins.IsLoopbackHost(Origins.HostOf(connection.BaseUrl)) && !state.ConsentedOrigins.Contains(origin)) throw new RunnerException(new RunnerError.ConsentNeeded(origin));
         string? key;
         try { key = await secrets.GetAsync(connectionId, origin); }
         catch (OriginMismatchException) { throw new RunnerException(new RunnerError.KeyMissing()); }

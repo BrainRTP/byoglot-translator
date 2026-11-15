@@ -62,11 +62,16 @@ public sealed class ConnectionEditor(ISettingsRepository settings, ISecretStore 
         else if (changedOrigin) await secrets.DeleteAsync(id);
         try
         {
-            await settings.UpdateAsync(s => s with
+            await settings.UpdateAsync(s =>
             {
-                Connections = s.Connections.Any(c => c.Id == id) ? s.Connections.Select(c => c.Id == id ? connection : c).ToArray() : [.. s.Connections, connection],
-                ActiveConnectionId = id,
-                ConsentedOrigins = consent && !s.ConsentedOrigins.Contains(origin) ? [.. s.ConsentedOrigins, origin] : s.ConsentedOrigins
+                var connections = s.Connections.Any(c => c.Id == id) ? s.Connections.Select(c => c.Id == id ? connection : c).ToArray() : [.. s.Connections, connection];
+                var origins = consent ? s.ConsentedOrigins.Append(origin) : s.ConsentedOrigins;
+                return s with
+                {
+                    Connections = connections,
+                    ActiveConnectionId = id,
+                    ConsentedOrigins = origins.Where(o => connections.Any(c => Origins.OriginOf(c.BaseUrl) == o)).Distinct().ToArray()
+                };
             });
         }
         catch
@@ -81,7 +86,16 @@ public sealed class ConnectionEditor(ISettingsRepository settings, ISecretStore 
     public async Task RemoveAsync(string id)
     {
         await secrets.DeleteAsync(id);
-        await settings.UpdateAsync(s => s with { Connections = s.Connections.Where(c => c.Id != id).ToArray(), ActiveConnectionId = s.ActiveConnectionId == id ? null : s.ActiveConnectionId });
+        await settings.UpdateAsync(s =>
+        {
+            var connections = s.Connections.Where(c => c.Id != id).ToArray();
+            return s with
+            {
+                Connections = connections,
+                ActiveConnectionId = s.ActiveConnectionId == id ? null : s.ActiveConnectionId,
+                ConsentedOrigins = s.ConsentedOrigins.Where(o => connections.Any(c => Origins.OriginOf(c.BaseUrl) == o)).ToArray()
+            };
+        });
     }
 
     public async Task<IReadOnlyList<ModelInfo>> ModelsAsync(string connectionId, CancellationToken ct)

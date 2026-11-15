@@ -30,8 +30,7 @@ internal static class PageSupport
         catch (BackendException error) { await Message(owner, ErrorText.Text(new RunnerError.Backend(error))); }
         catch (ArgumentException) { await Message(owner, Strings.Get("Err_Invalid")); }
         catch (System.Text.Json.JsonException) { await Message(owner, Strings.Get("Err_Invalid")); }
-        catch (IOException) { await Message(owner, Strings.Get("Err_Storage")); }
-        catch (UnauthorizedAccessException) { await Message(owner, Strings.Get("Err_Storage")); }
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException) { await Message(owner, Strings.Get("Err_Storage")); }
     }
     public static Task<ContentDialogResult> Message(FrameworkElement owner, string text) => new ContentDialog { XamlRoot = owner.XamlRoot, Title = "ByoGlot", Content = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap }, CloseButtonText = Strings.Get("Close") }.ShowAsync().AsTask();
     public sealed record Language(string Code, string Name);

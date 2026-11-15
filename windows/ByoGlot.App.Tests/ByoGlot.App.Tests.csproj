@@ -15,6 +15,8 @@
     <ProjectReference Include="../ByoGlot.Core/ByoGlot.Core.csproj" />
     <Compile Include="../ByoGlot.App/Services/HttpClientTransport.cs" Link="Services/HttpClientTransport.cs" />
     <Compile Include="../ByoGlot.App/Services/FileSettingsRepository.cs" Link="Services/FileSettingsRepository.cs" />
+    <Compile Include="../ByoGlot.App/ViewModels/MainViewModel.cs" Link="ViewModels/MainViewModel.cs" />
+    <Compile Include="../ByoGlot.App/ViewModels/ObservableObject.cs" Link="ViewModels/ObservableObject.cs" />
     <Using Include="Xunit" />
     <Using Include="ByoGlot.Core" />
     <Using Include="ByoGlot.App.Services" />
@@ -25,6 +27,7 @@
     <Compile Include="../ByoGlot.App/Services/DpapiSecretStore.cs" Link="Services/DpapiSecretStore.cs" />
     <Compile Include="../ByoGlot.App/Shell/ClipboardSnapshot.cs" Link="Shell/ClipboardSnapshot.cs" />
     <Compile Include="../ByoGlot.App/Shell/ClipboardAccess.cs" Link="Shell/ClipboardAccess.cs" />
+    <Compile Include="../ByoGlot.App/Shell/ClipboardThread.cs" Link="Shell/ClipboardThread.cs" />
     <AdditionalFiles Include="../ByoGlot.App/NativeMethods.txt" />
   </ItemGroup>
   <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))"><Compile Remove="DpapiSecretStoreTests.cs;ClipboardSnapshotTests.cs" /></ItemGroup>

@@ -75,9 +75,19 @@ public sealed class DpapiSecretStore(string filePath) : ISecretStore
 
     private async Task<Dictionary<string, Entry>> ReadAsync()
     {
-        try { return JsonSerializer.Deserialize<Dictionary<string, Entry>>(await File.ReadAllTextAsync(path).ConfigureAwait(false), CoreJson.Options) ?? []; }
+        if (File.Exists(path + ".bad")) throw new InvalidDataException();
+        try
+        {
+            var values = JsonSerializer.Deserialize<Dictionary<string, Entry>>(await File.ReadAllTextAsync(path).ConfigureAwait(false), CoreJson.Options);
+            if (values is null || values.Values.Any(value => value is null)) throw new JsonException();
+            return values;
+        }
         catch (FileNotFoundException) { return []; }
         catch (DirectoryNotFoundException) { return []; }
-        catch (JsonException) { return []; }
+        catch (JsonException)
+        {
+            File.Move(path, path + ".bad");
+            throw new InvalidDataException();
+        }
     }
 }

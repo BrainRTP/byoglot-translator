@@ -43,7 +43,7 @@ public sealed partial class ConnectionsPage : Page
         var content = new StackPanel { Spacing = 12 }; content.Children.Add(page); content.Children.Add(selection); content.Children.Add(effort);
         var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = Strings.Get("ChooseModels"), Content = content, PrimaryButtonText = Strings.Get("Save"), CloseButtonText = Strings.Get("Cancel") };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-        ModelRef? Reference(ComboBox picker, string? variant) => picker.SelectedItem is ModelInfo m ? new(m.ProviderID, m.Id, variant, connection.Id) : null;
-        await AppServices.Current.Settings.UpdateAsync(s => s with { Connections = s.Connections.Select(c => c.Id == connection.Id ? c with { PageModel = Reference(page, null), SelectionModel = Reference(selection, effort.SelectedValue as string) } : c).ToArray() });
+        ModelRef? Reference(ComboBox picker, string? variant) => picker.SelectedItem is ModelInfo m ? new(m.ProviderID, m.Id, variant is not null && m.Variants.Contains(variant) ? variant : null, connection.Id) : null;
+        await AppServices.Current.Settings.UpdateAsync(s => s with { Connections = s.Connections.Select(c => c.Id == connection.Id ? c with { PageModel = Reference(page, c.PageModel?.Variant), SelectionModel = Reference(selection, effort.SelectedValue as string) } : c).ToArray() });
     }
 }

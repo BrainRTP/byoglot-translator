@@ -31,6 +31,7 @@ public sealed class MainState(TranslationRunner runner, ISettingsRepository sett
         }
         catch (OperationCanceledException) { if (request == generation) Set(new TranslatePhase.Idle()); }
         catch (RunnerException error) { if (request == generation) Set(new TranslatePhase.Failed(error.Error)); }
+        catch (Exception error) { if (request == generation) Set(new TranslatePhase.Failed(error is IOException or InvalidDataException or UnauthorizedAccessException ? new RunnerError.Storage() : new RunnerError.Backend(new BackendException(ErrorKind.ProviderError)))); }
         finally { if (request == generation) pending = null; }
     }
 

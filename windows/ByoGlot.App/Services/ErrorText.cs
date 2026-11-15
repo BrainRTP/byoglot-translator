@@ -12,6 +12,7 @@ public static class ErrorText
         RunnerError.ConsentNeeded => "Err_ConsentNeeded",
         RunnerError.TooLong => "Err_TooLong",
         RunnerError.Empty => "Err_Empty",
+        RunnerError.Storage => "Err_Storage",
         RunnerError.Backend backend => backend.Error.Kind switch
         {
             ErrorKind.Offline => "Err_Offline",

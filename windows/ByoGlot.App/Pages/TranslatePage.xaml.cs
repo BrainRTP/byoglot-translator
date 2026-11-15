@@ -15,6 +15,7 @@ public sealed partial class TranslatePage : Page
     private readonly TextBlock error = new() { TextWrapping = TextWrapping.Wrap };
     private readonly Button translate;
     private readonly Button fix;
+    private readonly Button copy;
     private readonly ProgressBar progress = new() { IsIndeterminate = true };
     public TranslatePage(MainViewModel model)
     {
@@ -37,7 +38,8 @@ public sealed partial class TranslatePage : Page
         Panel.Children.Add(error);
         Panel.Children.Add(fix);
         Panel.Children.Add(output);
-        Panel.Children.Add(PageSupport.Button("Copy", () => ((App)Application.Current).Copy(output.Text)));
+        copy = PageSupport.Button("Copy", () => { if (model.State.Phase is TranslatePhase.Done done) ((App)Application.Current).Copy(done.Output.Text); });
+        Panel.Children.Add(copy);
         model.State.Changed += Refresh;
         Unloaded += (_, _) => model.State.Changed -= Refresh;
         Refresh();
@@ -56,10 +58,11 @@ public sealed partial class TranslatePage : Page
         var target = PageSupport.Languages();
         source.Header = Strings.Get("Source"); target.Header = Strings.Get("Target");
         source.SelectedValue = settings.Globals.SourceLang; target.SelectedValue = selection.TargetLang;
-        source.SelectionChanged += (_, _) => _ = PageSupport.Guard(this, async () => { if (source.SelectedValue is string code) await AppServices.Current.Settings.UpdateAsync(s => s with { Globals = s.Globals with { SourceLang = code } }); });
+        source.SelectionChanged += (_, _) => _ = PageSupport.Guard(this, async () => { if (source.SelectedValue is string code) { model.InvalidateResult(); await AppServices.Current.Settings.UpdateAsync(s => s with { Globals = s.Globals with { SourceLang = code } }); } });
         target.SelectionChanged += (_, _) => _ = PageSupport.Guard(this, async () =>
         {
             if (applyingTemplate || target.SelectedValue is not string code) return;
+            model.InvalidateResult();
             selection.ChooseTarget(code);
             await AppServices.Current.Settings.UpdateAsync(s => s with { Globals = s.Globals with { TargetLang = code } });
         });
@@ -67,6 +70,7 @@ public sealed partial class TranslatePage : Page
         templates.SelectionChanged += (_, _) =>
         {
             if (settings.Templates.FirstOrDefault(t => t.Id == templates.SelectedValue as string) is not { } chosen) return;
+            model.InvalidateResult();
             selection.ChooseTemplate(chosen);
             applyingTemplate = true;
             try { target.SelectedValue = selection.TargetLang; }
@@ -79,6 +83,7 @@ public sealed partial class TranslatePage : Page
         translate.Content = Strings.Get(model.State.Phase is TranslatePhase.Working ? "Cancel" : "Translate");
         progress.Visibility = model.State.Phase is TranslatePhase.Working ? Visibility.Visible : Visibility.Collapsed;
         output.Text = model.State.Phase is TranslatePhase.Done done ? done.Output.Text : "";
+        copy.IsEnabled = model.State.Phase is TranslatePhase.Done;
         error.Text = model.State.Phase is TranslatePhase.Failed failed ? ErrorText.Text(failed.Error) : "";
         fix.Visibility = model.State.Phase is TranslatePhase.Failed failure && ErrorActions.OpensConnections(failure.Error) ? Visibility.Visible : Visibility.Collapsed;
     }

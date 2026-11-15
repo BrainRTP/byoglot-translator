@@ -8,6 +8,16 @@ namespace ByoGlot.App.Tests;
 
 public class ClipboardSnapshotTests
 {
+    [Theory]
+    [InlineData("timeout")]
+    [InlineData("invalid")]
+    [InlineData("access")]
+    public async Task ClipboardThreadFailuresReturnUnavailableAndReleaseTheGate(string kind)
+    {
+        Exception error = kind switch { "timeout" => new TimeoutException(), "invalid" => new InvalidOperationException(), _ => new UnauthorizedAccessException() };
+        Assert.Equal(-1, await ClipboardThread.Run<int>(() => throw error, -1, TestContext.Current.CancellationToken));
+        Assert.Equal(ApartmentState.STA, await ClipboardThread.Run(() => Thread.CurrentThread.GetApartmentState(), ApartmentState.Unknown, TestContext.Current.CancellationToken));
+    }
     private sealed class Source(bool stream, bool failEnumeration = false) : IDataObject
     {
         public byte[] Bytes { get; set; } = [1, 2, 3, 4];

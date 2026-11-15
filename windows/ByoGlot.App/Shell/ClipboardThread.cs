@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Windows.Win32;
 
 namespace ByoGlot.App.Shell;
@@ -13,12 +12,17 @@ internal static class ClipboardThread
         var thread = new Thread(() =>
         {
             var result = unavailable;
-            var ole = PInvoke.OleInitialize();
-            try { if (ole.Succeeded && !cancellation.IsCancellationRequested) result = operation(); }
-            catch (Exception error) when (error is COMException or IOException or UnauthorizedAccessException or OverflowException) { }
+            var initialized = false;
+            try
+            {
+                initialized = PInvoke.OleInitialize().Succeeded;
+                if (initialized && !cancellation.IsCancellationRequested) result = operation();
+            }
+            catch (Exception) { }
             finally
             {
-                if (ole.Succeeded) PInvoke.OleUninitialize();
+                try { if (initialized) PInvoke.OleUninitialize(); }
+                catch (Exception) { }
                 Gate.Release();
             }
             completion.TrySetResult(result);

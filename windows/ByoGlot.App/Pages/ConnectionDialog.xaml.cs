@@ -48,7 +48,7 @@ public sealed partial class ConnectionDialog : ContentDialog
         catch (RunnerException e) { error.Text = ErrorText.Text(e.Error); args.Cancel = true; }
         catch (BackendException e) { error.Text = ErrorText.Text(new RunnerError.Backend(e)); args.Cancel = true; }
         catch (ArgumentException) { error.Text = Strings.Get("Err_InvalidConnection"); args.Cancel = true; }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.Cryptography.CryptographicException) { error.Text = Strings.Get("Err_Storage"); args.Cancel = true; }
+        catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException or System.Security.Cryptography.CryptographicException) { error.Text = Strings.Get("Err_Storage"); args.Cancel = true; }
         finally { IsPrimaryButtonEnabled = true; deferral.Complete(); }
     }
 }

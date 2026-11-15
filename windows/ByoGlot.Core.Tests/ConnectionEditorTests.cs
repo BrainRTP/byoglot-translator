@@ -89,6 +89,7 @@ public class ConnectionEditorTests
         await editor.SaveAsync(Draft("http://localhost:11434/v1", "", "c", ProviderPreset.Custom), false, CancellationToken.None);
         Assert.False(await secrets.HasAsync("c"));
         Assert.False(Assert.Single(transport.Calls).Request.Headers.ContainsKey("authorization"));
+        Assert.DoesNotContain("https://api.deepseek.com", (await repository.ReadAsync()).ConsentedOrigins);
     }
 
     [Fact]
@@ -101,7 +102,24 @@ public class ConnectionEditorTests
         await editor.RemoveAsync("c");
         Assert.Null((await repository.ReadAsync()).ActiveConnectionId);
         Assert.Empty((await repository.ReadAsync()).Connections);
+        Assert.Empty((await repository.ReadAsync()).ConsentedOrigins);
         Assert.False(await secrets.HasAsync("c"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OriginConsentLastsUntilItsFinalConnectionIsRemovedOrMoved(bool move)
+    {
+        var initial = TranslationRunnerTests.Configured();
+        var repository = new InMemorySettingsRepository(initial with { Connections = [initial.Connections[0], initial.Connections[0] with { Id = "shared" }] });
+        var editor = new ConnectionEditor(repository, new InMemorySecretStore(), new RecordingTransport(RecordingTransport.JsonResponse(Models)));
+        if (move) await editor.SaveAsync(Draft("https://other.example", "key", "c"), true, CancellationToken.None);
+        else await editor.RemoveAsync("c");
+        Assert.Contains("https://api.deepseek.com", (await repository.ReadAsync()).ConsentedOrigins);
+        await editor.RemoveAsync("shared");
+        Assert.DoesNotContain("https://api.deepseek.com", (await repository.ReadAsync()).ConsentedOrigins);
+        await Assert.ThrowsAsync<RunnerException>(() => editor.SaveAsync(Draft(), false, CancellationToken.None));
     }
 
     [Theory]

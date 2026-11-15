@@ -24,7 +24,9 @@ public sealed class QuickCoordinator
     public async Task SelectionAsync()
     {
         var id = Begin();
-        var selected = await window.SetTemplatesAsync(template);
+        string? selected;
+        try { selected = await window.SetTemplatesAsync(template); }
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException) { if (id == nextRequest) ShowStorageError(); return; }
         if (id != nextRequest) return;
         template = selected;
         var captureTask = reader.ReadAsync();
@@ -37,13 +39,20 @@ public sealed class QuickCoordinator
     public async Task ClipboardAsync()
     {
         var id = Begin();
-        var selected = await window.SetTemplatesAsync(template);
+        string? selected;
+        try { selected = await window.SetTemplatesAsync(template); }
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException) { if (id == nextRequest) ShowStorageError(); return; }
         if (id != nextRequest) return;
         template = selected;
         appName = "";
-        Apply(new QuickEvent.Clipboard(ClipboardAccess.Read(InputLimits.Quick), id));
+        using var cancellation = new CancellationTokenSource();
+        ClipboardRead value;
+        try { value = await ClipboardThread.Run<ClipboardRead>(() => ClipboardAccess.Read(InputLimits.Quick), new ClipboardRead.Empty(), cancellation.Token).WaitAsync(TimeSpan.FromMilliseconds(ClipboardCopy.OperationTimeoutMs)); }
+        catch (TimeoutException) { cancellation.Cancel(); value = new ClipboardRead.Empty(); }
+        if (id == nextRequest) Apply(new QuickEvent.Clipboard(value, id));
     }
     public void Dismiss() { Begin(); Apply(new QuickEvent.Dismissed()); }
+    public void ShowStorageError() { Begin(); State = new QuickState.Message("Err_Storage"); window.Render(State); }
     private void Apply(QuickEvent action)
     {
         var reduced = QuickReducer.Reduce(State, action); State = reduced.State;
@@ -60,7 +69,7 @@ public sealed class QuickCoordinator
         }
         catch (OperationCanceledException) { }
         catch (RunnerException error) { if (id == nextRequest) Apply(new QuickEvent.FailedWith(error.Error, id)); }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { if (id == nextRequest) Apply(new QuickEvent.FailedWith(new RunnerError.Backend(new BackendException(ErrorKind.Offline)), id)); }
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException) { if (id == nextRequest) Apply(new QuickEvent.FailedWith(new RunnerError.Storage(), id)); }
         finally { if (id == nextRequest) pending = null; }
     }
 }

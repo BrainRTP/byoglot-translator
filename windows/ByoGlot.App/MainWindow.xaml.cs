@@ -9,7 +9,7 @@ namespace ByoGlot.App;
 
 public sealed partial class MainWindow : Window
 {
-    public MainViewModel Model { get; } = new();
+    public MainViewModel Model { get; } = new(new(AppServices.Current.Runner, AppServices.Current.Settings));
     public MainWindow()
     {
         InitializeComponent();

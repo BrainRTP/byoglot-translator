@@ -1,9 +1,11 @@
 package io.github.brainrtp.byoglot
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.PersistableBundle
 import android.provider.Settings
@@ -28,6 +30,11 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private lateinit var model: MainViewModel
+    private val localNetworkPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (!granted && !shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_LOCAL_NETWORK))
+                openNetworkSettings()
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,6 +51,7 @@ class MainActivity : ComponentActivity() {
                             container.settings,
                             container.secrets,
                             container.transport,
+                            stream = container.runner::stream,
                             networkOnline = network::online,
                             cache = container.cache,
                             sourceLanguageDetector =
@@ -53,7 +61,7 @@ class MainActivity : ComponentActivity() {
                 },
             )[MainViewModel::class.java]
         model = vm
-        val destination = mainDestination(intent::getStringExtra)
+        val destination = mainDestination(caller?.getPackage(), packageName, intent::getStringExtra)
         val export =
             registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) {
                 uri ->
@@ -95,11 +103,12 @@ class MainActivity : ComponentActivity() {
                         }
                     }
             }
-        val networkSettings = { openNetworkSettings() }
+        val networkSettings = { requestLocalNetwork() }
         if (savedInstanceState == null && destination == "network") networkSettings()
         val version = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
         setContent {
             val appSettings by vm.settings.collectAsState()
+            val corruptSettings by container.settings.corrupt.collectAsState()
             LaunchedEffect(vm) { network.changes.collect(vm::setNetworkAvailable) }
             ByoglotTheme(appSettings?.theme ?: io.github.brainrtp.byoglot.core.ThemeChoice.system) {
                 val background = ByoTheme.colors.bg
@@ -108,6 +117,13 @@ class MainActivity : ComponentActivity() {
                         if (background.luminance() < .5f) SystemBarStyle.dark(background.toArgb())
                         else SystemBarStyle.light(background.toArgb(), background.toArgb())
                     enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                }
+                if (corruptSettings) {
+                    SettingsRecoveryScreen {
+                        container.settings.resetCorruptSettings()
+                        vm.refresh()
+                    }
+                    return@ByoglotTheme
                 }
                 AppNavigation(
                     vm,
@@ -166,10 +182,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        setIntent(intent)
-        val destination = mainDestination(intent::getStringExtra)
+        setIntent(intent, currentCaller)
+        val destination = mainDestination(currentCaller.getPackage(), packageName, intent::getStringExtra)
         model.receiveQuickRequest(destination)
-        if (destination == "network") openNetworkSettings()
+        if (destination == "network") requestLocalNetwork()
+    }
+
+    private fun requestLocalNetwork() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_LOCAL_NETWORK) != PackageManager.PERMISSION_GRANTED)
+            localNetworkPermission.launch(Manifest.permission.ACCESS_LOCAL_NETWORK)
     }
 
     private fun openNetworkSettings() {

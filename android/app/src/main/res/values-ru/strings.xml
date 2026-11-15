@@ -1,4 +1,7 @@
 <resources>
+    <string name="settings_corrupt">Не удалось загрузить настройки</string>
+    <string name="settings_recovery">Сбросьте настройки, чтобы продолжить. Поврежденный файл останется на диске для восстановления. API-ключи сохранятся.</string>
+    <string name="reset_settings">Сбросить настройки</string>
     <string name="app_name">ByoGlot</string>
     <string name="quick_label">Перевести в ByoGlot</string>
     <string name="template">Шаблон</string>
@@ -8,9 +11,10 @@
     <string name="error_no_model">Выберите модель в ByoGlot.</string>
     <string name="error_key_missing">Для этого провайдера не задан API-ключ.</string>
     <string name="error_consent">Подтвердите в ByoGlot отправку текста на %1$s.</string>
-    <string name="error_too_long">Текст длиннее %1$d символов.</string>
+    <string name="error_too_long">Слишком длинный текст. Лимит символов: %1$d.</string>
     <string name="error_empty">Нет текста для перевода.</string>
-    <string name="error_local_network">Разрешите ByoGlot доступ к локальной сети в настройках системы.</string>
+    <string name="error_local_network">Разрешите ByoGlot доступ к локальной сети и повторите запрос.</string>
+    <string name="allow_local_network">Разрешить доступ к локальной сети</string>
     <string name="error_offline">Провайдер не ответил. Проверьте соединение.</string>
     <string name="error_auth">Провайдер отклонил API-ключ (HTTP %1$d).</string>
     <string name="error_rate_limit">Достигнут лимит провайдера. Повторите позже.</string>

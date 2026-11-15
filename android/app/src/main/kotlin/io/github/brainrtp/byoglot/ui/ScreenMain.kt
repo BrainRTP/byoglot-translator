@@ -174,7 +174,7 @@ fun ScreenMainErrors(
                     if (p.kind == MainErrorKind.Key) R.string.key_replace
                     else R.string.err_openSettings,
                 )
-            MainErrorAction.Network -> stringResource(R.string.err_openSettings)
+            MainErrorAction.Network -> stringResource(R.string.allow_local_network)
         }
     Banner(title, body, actionLabel ?: action, { onAction(p.action) }, warning = p.warning)
 }

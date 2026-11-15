@@ -69,11 +69,16 @@ class QuickTranslateActivity : ComponentActivity() {
             )[QuickTranslateViewModel::class.java]
         model = vm
         setContent {
-            val theme by
-                produceState(io.github.brainrtp.byoglot.core.ThemeChoice.system) {
-                    value = container.settings.read().theme
+            val settings by vm.settings.collectAsState()
+            val corruptSettings by container.settings.corrupt.collectAsState()
+            ByoglotTheme(settings?.theme ?: io.github.brainrtp.byoglot.core.ThemeChoice.system) {
+                if (corruptSettings) {
+                    SettingsRecoveryScreen {
+                        container.settings.resetCorruptSettings()
+                        vm.refresh()
+                    }
+                    return@ByoglotTheme
                 }
-            ByoglotTheme(theme) {
                 ScreenShare(
                     vm,
                     onCopy = {

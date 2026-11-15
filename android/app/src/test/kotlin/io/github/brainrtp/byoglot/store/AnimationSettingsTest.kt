@@ -1,5 +1,6 @@
 package io.github.brainrtp.byoglot.store
 
+import androidx.datastore.core.CorruptionException
 import io.github.brainrtp.byoglot.core.*
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -20,6 +21,33 @@ class AnimationSettingsTest {
             val bytes = ByteArrayOutputStream()
             SettingsSerializer.writeTo(saved, bytes)
             assertEquals(saved, SettingsSerializer.readFrom(ByteArrayInputStream(bytes.toByteArray())))
+        }
+    }
+
+    @Test
+    fun `unknown device enums preserve connections templates and consent`() = runBlocking {
+        val connection = Connection("saved", ProviderPreset.custom, "Saved", "https://provider.test/v1")
+        val saved = AppSettings.initial("en").copy(
+            connections = listOf(connection),
+            activeConnectionId = connection.id,
+            consentedOrigins = listOf("https://provider.test"),
+            templates = listOf(Contracts.builtinTemplate, Template("own", "Own", false, TemplateSettings())),
+        )
+        val data = json.encodeToJsonElement(saved).jsonObject
+        val future = JsonObject(data + mapOf(
+            "animation" to JsonPrimitive("future"),
+            "theme" to JsonPrimitive("future"),
+            "connections" to JsonArray(listOf(JsonObject(
+                data.getValue("connections").jsonArray.single().jsonObject + ("preset" to JsonPrimitive("future")),
+            ))),
+        ))
+        assertEquals(saved, SettingsSerializer.readFrom(ByteArrayInputStream(future.toString().toByteArray())))
+    }
+
+    @Test
+    fun `malformed settings fail instead of becoming defaults`() {
+        assertThrows(CorruptionException::class.java) {
+            runBlocking { SettingsSerializer.readFrom(ByteArrayInputStream("broken".toByteArray())) }
         }
     }
 

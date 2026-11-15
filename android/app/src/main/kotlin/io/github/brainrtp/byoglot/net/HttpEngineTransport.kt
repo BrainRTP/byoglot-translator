@@ -3,6 +3,7 @@ package io.github.brainrtp.byoglot.net
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.InetAddresses
 import android.net.http.*
 import io.github.brainrtp.byoglot.core.*
 import java.io.ByteArrayOutputStream
@@ -47,7 +48,12 @@ class HttpEngineTransport(context: Context) : HttpTransport {
 
     private fun responseFlow(request: HttpRequest): Flow<HttpStreamEvent> = callbackFlow {
         val origin = PhoneProviderPolicy.requireOrigin(request.url)
-        val local = isLocalHost(URI(origin).host)
+        val host = URI(origin).host.removePrefix("[").removeSuffix("]").removeSuffix(".")
+        val loopback =
+            host == "localhost" ||
+                (InetAddresses.isNumericAddress(host) &&
+                    InetAddresses.parseNumericAddress(host).isLoopbackAddress)
+        val local = !loopback && isLocalHost(host)
         if (local && !localAllowed())
             throw TransportException(TransportException.Reason.LocalNetworkDenied)
         var redirects = 0
@@ -106,7 +112,7 @@ class HttpEngineTransport(context: Context) : HttpTransport {
 
                 override fun onFailed(r: UrlRequest, info: UrlResponseInfo?, error: HttpException) {
                     val denied =
-                        !localAllowed() &&
+                        !loopback && !localAllowed() &&
                             (local ||
                                 generateSequence<Throwable>(error) { it.cause }
                                     .any {

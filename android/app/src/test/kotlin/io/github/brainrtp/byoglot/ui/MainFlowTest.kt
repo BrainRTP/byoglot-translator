@@ -97,7 +97,7 @@ class MainFlowTest {
     }
 
     @Test
-    fun `manual mode uses keyboard action and counts UTF16 before trimming`() = runTest {
+    fun `manual mode uses keyboard action and counts UTF16 after JS trimming`() = runTest {
         var calls = 0
         val vm =
             MainViewModel(
@@ -119,11 +119,77 @@ class MainFlowTest {
         runCurrent()
         assertEquals(1, calls)
         assertEquals(InputCounter(20000, 20000), InputCounter.editor("😀".repeat(10000)))
-        vm.setText(" " + "😀".repeat(10000))
+        val padded = "\uFEFF " + "😀".repeat(10000) + "\n".repeat(20)
+        assertEquals(InputCounter(20000, 20000), InputCounter.editor(padded))
+        vm.setText(padded)
+        vm.keyboardTranslate()
+        runCurrent()
+        assertNull(vm.translation.value.error)
+        assertEquals(2, calls)
+        vm.setText("😀".repeat(10000) + "x")
         vm.keyboardTranslate()
         runCurrent()
         assertEquals(RunnerError.TooLong(20000), vm.translation.value.error)
-        assertEquals(1, calls)
+        assertEquals(2, calls)
+    }
+
+    @Test
+    fun `only a displayed complete result suppresses equivalent automatic requests`() = runTest {
+        for (firstResult in listOf("complete", "incomplete", "error")) {
+            var calls = 0
+            val vm =
+                MainViewModel(
+                    InMemorySettingsRepository(AppSettings.initial("en")),
+                    InMemorySecretStore(),
+                    transport,
+                    backgroundScope,
+                    stream = { input ->
+                        calls++
+                        if (calls == 1 && firstResult == "error")
+                            throw RunnerException(RunnerError.Backend(BackendException(ErrorKind.RateLimit)))
+                        flowOf(RunnerStreamOutput(output(input), true, calls == 1 && firstResult == "incomplete"))
+                    },
+                )
+            runCurrent()
+            vm.setText("source")
+            advanceTimeBy(801)
+            runCurrent()
+            assertEquals(1, calls)
+            vm.paste("source")
+            runCurrent()
+            val repeated = if (firstResult == "complete") 1 else 2
+            assertEquals(repeated, calls)
+            val answer = vm.translation.value
+            assertTrue(answer.complete)
+            assertFalse(answer.incomplete)
+            assertNull(answer.error)
+            vm.setText("source ")
+            advanceTimeBy(801)
+            runCurrent()
+            vm.setText("source")
+            advanceTimeBy(801)
+            runCurrent()
+            vm.paste("\uFEFFsource\n")
+            runCurrent()
+            assertEquals(repeated, calls)
+            assertEquals(answer, vm.translation.value)
+            vm.setText("different")
+            assertNull(vm.translation.value.output)
+            vm.setText("source")
+            advanceTimeBy(801)
+            runCurrent()
+            assertEquals(repeated + 1, calls)
+            assertEquals("translated", vm.translation.value.output?.text)
+            vm.setText("")
+            assertNull(vm.translation.value.output)
+            vm.paste("source")
+            runCurrent()
+            assertEquals(repeated + 2, calls)
+            assertEquals("translated", vm.translation.value.output?.text)
+            vm.translate(forceRequest = true)
+            runCurrent()
+            assertEquals(repeated + 3, calls)
+        }
     }
 
     @Test

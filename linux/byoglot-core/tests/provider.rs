@@ -206,21 +206,19 @@ async fn provider_refuses_insecure_remote_requests_and_allows_lan() {
     }
 }
 #[test]
-fn custom_key_requirement_matches_the_typescript_loopback_allowlist() {
-    for host in ["localhost", "127.0.0.1"] {
+fn custom_needs_a_key_except_on_loopback() {
+    for host in ["localhost", "127.0.0.1", "127.0.0.2", "127.2.3.4", "[::1]"] {
         assert!(!needs_key(
             ProviderPreset::Custom,
             &format!("http://{host}:8080/v1")
         ));
     }
     for host in [
-        "127.2.3.4",
         "10.0.0.1",
         "172.16.0.1",
         "192.168.0.1",
         "169.254.0.1",
         "box.local",
-        "[::1]",
         "[fc00::1]",
         "[fe80::1]",
         "localhost.",
@@ -229,6 +227,50 @@ fn custom_key_requirement_matches_the_typescript_loopback_allowlist() {
             needs_key(ProviderPreset::Custom, &format!("http://{host}/v1")),
             "{host}"
         );
+    }
+}
+#[test]
+fn keyless_presets_need_a_key_only_for_external_hosts() {
+    for preset in [ProviderPreset::Ollama, ProviderPreset::Lmstudio] {
+        for host in [
+            "localhost",
+            "127.0.0.1",
+            "127.0.0.2",
+            "[::1]",
+            "10.1.2.3",
+            "172.16.0.1",
+            "172.31.255.255",
+            "192.168.1.5",
+            "169.254.0.1",
+            "box.local",
+            "[fc00::1]",
+            "[fdff::1]",
+            "[fe80::1]",
+            "[febf::1]",
+        ] {
+            assert!(!needs_key(preset, &format!("http://{host}/v1")), "{host}");
+        }
+        for host in [
+            "example.com",
+            "localhost.example",
+            "172.15.255.255",
+            "172.32.0.1",
+            "[fbff::1]",
+            "[fe7f::1]",
+            "[fec0::1]",
+            "[2001:db8::1]",
+        ] {
+            assert!(needs_key(preset, &format!("https://{host}/v1")), "{host}");
+        }
+        assert!(needs_key(preset, "broken url"));
+    }
+    for preset in [
+        ProviderPreset::Deepseek,
+        ProviderPreset::Openrouter,
+        ProviderPreset::Openai,
+        ProviderPreset::Mistral,
+    ] {
+        assert!(needs_key(preset, "http://localhost/v1"));
     }
 }
 #[test]

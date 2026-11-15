@@ -95,7 +95,7 @@ impl<S: SettingsRepository, K: SecretStore, T: HttpTransport + Send> ConnectionE
             Some(_) => return Err(invalid_base_url()),
             None => (),
         }
-        if !crate::effort::local_origin(&origin)
+        if !crate::effort::is_loopback_origin(&origin)
             && !consent
             && !settings.consented_origins.contains(&origin)
         {
@@ -199,7 +199,9 @@ impl<S: SettingsRepository, K: SecretStore, T: HttpTransport + Send> ConnectionE
         let origin = crate::effort::permitted_endpoint(&connection.base_url)
             .ok_or_else(invalid_base_url)?
             .origin;
-        if !crate::effort::local_origin(&origin) && !settings.consented_origins.contains(&origin) {
+        if !crate::effort::is_loopback_origin(&origin)
+            && !settings.consented_origins.contains(&origin)
+        {
             return Err(RunnerError::ConsentNeeded { origin });
         }
         let secret = self

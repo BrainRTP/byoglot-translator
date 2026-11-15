@@ -128,6 +128,61 @@ async fn remote_origin_needs_consent_then_is_recorded() {
     assert_eq!(editor.models(&saved.id).await.unwrap().len(), 1);
 }
 #[tokio::test]
+async fn lan_save_needs_consent_before_checking_models() {
+    let transport = RecordingTransport::models();
+    let (editor, repository, _) = editor(AppSettings::initial(None), transport.clone());
+    let mut d = draft();
+    d.preset = ProviderPreset::Ollama;
+    d.base_url = "http://192.168.1.5/v1".into();
+    d.api_key.clear();
+    assert_eq!(
+        editor.save(d.clone(), false).await,
+        Err(RunnerError::ConsentNeeded {
+            origin: "http://192.168.1.5".into()
+        })
+    );
+    assert!(transport.requests.lock().unwrap().is_empty());
+    assert!(repository.read().await.connections.is_empty());
+    assert!(editor.save(d, true).await.is_ok());
+    assert_eq!(transport.requests.lock().unwrap().len(), 1);
+}
+#[tokio::test]
+async fn imported_connections_stay_listed_when_models_need_consent_or_a_key() {
+    for (base_url, missing) in [
+        (
+            "http://192.168.1.5/v1",
+            RunnerError::ConsentNeeded {
+                origin: "http://192.168.1.5".into(),
+            },
+        ),
+        ("https://example.com/v1", RunnerError::KeyMissing),
+    ] {
+        let mut s = settings();
+        s.connections[0].preset = ProviderPreset::Ollama;
+        s.connections[0].base_url = base_url.into();
+        let imported = merge_export(
+            export_settings(&s, "2026-11-15T00:00:00.000Z"),
+            AppSettings::initial(None),
+        );
+        assert_eq!(imported.connections.len(), 1);
+        assert!(imported.consented_origins.is_empty());
+        let transport = RecordingTransport::models();
+        let (editor, repository, _) = editor(imported, transport.clone());
+        if missing == RunnerError::KeyMissing {
+            repository
+                .update(Box::new(|mut s| {
+                    s.consented_origins.push("https://example.com".into());
+                    s
+                }))
+                .await;
+        }
+        let before = repository.read().await;
+        assert_eq!(editor.models("c1").await, Err(missing));
+        assert!(transport.requests.lock().unwrap().is_empty());
+        assert_eq!(repository.read().await, before);
+    }
+}
+#[tokio::test]
 async fn changed_origin_never_uses_old_key_and_replaces_it_after_check() {
     let transport = RecordingTransport::models();
     let (editor, repository, secrets) = editor(settings(), transport.clone());

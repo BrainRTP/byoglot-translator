@@ -18,8 +18,7 @@ pub fn new_id(prefix: &str) -> String {
 
 pub fn remote_origin(url: &str) -> Option<String> {
     let origin = byoglot_core::origin_of(url.trim())?;
-    let parsed = reqwest::Url::parse(&origin).ok()?;
-    (!parsed.host_str().is_some_and(byoglot_core::is_local_host)).then_some(origin)
+    (!byoglot_core::is_loopback_origin(&origin)).then_some(origin)
 }
 
 pub fn model_choices(
@@ -243,14 +242,19 @@ mod tests {
         assert!(!save_profile(&mut settings, "auto", Some("unused".into())));
     }
     #[test]
-    fn consent_is_only_requested_for_remote_origins() {
-        assert_eq!(
-            remote_origin("https://example.com/v1"),
-            Some("https://example.com".into())
-        );
+    fn consent_is_requested_for_every_non_loopback_origin() {
+        for (url, origin) in [
+            ("https://example.com/v1", "https://example.com"),
+            ("http://192.168.1.4/v1", "http://192.168.1.4"),
+            ("http://box.local/v1", "http://box.local"),
+            ("http://[fd00::1]/v1", "http://[fd00::1]"),
+        ] {
+            assert_eq!(remote_origin(url), Some(origin.into()));
+        }
         for url in [
+            "http://localhost/v1",
             "http://127.0.0.1:1234/v1",
-            "http://192.168.1.4/v1",
+            "http://127.0.0.2/v1",
             "http://[::1]/v1",
         ] {
             assert_eq!(remote_origin(url), None);

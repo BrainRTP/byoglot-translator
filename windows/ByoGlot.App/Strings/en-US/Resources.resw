@@ -60,7 +60,7 @@
   <data name="Err_NoConnection" xml:space="preserve"><value>Add a provider first.</value></data>
   <data name="Err_NoModel" xml:space="preserve"><value>Choose a model.</value></data>
   <data name="Err_KeyMissing" xml:space="preserve"><value>The API key for this provider is missing.</value></data>
-  <data name="Err_ConsentNeeded" xml:space="preserve"><value>Confirm that text may be sent to {0}.</value></data>
+  <data name="Err_ConsentNeeded" xml:space="preserve"><value>Confirm that requests and text may be sent to {0}.</value></data>
   <data name="Err_TooLong" xml:space="preserve"><value>The text is longer than {0} characters.</value></data>
   <data name="Err_Empty" xml:space="preserve"><value>There is no text to translate.</value></data>
   <data name="Err_Offline" xml:space="preserve"><value>The provider did not answer. Check the connection.</value></data>
@@ -70,7 +70,7 @@
   <data name="Err_Invalid" xml:space="preserve"><value>This settings file or value is invalid.</value></data>
   <data name="Err_InvalidConnection" xml:space="preserve"><value>Check the URL and API key. Public endpoints require HTTPS.</value></data>
   <data name="Err_Storage" xml:space="preserve"><value>Settings or API keys could not be read or saved. If a .bad file exists in the app data folder, recover it or move it elsewhere before trying again.</value></data>
-  <data name="Consent_Text" xml:space="preserve"><value>Text I translate and my instructions are sent to {0}.</value></data>
+  <data name="Consent_Text" xml:space="preserve"><value>I allow requests, my translation text and instructions to be sent to {0}.</value></data>
   <data name="Quick_NoText" xml:space="preserve"><value>No text was selected.</value></data>
   <data name="Quick_Elevated" xml:space="preserve"><value>ByoGlot cannot read text from apps that run as administrator.</value></data>
   <data name="Quick_Private" xml:space="preserve"><value>ByoGlot does not read private clipboard content.</value></data>

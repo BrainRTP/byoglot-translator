@@ -44,7 +44,7 @@ public sealed partial class QuickWindow : Window
         PInvoke.SetWindowLongPtr(handle, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE, PInvoke.GetWindowLongPtr(handle, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE) | (nint)(WINDOW_EX_STYLE.WS_EX_NOACTIVATE | WINDOW_EX_STYLE.WS_EX_TOOLWINDOW));
         pin.Header = Strings.Get("Pin"); templates.Header = Strings.Get("Template");
         templates.SelectionChanged += (_, _) => { if (!updating) TemplateChanged?.Invoke(templates.SelectedValue as string); };
-        copy = PageSupport.Button("Copy", () => { if (copy.IsEnabled) ((App)Application.Current).Copy(result.Text); });
+        copy = PageSupport.Button("Copy", () => { if (copy?.IsEnabled == true) ((App)Application.Current).Copy(result.Text); });
         copy.IsEnabled = false;
         foreach (var element in new UIElement[] { source, progress, result, copy, templates, PageSupport.Button("OpenEditor", () => { ((App)Application.Current).Main.Model.Text = original; ((App)Application.Current).ShowMain(); }), pin }) Panel.Children.Add(element);
         AppWindow.Closing += (_, args) => { args.Cancel = true; Dismiss(); };

@@ -24,7 +24,9 @@ public sealed class QuickCoordinator
     public async Task SelectionAsync()
     {
         var id = Begin();
-        var selected = await window.SetTemplatesAsync(template);
+        string? selected;
+        try { selected = await window.SetTemplatesAsync(template); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { if (id == nextRequest) ShowStorageError(); return; }
         if (id != nextRequest) return;
         template = selected;
         var captureTask = reader.ReadAsync();
@@ -37,7 +39,9 @@ public sealed class QuickCoordinator
     public async Task ClipboardAsync()
     {
         var id = Begin();
-        var selected = await window.SetTemplatesAsync(template);
+        string? selected;
+        try { selected = await window.SetTemplatesAsync(template); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { if (id == nextRequest) ShowStorageError(); return; }
         if (id != nextRequest) return;
         template = selected;
         appName = "";
@@ -48,6 +52,7 @@ public sealed class QuickCoordinator
         if (id == nextRequest) Apply(new QuickEvent.Clipboard(value, id));
     }
     public void Dismiss() { Begin(); Apply(new QuickEvent.Dismissed()); }
+    private void ShowStorageError() { Begin(); State = new QuickState.Message("Err_Storage"); window.Render(State); }
     private void Apply(QuickEvent action)
     {
         var reduced = QuickReducer.Reduce(State, action); State = reduced.State;

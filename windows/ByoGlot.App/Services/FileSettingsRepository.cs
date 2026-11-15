@@ -38,14 +38,21 @@ public sealed class FileSettingsRepository(string filePath) : ISettingsRepositor
 
     private async Task<AppSettings> ReadFileAsync()
     {
+        if (File.Exists(path + ".bad")) throw new InvalidDataException();
         try
         {
             var value = JsonSerializer.Deserialize<AppSettings>(await File.ReadAllTextAsync(path).ConfigureAwait(false), CoreJson.Options);
-            if (value is { Globals: not null, Templates: not null, Connections: not null, ConsentedOrigins: not null, ProfileOverrides: not null, SiteRules: not null }) return value;
+            if (value is not { Globals: not null, Templates: not null, Connections: not null, ConsentedOrigins: not null, ProfileOverrides: not null, SiteRules: not null }) throw new JsonException();
+            if (value.SchemaVersion != 1) throw new InvalidDataException();
+            return value;
         }
         catch (FileNotFoundException) { }
         catch (DirectoryNotFoundException) { }
-        catch (JsonException) { }
+        catch (JsonException)
+        {
+            File.Move(path, path + ".bad");
+            throw new InvalidDataException();
+        }
         return AppSettings.Initial(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
     }
 }

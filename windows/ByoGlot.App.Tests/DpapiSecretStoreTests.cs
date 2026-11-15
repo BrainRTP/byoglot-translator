@@ -16,6 +16,22 @@ public sealed class DpapiSecretStoreTests : IDisposable
         await Assert.ThrowsAsync<OriginMismatchException>(() => store.GetAsync("c", "https://other.example"));
     }
     [Fact] public async Task MissingSecretIsNull() => Assert.Null(await new DpapiSecretStore(PathName).GetAsync("c", "https://example.com"));
+    [Theory]
+    [InlineData("{")]
+    [InlineData("null")]
+    [InlineData("{\"c\":null}")]
+    public async Task ACorruptFileIsPreservedAndBlocksLaterWrites(string content)
+    {
+        Directory.CreateDirectory(folder);
+        await File.WriteAllTextAsync(PathName, content, TestContext.Current.CancellationToken);
+        var store = new DpapiSecretStore(PathName);
+        await Assert.ThrowsAsync<InvalidDataException>(() => store.HasAsync("c"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => store.SetAsync("key", "c", "https://example.com"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => new DpapiSecretStore(PathName).DeleteAsync("c"));
+        Assert.Equal(content, await File.ReadAllTextAsync(PathName + ".bad", TestContext.Current.CancellationToken));
+        Assert.False(File.Exists(PathName));
+        Assert.False(File.Exists(PathName + ".tmp"));
+    }
     [Fact] public async Task DeleteRemovesIt()
     {
         var store = new DpapiSecretStore(PathName);

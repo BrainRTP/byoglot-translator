@@ -61,7 +61,7 @@ class ConnectionEditor(
                 throw RunnerException(RunnerError.Backend(BackendException(ErrorKind.ProviderError)))
             null -> Unit
         }
-        if (!isLocalHost(URI(origin).host) && !consent)
+        if (!isLoopbackHost(URI(origin).host) && !consent)
             throw RunnerException(RunnerError.ConsentNeeded(origin))
         val connection =
             Connection(
@@ -171,7 +171,7 @@ class ConnectionEditor(
             state.connections.find { it.id == connectionId }
                 ?: throw RunnerException(RunnerError.NoConnection)
         val origin = PhoneProviderPolicy.requireOrigin(connection.baseUrl)
-        if (!isLocalHost(URI(origin).host) && origin !in state.consentedOrigins)
+        if (!isLoopbackHost(URI(origin).host) && origin !in state.consentedOrigins)
             throw RunnerException(RunnerError.ConsentNeeded(origin))
         val key = readSecret(connectionId, origin)
         if (key.isNullOrEmpty() && ProviderEffort.needsKey(connection.preset, connection.baseUrl))

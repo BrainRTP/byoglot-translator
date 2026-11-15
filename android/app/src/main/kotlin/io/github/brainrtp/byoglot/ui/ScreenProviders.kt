@@ -27,10 +27,9 @@ import kotlinx.coroutines.launch
 
 fun phonePresets(): List<ProviderPreset> =
     Contracts.presets
-        .filter { (preset, info) ->
+        .filter { (preset, _) ->
             preset != ProviderPreset.custom &&
-                info.needsKey &&
-                originOf(info.baseUrl)?.let { !isLocalHost(URI(it).host) } == true
+                preset != ProviderPreset.ollama && preset != ProviderPreset.lmstudio
         }
         .keys
         .sortedBy { it.ordinal }
@@ -42,6 +41,8 @@ fun presetLabel(preset: ProviderPreset): String =
         ProviderPreset.openrouter -> stringResource(R.string.preset_openrouter)
         ProviderPreset.openai -> stringResource(R.string.preset_openai)
         ProviderPreset.mistral -> stringResource(R.string.preset_mistral)
+        ProviderPreset.ollama -> stringResource(R.string.preset_ollama)
+        ProviderPreset.lmstudio -> stringResource(R.string.preset_lmstudio)
         else -> stringResource(R.string.providers_custom)
     }
 
@@ -118,19 +119,7 @@ fun ProviderKeyScreen(
     if (initial != null && legacyPhoneConnection(initial)) {
         ScreenColumn {
             Text(initial.baseUrl, style = ByoType.mono)
-            if (PhoneProviderPolicy.origin(initial.baseUrl) == null)
-                Text(stringResource(R.string.legacy_https_only), style = ByoType.body)
-            else
-                ByoButton(
-                    stringResource(R.string.use_connection),
-                    {
-                        vm.action {
-                            vm.activate(initial.id)
-                            onDone()
-                        }
-                    },
-                    enabled = initial.id != settings.activeConnectionId,
-                )
+            Text(stringResource(R.string.legacy_https_only), style = ByoType.body)
             ConnectionDelete(vm, initial, onDone)
         }
         return
@@ -155,6 +144,7 @@ fun ProviderKeyScreen(
     var checked by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<RunnerError?>(null) }
     val origin = originOf(url)
+    val needsConsent = origin?.let { !isLoopbackHost(URI(it).host) } == true
     var consent by remember(origin) { mutableStateOf(origin in settings.consentedOrigins) }
     val stored =
         keys[id] == true &&
@@ -166,7 +156,7 @@ fun ProviderKeyScreen(
             stored && !replacing,
         )
     val secure = problem != DraftProblem.BaseUrl && problem != DraftProblem.HttpsRequired
-    val valid = problem == null && consent
+    val valid = problem == null && (!needsConsent || consent)
     val save: () -> Unit = {
         if (!saving && valid) {
             saving = true
@@ -249,7 +239,10 @@ fun ProviderKeyScreen(
                     key = it
                     error = null
                 },
-                stringResource(R.string.key_label),
+                stringResource(
+                    if (ProviderEffort.needsKey(preset, url)) R.string.key_label
+                    else R.string.key_optional,
+                ),
                 mono = true,
                 enabled = !saving,
                 error =
@@ -278,7 +271,7 @@ fun ProviderKeyScreen(
                     )
                 },
             )
-        if (secure && origin != null && origin !in settings.consentedOrigins)
+        if (secure && needsConsent && origin !in settings.consentedOrigins)
             Row(
                 Modifier.fillMaxWidth()
                     .heightIn(min = 48.dp)
@@ -390,9 +383,7 @@ fun ProviderKeyScreen(
 }
 
 internal fun legacyPhoneConnection(connection: Connection): Boolean =
-    connection.preset == ProviderPreset.ollama ||
-        connection.preset == ProviderPreset.lmstudio ||
-        PhoneProviderPolicy.origin(connection.baseUrl) == null
+    PhoneProviderPolicy.origin(connection.baseUrl) == null
 
 @Composable
 private fun ConnectionDelete(vm: MainViewModel, connection: Connection, onDone: () -> Unit) {

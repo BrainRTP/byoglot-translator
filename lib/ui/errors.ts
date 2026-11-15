@@ -1,6 +1,6 @@
 import type { ConnectionKind } from "../connections/types";
 import { formatRetryAfter, type MessageKey, resolveLang, t } from "../i18n";
-import type { BackendErrorKind } from "../opencode/types";
+import type { SelectionErrorKind } from "../messaging/protocol";
 
 export type ErrorSurface = "popup" | "card";
 export type ErrorAction = "retry" | "chooseModel" | "connect";
@@ -13,7 +13,7 @@ export type ErrorPresentation = {
   action: ErrorAction;
 };
 
-export type PresentableKind = Exclude<BackendErrorKind, "aborted">;
+export type PresentableKind = Exclude<SelectionErrorKind, "aborted">;
 
 const TITLES: Record<PresentableKind, MessageKey> = {
   offline: "error.offline.title",
@@ -24,6 +24,7 @@ const TITLES: Record<PresentableKind, MessageKey> = {
   bad_response: "error.bad_response.title",
   incompatible: "error.incompatible.title",
   no_model: "error.no_model.title",
+  unknown_template: "error.unknown_template.title",
 };
 
 const BODIES: Record<PresentableKind, Record<ErrorSurface, MessageKey>> = {
@@ -35,9 +36,10 @@ const BODIES: Record<PresentableKind, Record<ErrorSurface, MessageKey>> = {
   bad_response: { popup: "error.bad_response", card: "error.bad_response" },
   incompatible: { popup: "error.incompatible", card: "error.incompatible" },
   no_model: { popup: "error.no_model", card: "error.no_model" },
+  unknown_template: { popup: "error.unknown_template", card: "error.unknown_template" },
 };
 
-const HINTS: Partial<Record<BackendErrorKind, string>> = {
+const HINTS: Partial<Record<PresentableKind, string>> = {
   offline: "opencode service start",
   provider_auth: "opencode auth login",
 };
@@ -51,6 +53,7 @@ const ACTIONS: Record<PresentableKind, ErrorAction> = {
   bad_response: "retry",
   incompatible: "retry",
   no_model: "chooseModel",
+  unknown_template: "retry",
 };
 
 const PROVIDER_TITLES: Partial<Record<PresentableKind, MessageKey>> = {

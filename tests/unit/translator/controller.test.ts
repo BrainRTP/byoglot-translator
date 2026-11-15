@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { ConnectionView } from "../../../lib/connections/types";
 import type { SelectionResult } from "../../../lib/messaging/protocol";
 import { MAX_EDITOR_TEXT } from "../../../lib/selection/limits";
 import { builtinTemplate, DEFAULT_GLOBALS } from "../../../lib/settings/defaults";
@@ -122,6 +123,154 @@ describe("translator defaults", () => {
 });
 
 describe("translator request identity", () => {
+  it("invalidates results and in-flight requests when the model, effort, connection or language prompt changes", async () => {
+    const { controller, translate, cancel } = setup();
+    let globals = {
+      ...DEFAULT_GLOBALS,
+      selectionModel: { providerID: "p", id: "first", variant: "high" },
+    };
+    let connection: ConnectionView = {
+      id: "first",
+      kind: "provider",
+      name: "Local",
+      url: "http://localhost:1234",
+      active: true,
+      hasKey: false,
+    };
+    let profiles = [
+      { id: "ru", text: "Original", builtin: "Original", modified: false, outdated: false },
+    ];
+    controller.refreshSettings(globals, connection, profiles);
+    translate.mockResolvedValue({ ...answer("Saved"), truncated: false });
+    for (const change of [
+      () => {
+        globals = { ...globals, selectionModel: { ...globals.selectionModel, id: "second" } };
+      },
+      () => {
+        globals = { ...globals, selectionModel: { ...globals.selectionModel, variant: "low" } };
+      },
+      () => {
+        connection = { ...connection, id: "second" };
+      },
+      () => {
+        globals = { ...globals, languageProfile: "ru" };
+      },
+      () => {
+        globals = { ...globals, languagePromptEnabled: !globals.languagePromptEnabled };
+      },
+      () => {
+        profiles = profiles.map((profile) => ({ ...profile, text: "Updated" }));
+      },
+    ]) {
+      await controller.translate();
+      controller.refreshSettings(globals, { ...connection }, [...profiles]);
+      expect(controller.state.result).toBe("Saved");
+      change();
+      controller.refreshSettings(globals, connection, profiles);
+      expect(controller.state.result).toBe("");
+      expect(controller.state.completion).toBeNull();
+      controller.update({ text: "Hello!" });
+      controller.update({ text: "Hello" });
+      expect(controller.state.result).toBe("");
+    }
+    const old = deferred();
+    translate.mockReturnValue(old.promise);
+    const pending = controller.translate();
+    controller.refreshSettings(globals, { ...connection, id: "third" }, profiles);
+    expect(cancel).toHaveBeenCalledWith(translate.mock.lastCall?.[0].requestId);
+    old.resolve(answer("Stale model"));
+    await pending;
+    expect(controller.state.result).toBe("");
+  });
+
+  it("allows retrying truncated output without editing the text", async () => {
+    const { controller, translate } = setup();
+    translate
+      .mockResolvedValueOnce({ ...answer("Partial"), truncated: true })
+      .mockResolvedValueOnce({ ...answer("Full"), truncated: false });
+    await controller.translate();
+    expect(controller.state.completion).toBe("truncated");
+    await controller.translate();
+    expect(translate).toHaveBeenCalledTimes(2);
+    expect(controller.state.result).toBe("Full");
+  });
+
+  it("reuses the last result for unchanged inputs and after reverting edits", async () => {
+    const { controller, translate } = setup();
+    translate.mockResolvedValue({ ...answer("Saved"), truncated: false });
+    await controller.translate();
+    await controller.translate();
+    for (const patch of [
+      { text: "Hello!" },
+      { sourceLang: "de" },
+      { targetLang: "ja" },
+      { templateId: "other" },
+    ]) {
+      const before = { ...controller.state };
+      controller.update(patch);
+      expect(controller.state.completion).toBeNull();
+      controller.update({
+        text: before.text,
+        sourceLang: before.sourceLang,
+        targetLang: before.targetLang,
+        templateId: before.templateId,
+      });
+      expect(controller.state.result).toBe("Saved");
+      expect(controller.state.completion).toBe("complete");
+      await controller.translate();
+    }
+    expect(translate).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidates saved results when the selected template changes or is removed", async () => {
+    const { controller, translate } = setup();
+    const builtin = builtinTemplate();
+    controller.refreshTemplates([builtin]);
+    translate.mockResolvedValue(answer("First"));
+    await controller.translate();
+    controller.refreshTemplates([{ ...builtin, name: "Renamed" }]);
+    expect(controller.state.result).toBe("First");
+    const edited = { ...builtin, settings: { prePrompt: "New prompt", targetLang: "ja" } };
+    controller.refreshTemplates([edited]);
+    expect(controller.state.result).toBe("");
+    expect(controller.state.targetLang).toBe("ja");
+    await controller.translate();
+    expect(translate).toHaveBeenCalledTimes(2);
+    controller.refreshTemplates([{ ...edited, id: "replacement", builtin: true }]);
+    expect(controller.state.templateId).toBe("replacement");
+    expect(controller.state.result).toBe("");
+  });
+
+  it("cancels an in-flight request when its template changes", async () => {
+    const { controller, translate } = setup();
+    const template = builtinTemplate();
+    controller.refreshTemplates([template]);
+    const old = deferred();
+    translate.mockReturnValue(old.promise);
+    const pending = controller.translate();
+    controller.refreshTemplates([{ ...template, settings: { prePrompt: "Changed" } }]);
+    old.resolve(answer("Old prompt"));
+    await pending;
+    expect(controller.state.result).toBe("");
+    expect(controller.state.running).toBe(false);
+  });
+
+  it("does not restore a result after its template was edited while another was selected", async () => {
+    const { controller, translate } = setup();
+    const builtin = builtinTemplate();
+    const other = { ...builtin, id: "other" };
+    controller.refreshTemplates([builtin, other]);
+    translate.mockResolvedValue(answer("Old instructions"));
+    await controller.translate();
+    controller.chooseTemplate(other);
+    const edited = { ...builtin, settings: { prePrompt: "New instructions" } };
+    controller.refreshTemplates([edited, other]);
+    controller.chooseTemplate(edited);
+    expect(controller.state.result).toBe("");
+    await controller.translate();
+    expect(translate).toHaveBeenCalledTimes(2);
+  });
+
   it("cancels the exact request and ignores its late answer", async () => {
     const { controller, translate, cancel } = setup();
     const old = deferred();
@@ -181,6 +330,12 @@ describe("translator request identity", () => {
 });
 
 describe("translator errors", () => {
+  it("shows an unknown template error for the editor without opencode advice", () => {
+    const error = translatorError({ error: "unknown_template", backend: "opencode" });
+    expect(error?.title).toBe("Template no longer exists");
+    expect(error?.body).toBe("Choose an available template and retry.");
+    expect(error?.hint).toBeUndefined();
+  });
   it("shows a timeout and allows retrying the same text", async () => {
     const { controller, translate } = setup();
     translate

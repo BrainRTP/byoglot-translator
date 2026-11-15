@@ -1,6 +1,7 @@
 import type { ConnectionKind } from "../connections/types";
 import { resolveLang, t } from "../i18n";
-import type { BackendErrorKind, ModelRef } from "../opencode/types";
+import type { SelectionErrorKind } from "../messaging/protocol";
+import type { ModelRef } from "../opencode/types";
 import type { Template } from "../settings/types";
 import { describeError } from "../ui/errors";
 import type { InsertOutcome } from "./insert";
@@ -9,7 +10,7 @@ import { attachWindow, type WindowRect, type WindowShell } from "./window";
 
 export type SelectionTranslation =
   | { text: string; sourceLang?: string; targetLang?: string; model?: ModelRef }
-  | { error: BackendErrorKind; retryAfterMs?: number; backend?: ConnectionKind; source?: string };
+  | { error: SelectionErrorKind; retryAfterMs?: number; backend?: ConnectionKind; source?: string };
 
 export type CardDeps = {
   translate(
@@ -35,7 +36,7 @@ type State =
   | { kind: "result"; text: string; langs: string; model: string }
   | {
       kind: "error";
-      error: BackendErrorKind;
+      error: SelectionErrorKind;
       retryAfterMs?: number;
       backend?: ConnectionKind;
       source?: string;
@@ -114,7 +115,7 @@ function clamp(v: number, min: number, max: number): number {
 }
 
 function errorView(
-  kind: BackendErrorKind,
+  kind: SelectionErrorKind,
   retryAfterMs?: number,
   backend?: ConnectionKind,
   source?: string,
@@ -311,6 +312,15 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
       (res) => {
         if (mine !== entry.seq) return;
         entry.pending = false;
+        if ("error" in res && res.error === "unknown_template") {
+          const current = select;
+          void deps
+            .listTemplates()
+            .then((list) => {
+              if (select === current) fillTemplates(list, current?.value);
+            })
+            .catch(() => {});
+        }
         render(
           entry,
           "text" in res
@@ -333,6 +343,7 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
 
   function fillTemplates(list: Template[], current: string | undefined) {
     if (!select || list.length === 0) return;
+    select.replaceChildren();
     for (const tpl of list) {
       const opt = h(doc, "option", undefined, templateLabel(tpl));
       opt.value = tpl.id;
@@ -342,7 +353,7 @@ export function createCard(root: HTMLElement, deps: CardDeps) {
       list.find((tpl) => tpl.id === current) ?? list.find((tpl) => tpl.builtin) ?? list[0];
     if (!selected) return;
     select.value = selected.id;
-    initialTemplateId = selected.id;
+    initialTemplateId ??= selected.id;
     select.hidden = false;
   }
 

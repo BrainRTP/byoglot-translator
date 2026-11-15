@@ -91,7 +91,9 @@ export function registerBackground(deps: BackgroundDeps): void {
     void handlers.tabRemoved(tabId);
   });
   browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
-    if (changeInfo.url) void handlers.tabNavigated(tabId, changeInfo.url);
+    if (changeInfo.url) {
+      void handlers.tabNavigated(tabId, changeInfo.url);
+    }
   });
 
   registerCommands();

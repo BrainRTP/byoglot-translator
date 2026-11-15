@@ -1,6 +1,48 @@
 import type { Page } from "@playwright/test";
+import { seedProvider } from "./extension";
 import { expect, test } from "./fixtures";
+import { startMockProvider } from "./mock-provider";
 import { countClosedShadow, queryClosedShadow } from "./shadow";
+
+test("keeps selection requests on same-document and iframe updates, then cancels on document navigation", async ({
+  ext,
+  mock,
+}) => {
+  const provider = await startMockProvider({ mode: "slow" });
+  try {
+    await seedProvider(ext.worker, provider);
+    const page = await ext.context.newPage();
+    await page.goto(`${mock.url}/fixtures/article.html`);
+    await page.locator("#sel").click({ clickCount: 3 });
+    await expect.poll(() => queryClosedShadow(page, "button.icon")).not.toBeNull();
+    const icon = await queryClosedShadow(page, "button.icon");
+    if (!icon) throw new Error("icon missing");
+    await page.mouse.click(icon.center.x, icon.center.y);
+    await expect
+      .poll(
+        () => provider.requests.filter((request) => request.path === "/v1/chat/completions").length,
+      )
+      .toBe(1);
+    await page.evaluate(async () => {
+      location.hash = "intro";
+      history.pushState({}, "", "?spa=1#intro");
+      const frame = document.createElement("iframe");
+      const loaded = new Promise<void>((resolve) =>
+        frame.addEventListener("load", () => resolve(), { once: true }),
+      );
+      frame.src = "/fixtures/other.html";
+      document.body.append(frame);
+      await loaded;
+      frame.remove();
+    });
+    expect(provider.aborted).toBe(0);
+    await expect.poll(() => countClosedShadow(page, ".card .loading")).toBe(1);
+    await page.goto(`${mock.url}/fixtures/other.html`);
+    await expect.poll(() => provider.aborted).toBe(1);
+  } finally {
+    await provider.stop();
+  }
+});
 
 test("selection icon opens a card with the translated selection", async ({ paired, mock }) => {
   const page = await paired.context.newPage();

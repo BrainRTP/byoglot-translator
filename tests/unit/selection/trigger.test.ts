@@ -299,7 +299,7 @@ describe("touch", () => {
     expect(translate).toHaveBeenLastCalledWith("Other text", "Other text", undefined, "oneshot");
   });
 
-  it("adds a touch selection to a pinned card without duplicates or its own text", async () => {
+  it("requires an explicit click for touch selections in a pinned card", async () => {
     const { translate } = mountTouch(true);
     selectPageText();
     ui?.trigger();
@@ -309,7 +309,15 @@ describe("touch", () => {
 
     selectPageText("Other text");
     await vi.advanceTimersByTimeAsync(500);
-    expect(translate).toHaveBeenCalledWith("Other text", "Other text", undefined, "pinned");
+    expect(translate).not.toHaveBeenCalled();
+    expect(icon()).not.toBeNull();
+    selectPageText("Final text");
+    expect(icon()).toBeNull();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(translate).not.toHaveBeenCalled();
+    icon()?.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(translate).toHaveBeenCalledWith("Final text", "Final text", undefined, "pinned");
     expect(shadow().querySelectorAll(".entry")).toHaveLength(2);
     expect(icon()).toBeNull();
     document.dispatchEvent(new Event("selectionchange"));

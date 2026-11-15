@@ -57,6 +57,7 @@ describe("generate", () => {
     const { url, init } = callAt(fetchImpl, 0);
     expect(url).toBe("http://127.0.0.1:49374/api/experimental/generate/text");
     expect(init.method).toBe("POST");
+    expect(init.redirect).toBe("error");
     const headers = new Headers(init.headers);
     expect(headers.get("authorization")).toBe(`Basic ${btoa("opencode:tok")}`);
     expect(headers.get("content-type")).toBe("application/json");

@@ -21,7 +21,7 @@ import type {
   TabView,
   TemplateOp,
 } from "../messaging/protocol";
-import { BackendError } from "../opencode/errors";
+import { BackendError, fromFetchFailure, isTimeout } from "../opencode/errors";
 import { parsePairingLink } from "../opencode/pairing";
 import type {
   BackendErrorKind,
@@ -31,6 +31,7 @@ import type {
   TranslationBackend,
 } from "../opencode/types";
 import { needsKey, PRESETS } from "../provider/presets";
+import { MAX_CONTEXT, MAX_SELECTION } from "../selection/limits";
 import { BUILTIN_TEMPLATE_ID, builtinTemplate } from "../settings/defaults";
 import {
   applyTemplate,
@@ -75,7 +76,12 @@ import type {
   TemplateSettings,
 } from "../settings/types";
 import { BUILTIN_PROFILES, PROFILE_IDS } from "../translate/profiles";
-import type { createTranslationService, PageJob, Segment } from "../translate/service";
+import {
+  type createTranslationService,
+  GENERATE_TIMEOUT_MS,
+  type PageJob,
+  type Segment,
+} from "../translate/service";
 import { textProblem } from "../translator/input";
 
 export interface HandlerDeps {
@@ -106,7 +112,11 @@ export function hostnameOf(url: string | undefined): string {
   }
 }
 
-export function toBackendError(error: unknown): BackendError {
+export function toBackendError(error: unknown, signal?: AbortSignal): BackendError {
+  if (isTimeout(error) || isTimeout(signal?.reason)) {
+    return new BackendError("offline", { detail: "timeout", cause: error });
+  }
+  if (signal?.aborted) return fromFetchFailure(error, signal);
   if (error instanceof BackendError) return error;
   return new BackendError("incompatible", {
     detail: error instanceof Error ? error.message : String(error),
@@ -161,10 +171,7 @@ const BADGE_ERROR_COLOR = "#d93025";
 
 export function createHandlers(deps: HandlerDeps) {
   let modelsCache: { at: number; models: ModelInfo[] } | null = null;
-  const selectionJobs = new Map<
-    string,
-    { controller: AbortController; tabId?: number; editor?: boolean }
-  >();
+  const selectionJobs = new Map<string, { controller: AbortController; tabId?: number }>();
 
   let pending: Promise<ModelInfo[]> | null = null;
   let modelsEpoch = 0;
@@ -180,7 +187,18 @@ export function createHandlers(deps: HandlerDeps) {
     return lastStatusItem.removeValue();
   }
 
-  function fetchModels(): Promise<ModelInfo[]> {
+  function fetchModels(signal?: AbortSignal): Promise<ModelInfo[]> {
+    if (signal) {
+      // Cancel this waiter without stopping discovery shared with other tabs.
+      if (signal.aborted) return Promise.reject(signal.reason);
+      return new Promise((resolve, reject) => {
+        const onAbort = () => reject(signal.reason);
+        signal.addEventListener("abort", onAbort, { once: true });
+        fetchModels()
+          .then(resolve, reject)
+          .finally(() => signal.removeEventListener("abort", onAbort));
+      });
+    }
     if (pending) return pending;
     const epoch = modelsEpoch;
     const request: Promise<ModelInfo[]> = (async () =>
@@ -196,11 +214,12 @@ export function createHandlers(deps: HandlerDeps) {
     return request;
   }
 
-  async function loadModels(): Promise<ModelInfo[] | null> {
+  async function loadModels(signal?: AbortSignal): Promise<ModelInfo[] | null> {
     if (modelsCache && Date.now() - modelsCache.at < MODELS_TTL_MS) return modelsCache.models;
     try {
-      return await fetchModels();
+      return await fetchModels(signal);
     } catch {
+      signal?.throwIfAborted();
       return null;
     }
   }
@@ -236,6 +255,9 @@ export function createHandlers(deps: HandlerDeps) {
       connectionsStore.getActiveId(),
     ]);
     const byId = (id: string) => templates.find((t) => t.id === id);
+    if (templateOverride !== undefined && !byId(templateOverride)) {
+      throw new BackendError("incompatible", { detail: "unknown template" });
+    }
     const defaultTemplate =
       byId(g.defaultTemplateId) ?? byId(BUILTIN_TEMPLATE_ID) ?? builtinTemplate();
     const rule = matchSiteRule(hostname, rules);
@@ -369,11 +391,17 @@ export function createHandlers(deps: HandlerDeps) {
     await deps.removeOrigin(origin);
   }
 
-  async function initModels(): Promise<void> {
+  async function initModels(signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
     if ((await globalsItem.getValue()).pageModel) return;
     try {
       const backend = await deps.getBackend();
-      const [models, def] = await Promise.all([fetchModels(), backend.defaultModel()]);
+      const limited = signal ?? AbortSignal.timeout(CONNECT_TIMEOUT_MS);
+      const [models, def] = await Promise.all([
+        fetchModels(limited),
+        backend.defaultModel(limited),
+      ]);
+      limited.throwIfAborted();
       const activeId = await connectionsStore.getActiveId();
       if (!activeId) return;
       const picked = pickInitialModels(models, def, activeId);
@@ -381,22 +409,26 @@ export function createHandlers(deps: HandlerDeps) {
       const current = await globalsItem.getValue();
       if (current.pageModel) return;
       await globalsItem.setValue({ ...current, ...picked });
-    } catch {}
+    } catch {
+      signal?.throwIfAborted();
+    }
   }
 
   async function requireModel(
     tabId: number | undefined,
     hostname: string,
     key: "pageModel" | "selectionModel",
+    signal: AbortSignal,
     templateOverride?: string,
   ): Promise<{ view: TabView; model: ModelRef }> {
     if (!(await connectionsStore.getActive())) throw new BackendError("unauthorized");
     let view = await resolveView(tabId, hostname, templateOverride);
     if (!view[key].model) {
-      await initModels();
+      await initModels(signal);
       view = await resolveView(tabId, hostname, templateOverride);
     }
     const model = view[key].model;
+    signal.throwIfAborted();
     if (!model) throw new BackendError("no_model");
     return { view, model };
   }
@@ -457,8 +489,7 @@ export function createHandlers(deps: HandlerDeps) {
 
     let apiKey = i.apiKey;
     if (apiKey === "") {
-      if (existing) {
-        if (existingOrigin !== origin) return refuse("provider_auth");
+      if (existing && existingOrigin === origin) {
         apiKey = existing.apiKey;
       } else if (needsKey(i.preset, baseUrl)) {
         return refuse("provider_auth");
@@ -759,31 +790,39 @@ export function createHandlers(deps: HandlerDeps) {
       i: Parameters<ProtocolMap["translateSelection"]>[0],
       sender: Sender,
     ): Promise<SelectionResult> {
+      const controller = new AbortController();
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(GENERATE_TIMEOUT_MS)]);
       const editor = i.editor;
       if (editor) {
         if (sender.url !== browser.runtime.getURL("/translator.html")) {
           throw new Error("Editor translation requires the translator page");
         }
         if (textProblem(i.text)) throw new Error("Invalid translator input");
+      } else if (
+        !i.text.trim() ||
+        i.text.length > MAX_SELECTION ||
+        i.context.length > MAX_CONTEXT
+      ) {
+        throw new Error("Invalid selection input");
       }
-      let kind = editor ? undefined : await activeKind();
-      const controller = new AbortController();
-      if (i.requestId)
-        selectionJobs.set(i.requestId, { controller, tabId: sender.tab?.id, editor: !!editor });
-      if (editor) kind = await activeKind();
+      const requestId = i.requestId ?? crypto.randomUUID();
+      selectionJobs.set(requestId, { controller, tabId: sender.tab?.id });
+      let kind: ConnectionKind | undefined;
       let used: ModelRef | undefined;
       try {
+        kind = await activeKind();
         const hostname = editor ? "" : hostnameOf(sender.tab?.url) || i.hostname;
         const required = await requireModel(
           editor ? undefined : sender.tab?.id,
           hostname,
           "selectionModel",
+          signal,
           i.templateId,
         );
         const view = required.view;
         let model = required.model;
         if (!editor && i.window === "pinned") {
-          const info = (await loadModels())?.find(
+          const info = (await loadModels(signal))?.find(
             (m) => m.providerID === model.providerID && m.id === model.id,
           );
           model = pinnedModel(model, info, (await globalsItem.getValue()).pinnedEffort);
@@ -799,8 +838,9 @@ export function createHandlers(deps: HandlerDeps) {
           languagePrompt: await languagePromptFor(settings.targetLang),
         };
         const result = editor
-          ? await deps.service.translateText(input, controller.signal)
-          : { text: await deps.service.translateSelection(input, controller.signal) };
+          ? await deps.service.translateText(input, signal)
+          : { text: await deps.service.translateSelection(input, signal) };
+        signal.throwIfAborted();
         return {
           text: result.text,
           sourceLang: settings.sourceLang,
@@ -809,18 +849,18 @@ export function createHandlers(deps: HandlerDeps) {
           ...(editor && { truncated: "truncated" in result ? result.truncated : undefined }),
         };
       } catch (error) {
-        const e = toBackendError(error);
+        const e = toBackendError(error, signal);
         const source = (await errorSource(used))(e);
         return {
-          error: e.kind,
+          error: e.detail === "unknown template" ? "unknown_template" : e.kind,
           retryAfterMs: e.retryAfterMs,
           backend: kind,
           ...(editor && e.detail === "timeout" && { timeout: true }),
           ...(source !== undefined && { source }),
         };
       } finally {
-        if (i.requestId && selectionJobs.get(i.requestId)?.controller === controller) {
-          selectionJobs.delete(i.requestId);
+        if (selectionJobs.get(requestId)?.controller === controller) {
+          selectionJobs.delete(requestId);
         }
       }
     },
@@ -850,10 +890,14 @@ export function createHandlers(deps: HandlerDeps) {
     async pageJob(
       sender: Sender,
       req: { segments: Segment[]; page: { title: string; hostname: string } },
+      signal = new AbortController().signal,
     ): Promise<PageJob> {
+      const requestedAt = Date.now();
+      signal = AbortSignal.any([signal, AbortSignal.timeout(GENERATE_TIMEOUT_MS)]);
       const hostname = hostnameOf(sender.tab?.url) || req.page.hostname;
-      const { view, model } = await requireModel(sender.tab?.id, hostname, "pageModel");
+      const { view, model } = await requireModel(sender.tab?.id, hostname, "pageModel", signal);
       return {
+        requestedAt,
         segments: req.segments,
         settings: view.settings,
         model,
@@ -864,7 +908,7 @@ export function createHandlers(deps: HandlerDeps) {
 
     async tabRemoved(tabId: number): Promise<void> {
       for (const [id, job] of selectionJobs) {
-        if (job.editor && job.tabId === tabId) {
+        if (job.tabId === tabId) {
           job.controller.abort();
           selectionJobs.delete(id);
         }
@@ -872,7 +916,8 @@ export function createHandlers(deps: HandlerDeps) {
       await Promise.all([tabSettings(tabId).removeValue(), tabHostItem(tabId).removeValue()]);
     },
 
-    async tabNavigated(tabId: number, url: string): Promise<void> {
+    async tabNavigated(tabId: number, url?: string): Promise<void> {
+      if (!url) return;
       const next = hostnameOf(url);
       const previous = await tabHostItem(tabId).getValue();
       await rememberHost(tabId, next);

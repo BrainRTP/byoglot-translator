@@ -52,7 +52,9 @@ function fakeBackend(overrides: Partial<TranslationBackend> = {}): TranslationBa
 }
 
 function setup(backend: TranslationBackend = fakeBackend(), extra: Partial<HandlerDeps> = {}) {
-  const translateSelection = vi.fn(async () => "privet");
+  const translateSelection = vi.fn<HandlerDeps["service"]["translateSelection"]>(
+    async () => "privet",
+  );
   const translateText = vi.fn<HandlerDeps["service"]["translateText"]>(async () => ({
     text: "privet",
     truncated: false,
@@ -605,6 +607,35 @@ describe("background handlers", () => {
       expect(translateText).not.toHaveBeenCalled();
     });
 
+    it("rejects oversized selections and context at the background boundary", async () => {
+      const { handlers, translateSelection } = setup();
+      for (const input of [
+        { text: "a".repeat(5001), context: "" },
+        { text: "hello", context: "c".repeat(1001) },
+      ]) {
+        await expect(
+          handlers.translateSelection({ ...input, hostname: "example.com" }, { tab: { id: 5 } }),
+        ).rejects.toThrow("Invalid selection input");
+      }
+      expect(translateSelection).not.toHaveBeenCalled();
+    });
+
+    it("rejects a removed editor template instead of using a different prompt", async () => {
+      const { handlers, translateText } = setup();
+      const result = await handlers.translateSelection(
+        {
+          text: "Hello",
+          context: "",
+          hostname: "",
+          templateId: "removed",
+          editor: { sourceLang: "auto", targetLang: "ru" },
+        },
+        { url: browser.runtime.getURL("/translator.html") },
+      );
+      expect(result).toMatchObject({ error: "unknown_template" });
+      expect(translateText).not.toHaveBeenCalled();
+    });
+
     it("rejects editor overrides from a content script", async () => {
       const { handlers } = setup();
       await expect(
@@ -636,51 +667,73 @@ describe("background handlers", () => {
       );
       await handlers.cancelSelection("editor-request", sender);
       await pending;
-      const [, signal] = translateText.mock.calls[0] as unknown as [unknown, AbortSignal];
-      expect(signal.aborted).toBe(true);
+      expect(translateText).not.toHaveBeenCalled();
     });
 
-    it("aborts only editor jobs when their tab closes", async () => {
-      const { handlers, translateText, translateSelection } = setup();
-      await globalsItem.setValue({ ...DEFAULT_GLOBALS, selectionModel });
-      let release!: () => void;
-      const gate = new Promise<void>((resolve) => {
-        release = resolve;
-      });
-      let selectionSignal!: AbortSignal;
-      translateText.mockImplementation(async () => {
-        await gate;
-        return { text: "late", truncated: false };
-      });
-      translateSelection.mockImplementationOnce((async (_input: unknown, signal: AbortSignal) => {
-        selectionSignal = signal;
-        await gate;
-        return "selection";
-      }) as never);
-      const editor = handlers.translateSelection(
-        {
-          text: "Editor",
-          context: "",
-          hostname: "",
-          requestId: "editor-close",
-          editor: { sourceLang: "auto", targetLang: "ru" },
-        },
-        { url: browser.runtime.getURL("/translator.html"), tab: { id: 5 } },
-      );
-      const selection = handlers.translateSelection(
-        { text: "Selection", context: "", hostname: "example.com", requestId: "selection-close" },
-        { tab: { id: 5, url: "https://example.com" } },
-      );
-      await vi.waitFor(() => {
-        expect(translateText).toHaveBeenCalledTimes(1);
-        expect(translateSelection).toHaveBeenCalledTimes(1);
-      });
-      await handlers.tabRemoved(5);
-      expect(translateText.mock.calls[0]?.[1].aborted).toBe(true);
-      expect(selectionSignal.aborted).toBe(false);
-      release();
-      await Promise.all([editor, selection]);
-    });
+    it.each(["close", "navigate", "loading"])(
+      "cancels only on close, not tab updates (%s), and preserves other tabs",
+      async (action) => {
+        const { handlers, translateText, translateSelection } = setup();
+        await globalsItem.setValue({ ...DEFAULT_GLOBALS, selectionModel });
+        await tabSettings(5).setValue((await handlers.tabView({ tabId: 5 })).settings);
+        let release!: () => void;
+        const gate = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        let selectionSignal!: AbortSignal;
+        translateText.mockImplementation(async () => {
+          await gate;
+          return { text: "late", truncated: false };
+        });
+        translateSelection.mockImplementation(async (input, signal) => {
+          if (input.text === "Selection") selectionSignal = signal;
+          await gate;
+          return "selection";
+        });
+        const editor = handlers.translateSelection(
+          {
+            text: "Editor",
+            context: "",
+            hostname: "",
+            requestId: "editor-close",
+            editor: { sourceLang: "auto", targetLang: "ru" },
+          },
+          { url: browser.runtime.getURL("/translator.html"), tab: { id: 5 } },
+        );
+        const selection = handlers.translateSelection(
+          { text: "Selection", context: "", hostname: "example.com", requestId: "selection-close" },
+          { tab: { id: 5, url: "https://example.com" } },
+        );
+        const other = handlers.translateSelection(
+          { text: "Other", context: "", hostname: "example.com" },
+          { tab: { id: 6, url: "https://example.com" } },
+        );
+        await vi.waitFor(() => {
+          expect(translateText).toHaveBeenCalledTimes(1);
+          expect(translateSelection).toHaveBeenCalledTimes(2);
+        });
+        if (action === "close") await handlers.tabRemoved(5);
+        else
+          await handlers.tabNavigated(
+            5,
+            action === "navigate" ? "https://example.com/another-page" : undefined,
+          );
+        if (action === "loading") expect(await tabSettings(5).getValue()).not.toBeNull();
+        expect(translateText.mock.calls[0]?.[1].aborted).toBe(action === "close");
+        expect(selectionSignal.aborted).toBe(action === "close");
+        expect(
+          translateSelection.mock.calls.find(([input]) => input.text === "Other")?.[1].aborted,
+        ).toBe(false);
+        release();
+        expect(await editor).toMatchObject(
+          action === "close" ? { error: "aborted" } : { text: "late" },
+        );
+        expect(await selection).toMatchObject(
+          action === "close" ? { error: "aborted" } : { text: "selection" },
+        );
+        await other;
+      },
+    );
 
     it("returns editor completion and timeout metadata without changing selection results", async () => {
       const { handlers, translateText } = setup();
@@ -902,7 +955,8 @@ describe("background handlers", () => {
 
     it("initializes models lazily once and translates", async () => {
       const listModels = vi.fn(async () => [flash]);
-      const { handlers, translateSelection } = setup(fakeBackend({ listModels }));
+      const defaultModel = vi.fn<TranslationBackend["defaultModel"]>(async () => flash);
+      const { handlers, translateSelection } = setup(fakeBackend({ listModels, defaultModel }));
       const res = await handlers.translateSelection(
         { text: "hello", context: "", hostname: "example.com" },
         { tab: { id: 5 } },
@@ -910,7 +964,93 @@ describe("background handlers", () => {
       expect(res).toMatchObject({ text: "privet" });
       expect((await globalsItem.getValue()).selectionModel).not.toBeNull();
       expect(translateSelection).toHaveBeenCalledTimes(1);
+      expect(translateSelection.mock.calls[0]?.[1]).toBe(defaultModel.mock.calls[0]?.[0]);
     });
+
+    it("cancels a model-discovery waiter without stopping another tab", async () => {
+      let release!: (models: ModelInfo[]) => void;
+      const listModels = vi.fn(
+        () =>
+          new Promise<ModelInfo[]>((resolve) => {
+            release = resolve;
+          }),
+      );
+      const { handlers, translateSelection } = setup(fakeBackend({ listModels }));
+      const input = { text: "Hello", context: "", hostname: "example.com" };
+      const first = handlers.translateSelection(
+        { ...input, requestId: "first" },
+        { tab: { id: 5 } },
+      );
+      const second = handlers.translateSelection(
+        { ...input, requestId: "second" },
+        { tab: { id: 6 } },
+      );
+      await vi.waitFor(() => expect(listModels).toHaveBeenCalledTimes(1));
+      await handlers.cancelSelection("first", { tab: { id: 5 } });
+      expect(await first).toMatchObject({ error: "aborted" });
+      release([flash]);
+      expect(await second).toMatchObject({ text: "privet" });
+      expect(translateSelection).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(["editor", "selection", "page"])(
+      "starts one 180-second deadline before %s model initialization",
+      async (mode) => {
+        const deadline = new AbortController();
+        const timeout = AbortSignal.timeout.bind(AbortSignal);
+        const spy = vi
+          .spyOn(AbortSignal, "timeout")
+          .mockImplementation((ms) => (ms === 180_000 ? deadline.signal : timeout(ms)));
+        try {
+          const defaultModel = vi.fn<TranslationBackend["defaultModel"]>(
+            async (signal) =>
+              new Promise((_resolve, reject) =>
+                signal?.addEventListener("abort", () => reject(signal.reason)),
+              ),
+          );
+          const { handlers, translateSelection, translateText } = setup(
+            fakeBackend({ defaultModel }),
+          );
+          const pending =
+            mode === "page"
+              ? expect(
+                  handlers.pageJob(
+                    { tab: { id: 5 } },
+                    {
+                      segments: [{ id: "1", text: "hello" }],
+                      page: { title: "T", hostname: "example.com" },
+                    },
+                  ),
+                ).rejects.toMatchObject({ name: "TimeoutError" })
+              : handlers
+                  .translateSelection(
+                    {
+                      text: "Hello",
+                      context: "",
+                      hostname: "",
+                      ...(mode === "editor" && {
+                        editor: { sourceLang: "auto", targetLang: "ru" },
+                      }),
+                    },
+                    { url: browser.runtime.getURL("/translator.html"), tab: { id: 5 } },
+                  )
+                  .then((result) =>
+                    expect(result).toMatchObject({
+                      error: "offline",
+                      ...(mode === "editor" && { timeout: true }),
+                    }),
+                  );
+          await vi.waitFor(() => expect(defaultModel).toHaveBeenCalledTimes(1));
+          expect(spy.mock.calls.filter(([ms]) => ms === 180_000)).toHaveLength(1);
+          deadline.abort(new DOMException("timed out", "TimeoutError"));
+          await pending;
+          expect(translateSelection).not.toHaveBeenCalled();
+          expect(translateText).not.toHaveBeenCalled();
+        } finally {
+          spy.mockRestore();
+        }
+      },
+    );
 
     it("aborts the backend signal when the request is cancelled from the same tab", async () => {
       let signal: AbortSignal | undefined;
@@ -1706,6 +1846,29 @@ describe("connection operations", () => {
     const res = await handlers.saveProvider(ollama);
     expect(res.status).toMatchObject({ state: "connected", kind: "provider" });
     expect((await handlers.connections())[0]?.hasKey).toBe(false);
+  });
+
+  it("edits a keyless local connection to another port without reusing a secret", async () => {
+    const { handlers } = multi();
+    const { connections } = await handlers.saveProvider(ollama);
+    const id = connections[0]?.id as string;
+    const result = await handlers.saveProvider({
+      ...ollama,
+      id,
+      baseUrl: "http://localhost:11435/v1",
+    });
+    expect(result.status).toMatchObject({ state: "connected" });
+    expect(await saved()).toEqual([
+      expect.objectContaining({ id, baseUrl: "http://localhost:11435/v1", apiKey: "" }),
+    ]);
+  });
+
+  it("drops a stored key when moving to a keyless origin", async () => {
+    const { handlers } = multi();
+    const { connections } = await handlers.saveProvider(deepseek);
+    const result = await handlers.saveProvider({ ...ollama, id: connections[0]?.id });
+    expect(result.status).toMatchObject({ state: "connected" });
+    expect((await saved())[0]).toMatchObject({ baseUrl: ollama.baseUrl, apiKey: "" });
   });
 
   it("an invalid base URL gives incompatible and saves nothing", async () => {

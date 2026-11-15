@@ -69,6 +69,7 @@ export function createOpencodeBackend(
     let response: Response;
     try {
       response = await fetchImpl(`${base}${path}`, {
+        redirect: "error",
         method: body === undefined ? "GET" : "POST",
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),

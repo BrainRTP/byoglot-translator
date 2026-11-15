@@ -1,5 +1,6 @@
+import type { ConnectionView } from "../connections/types";
 import { t } from "../i18n";
-import type { ProtocolMap, SelectionResult } from "../messaging/protocol";
+import type { LanguageProfileView, ProtocolMap, SelectionResult } from "../messaging/protocol";
 import { BUILTIN_TEMPLATE_ID, builtinTemplate } from "../settings/defaults";
 import type { GlobalSettings, Template } from "../settings/types";
 import { describeError, type ErrorPresentation } from "../ui/errors";
@@ -72,6 +73,19 @@ export function createTranslator(
     error: null,
   };
   let active: string | null = null;
+  let templates: Template[] = [];
+  let requestSettings = "";
+  let last: { key: string; result: string; completion: TranslatorState["completion"] } | null =
+    null;
+  const inputKey = () =>
+    JSON.stringify([
+      state.text,
+      state.sourceLang,
+      state.targetLang,
+      state.templateId,
+      templates.find((template) => template.id === state.templateId)?.settings,
+      requestSettings,
+    ]);
 
   function publish(patch: Partial<TranslatorState>) {
     state = { ...state, ...patch };
@@ -87,7 +101,17 @@ export function createTranslator(
 
   function update(patch: Partial<TranslatorInput>) {
     cancel();
-    publish({ ...patch, result: "", completion: null, error: null });
+    state = { ...state, ...patch };
+    const saved = last?.key === inputKey() ? last : null;
+    publish({ result: saved?.result ?? "", completion: saved?.completion ?? null, error: null });
+  }
+
+  function chooseTemplate(template: Template | undefined) {
+    if (template)
+      update({
+        templateId: template.id,
+        targetLang: template.settings.targetLang ?? state.targetLang,
+      });
   }
 
   return {
@@ -95,17 +119,44 @@ export function createTranslator(
       return state;
     },
     update,
-    chooseTemplate(template: Template | undefined) {
-      if (template)
-        update({
-          templateId: template.id,
-          targetLang: template.settings.targetLang ?? state.targetLang,
-        });
+    chooseTemplate,
+    refreshSettings(
+      globals: GlobalSettings,
+      connection: ConnectionView | undefined,
+      profiles: LanguageProfileView[],
+    ) {
+      const next = JSON.stringify([
+        globals.selectionModel,
+        globals.languagePromptEnabled,
+        globals.languageProfile,
+        profiles.map(({ id, text }) => [id, text]),
+        connection,
+      ]);
+      if (next === requestSettings) return;
+      requestSettings = next;
+      last = null;
+      update({});
+    },
+    refreshTemplates(next: Template[]) {
+      const previous = templates.find((template) => template.id === state.templateId);
+      templates = next;
+      const selected = next.find((template) => template.id === state.templateId);
+      if (selected && JSON.stringify(selected.settings) === JSON.stringify(previous?.settings))
+        return;
+      last = null;
+      chooseTemplate(
+        selected ?? next.find((template) => template.builtin) ?? next[0] ?? builtinTemplate(),
+      );
     },
     cancel,
     async translate() {
       cancel();
       if (textProblem(state.text)) return;
+      const key = inputKey();
+      if (last?.key === key) {
+        publish({ result: last.result, completion: last.completion, error: null });
+        return;
+      }
       const requestId = crypto.randomUUID();
       active = requestId;
       publish({ running: true, result: "", completion: null, error: null });
@@ -132,6 +183,8 @@ export function createTranslator(
               }
             : { error: translatorError(result) },
         );
+        if ("text" in result && !result.truncated)
+          last = { key, result: state.result, completion: state.completion };
       } catch {
         if (active === requestId) publish({ error: translatorError({ error: "offline" }) });
       } finally {

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { browser } from "wxt/browser";
   import { resolveLang } from "../../lib/i18n";
   import { sendMessage } from "../../lib/messaging/protocol";
   import { MAX_EDITOR_TEXT } from "../../lib/selection/limits";
@@ -25,30 +26,45 @@
   }, (next) => { view = next; copyStatus = null; });
   const problem = $derived(textProblem(view.text));
   const sources = $derived(languageOptions(view.sourceLang === "auto" ? "en" : view.sourceLang));
+  let loadGeneration = 0;
 
-  async function load() {
-    loadFailed = false;
+  async function load(refresh = false) {
+    const generation = ++loadGeneration;
+    refresh &&= !loadFailed;
     try {
-      const [globals, list, mobile] = await Promise.all([
+      const [globals, list, mobile, connections, profiles] = await Promise.all([
         sendMessage("globals", undefined), sendMessage("templates", undefined), isAndroid(),
+        sendMessage("connections", undefined), sendMessage("languageProfiles", undefined),
       ]);
+      if (generation !== loadGeneration) return;
       templates = list.length ? list : [builtinTemplate()];
       android = mobile;
       changeUiLang(globals.uiLang);
       document.documentElement.lang = resolveLang();
       document.title = `${tr("translator.title")} | ByoGlot Translator`;
       applyTheme(document.documentElement, globals.theme);
-      translator.update(translatorDefaults(globals, templates));
+      translator.refreshSettings(globals, connections.find((connection) => connection.active), profiles);
+      translator.refreshTemplates(templates);
+      if (!refresh) translator.update(translatorDefaults(globals, templates));
+      loadFailed = false;
     } catch {
-      loadFailed = true;
+      if (generation !== loadGeneration) return;
+      if (!refresh) loadFailed = true;
     } finally {
-      loaded = true;
+      if (generation === loadGeneration) loaded = true;
     }
   }
 
   onMount(() => {
     void load();
-    return () => translator.cancel();
+    const changed = (changes: Record<string, unknown>, area: string) => {
+      if (loaded && area === "local" && ["templates", "globals", "connections", "activeConnectionId", "languageProfiles"].some((key) => key in changes)) void load(true);
+    };
+    browser.storage.onChanged.addListener(changed);
+    return () => {
+      browser.storage.onChanged.removeListener(changed);
+      translator.cancel();
+    };
   });
 
   async function copy() {
@@ -61,7 +77,7 @@
   }
 </script>
 
-<svelte:window onpagehide={() => translator.cancel()} />
+<svelte:window onpagehide={() => translator.cancel()} onfocus={() => { if (loaded) void load(true); }} />
 
 <main class:android>
   <header>
@@ -73,7 +89,7 @@
   {:else if loadFailed}
     <div class="box" role="alert">
       <p>{tr("popup.loadFailed")}</p>
-      <button class="btn" type="button" onclick={load}>{tr("common.retry")}</button>
+      <button class="btn" type="button" onclick={() => load()}>{tr("common.retry")}</button>
     </div>
   {:else}
     <div class="controls">
@@ -101,7 +117,7 @@
       <div id="text-limit" role="alert" class="err">{problem === "tooLong" ? tr("translator.limit", { count: view.text.length, limit: MAX_EDITOR_TEXT }) : ""}</div>
     </div>
     <div>
-      <button class="btn pri" type="button" disabled={!view.running && problem !== null} onclick={() => view.running ? translator.cancel() : translator.translate()}>{view.running ? tr("common.cancel") : tr("translator.translate")}</button>
+      <button class="btn pri" type="button" disabled={!view.running && (problem !== null || (view.completion !== null && view.completion !== "truncated"))} onclick={() => view.running ? translator.cancel() : translator.translate()}>{view.running ? tr("common.cancel") : tr("translator.translate")}</button>
     </div>
     {#if view.error}
       <div class="box failure {view.error.tone}" role="alert">

@@ -603,6 +603,62 @@ describe("translatePage fatal errors", () => {
 });
 
 describe("translatePage abort", () => {
+  it("gives each page retry a fresh deadline while initial batches include model setup", async () => {
+    let now = 30_000;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    const deadlines: number[] = [];
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+      deadlines.push(ms);
+      return new AbortController().signal;
+    });
+    try {
+      const fake = fakeBackend(async (prompt, _signal, call) => {
+        now += 100_000;
+        return call < 2 ? "{}" : echoAnswer(prompt);
+      });
+      const rec = recorder();
+      await service(fake).translatePage(
+        { ...job(segs(2)), requestedAt: 0 },
+        rec.cb,
+        new AbortController().signal,
+      );
+      expect(now).toBe(430_000);
+      expect(deadlines).toEqual([150_000, 180_000, 180_000, 180_000]);
+      expect(new Set(fake.signals).size).toBe(4);
+      expect(rec.flat()).toHaveLength(2);
+      expect(rec.fatal).toEqual([]);
+    } finally {
+      timeout.mockRestore();
+      clock.mockRestore();
+    }
+  });
+
+  it("expires a page request in the semaphore queue before contacting the provider", async () => {
+    const deadline = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(deadline.signal);
+    const gate = deferred();
+    const fake = fakeBackend(() => gate.promise);
+    const svc = service(fake, undefined, { concurrency: 1 });
+    const blocker = svc.translateText(
+      { text: "Blocker", settings, model, languagePrompt: "" },
+      new AbortController().signal,
+    );
+    try {
+      await until(() => fake.prompts.length === 1);
+      const rec = recorder();
+      const pending = svc.translatePage(job(segs(1)), rec.cb, new AbortController().signal);
+      await until(() => timeout.mock.calls.length === 1);
+      deadline.abort(new DOMException("timed out", "TimeoutError"));
+      await pending;
+      expect(rec.fatal).toEqual([expect.objectContaining({ kind: "offline", detail: "timeout" })]);
+      expect(fake.prompts).toHaveLength(1);
+    } finally {
+      gate.resolve("Released");
+      await blocker;
+      timeout.mockRestore();
+    }
+  });
+
   it("passes the signal on, starts nothing new and stays silent after abort", async () => {
     const gates: ReturnType<typeof deferred<string>>[] = [];
     const fake = fakeBackend((p, signal) => {
@@ -733,18 +789,32 @@ describe("translateSelection", () => {
 
   it("maps a generate timeout to offline, not aborted", async () => {
     const timeout = AbortSignal.abort(new DOMException("timed out", "TimeoutError"));
-    const spy = vi.spyOn(AbortSignal, "timeout").mockReturnValue(timeout);
-    try {
-      const fake = fakeBackend(async (_p, signal) => {
-        throw fromFetchFailure(signal?.reason, signal);
-      });
-      await expect(
-        service(fake).translateSelection(input, new AbortController().signal),
-      ).rejects.toMatchObject({ kind: "offline" });
-    } finally {
-      spy.mockRestore();
-    }
+    const fake = fakeBackend();
+    await expect(service(fake).translateSelection(input, timeout)).rejects.toMatchObject({
+      kind: "offline",
+      detail: "timeout",
+    });
+    expect(fake.prompts).toHaveLength(0);
   });
+
+  it.each(["translateSelection", "translateText"] as const)(
+    "expires %s in the shared queue without starting a request",
+    async (method) => {
+      const gate = deferred();
+      const fake = fakeBackend(() => gate.promise);
+      const svc = service(fake, undefined, { concurrency: 1 });
+      const first = svc.translateSelection(input, new AbortController().signal);
+      await until(() => fake.prompts.length === 1);
+      const deadline = new AbortController();
+      const queued = svc[method](input, deadline.signal);
+      const expired = expect(queued).rejects.toMatchObject({ kind: "offline", detail: "timeout" });
+      deadline.abort(new DOMException("timed out", "TimeoutError"));
+      await expired;
+      gate.resolve("first");
+      await first;
+      expect(fake.prompts).toHaveLength(1);
+    },
+  );
 
   it("shares the concurrency limit with page jobs", async () => {
     const gates: ReturnType<typeof deferred<string>>[] = [];
@@ -781,20 +851,21 @@ describe("translateText", () => {
     expect(fake.prompts).toHaveLength(0);
   });
 
-  it("preserves the 180-second timeout and identifies it for the editor", async () => {
-    const timeout = AbortSignal.abort(new DOMException("timed out", "TimeoutError"));
-    const spy = vi.spyOn(AbortSignal, "timeout").mockReturnValue(timeout);
-    try {
-      const fake = fakeBackend(async (_prompt, signal) => {
-        throw fromFetchFailure(signal?.reason, signal);
-      });
-      await expect(
-        service(fake).translateText(input, new AbortController().signal),
-      ).rejects.toMatchObject({ kind: "offline", detail: "timeout" });
-      expect(spy).toHaveBeenCalledWith(180_000);
-      expect(fake.prompts).toHaveLength(1);
-    } finally {
-      spy.mockRestore();
-    }
+  it("passes the caller deadline to metadata generation and identifies expiry for the editor", async () => {
+    const deadline = new AbortController();
+    const fake = fakeBackend();
+    const generateWithMetadata = vi.fn<NonNullable<TranslationBackend["generateWithMetadata"]>>(
+      async (_prompt, _model, signal) =>
+        new Promise<never>((_resolve, reject) => {
+          signal?.addEventListener("abort", () => reject(fromFetchFailure(signal.reason, signal)));
+        }),
+    );
+    fake.backend.generateWithMetadata = generateWithMetadata;
+    const pending = service(fake).translateText(input, deadline.signal);
+    const expired = expect(pending).rejects.toMatchObject({ kind: "offline", detail: "timeout" });
+    await until(() => generateWithMetadata.mock.calls.length === 1);
+    expect(generateWithMetadata.mock.calls[0]?.[2]).toBe(deadline.signal);
+    deadline.abort(new DOMException("timed out", "TimeoutError"));
+    await expired;
   });
 });

@@ -185,7 +185,7 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
     btn.addEventListener("mousedown", (e) => e.preventDefault());
     btn.addEventListener("click", () => {
       hideIcon();
-      void act(snap, card.open);
+      void act(snap, card.add);
     });
     root.append(btn);
     icon = btn;
@@ -206,7 +206,8 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
       const picked = readSelection(doc);
       if (!picked || picked.text === card.lastText()) return;
       if (card.mode() === "pinned") {
-        card.add(picked);
+        if (touch) showIcon(picked);
+        else card.add(picked);
       } else {
         // the safe zone keeps the card on mousedown, a new selection still replaces it
         card.close();
@@ -242,6 +243,7 @@ export function mountSelectionUi(doc: Document, deps: SelectionUiDeps): Selectio
     const sel = doc.getSelection();
     if (!sel || sel.isCollapsed) hideIcon();
     if (touch) {
+      hideIcon();
       clearTimeout(timer);
       timer = setTimeout(() => check(true), TOUCH_DEBOUNCE_MS);
     }

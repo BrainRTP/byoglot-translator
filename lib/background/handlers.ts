@@ -2,6 +2,7 @@ import { browser } from "wxt/browser";
 import { storage } from "wxt/utils/storage";
 import type { TranslationCache } from "../cache/cache";
 import {
+  isLanOrigin,
   isLocalOrigin,
   normalizeBaseUrl,
   originInUse,
@@ -83,6 +84,8 @@ import {
   type Segment,
 } from "../translate/service";
 import { textProblem } from "../translator/input";
+import { validProviderUrl } from "../ui/connection-logic";
+import { isAndroid } from "../ui/platform";
 
 export interface HandlerDeps {
   getBackend(): Promise<TranslationBackend>;
@@ -472,7 +475,7 @@ export function createHandlers(deps: HandlerDeps) {
     let baseUrl: string;
     try {
       const url = new URL(i.baseUrl);
-      if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("scheme");
+      if (!validProviderUrl(i.baseUrl, await isAndroid())) throw new Error("scheme");
       origin = url.origin;
       baseUrl = normalizeBaseUrl(i.baseUrl);
     } catch {
@@ -488,13 +491,8 @@ export function createHandlers(deps: HandlerDeps) {
     } catch {}
 
     let apiKey = i.apiKey;
-    if (apiKey === "") {
-      if (existing && existingOrigin === origin) {
-        apiKey = existing.apiKey;
-      } else if (needsKey(i.preset, baseUrl)) {
-        return refuse("provider_auth");
-      }
-    }
+    if (apiKey === "" && existing && existingOrigin === origin) apiKey = existing.apiKey;
+    if (!apiKey.trim() && needsKey(i.preset, baseUrl)) return refuse("provider_auth");
 
     const candidate: ConnectionRecord = {
       kind: "provider",
@@ -666,6 +664,9 @@ export function createHandlers(deps: HandlerDeps) {
       try {
         const url = new URL(conn.url);
         if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("scheme");
+        if (!conn.password.trim() && !isLocalOrigin(conn.url) && !isLanOrigin(conn.url)) {
+          return errorStatus(conn.url, new BackendError("unauthorized"), "opencode");
+        }
       } catch {
         return errorStatus(conn.url, new BackendError("incompatible"), "opencode");
       }

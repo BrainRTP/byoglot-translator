@@ -16,7 +16,27 @@ export function originPattern(url: string): string {
 
 export function isLocalOrigin(origin: string): boolean {
   const host = new URL(origin).hostname;
-  return host === "127.0.0.1" || host === "localhost";
+  return host === "localhost" || /^127\.\d+\.\d+\.\d+$/.test(host) || host === "[::1]";
+}
+
+export function isLanOrigin(origin: string): boolean {
+  const host = new URL(origin).hostname;
+  if (host.endsWith(".local")) return true;
+  if (host.startsWith("[")) {
+    const first = Number.parseInt(host.slice(1, host.indexOf(":")), 16);
+    return (first & 0xfe00) === 0xfc00 || (first & 0xffc0) === 0xfe80;
+  }
+  const octets = host.split(".").map(Number);
+  if (octets.length !== 4 || !octets.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
+    return false;
+  }
+  const [a, b = 0] = octets;
+  return (
+    a === 10 ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 169 && b === 254)
+  );
 }
 
 export function toView(rec: ConnectionRecord, activeId: string | null): ConnectionView {

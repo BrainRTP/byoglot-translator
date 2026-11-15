@@ -249,6 +249,186 @@
         "params": {},
         "needsKey": true
       }
+    },
+    {
+      "name": "ollama at loopback IPv4",
+      "input": {
+        "preset": "ollama",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://127.42.1.2/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": false
+      }
+    },
+    {
+      "name": "ollama at loopback IPv6",
+      "input": {
+        "preset": "ollama",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://[::1]/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": false
+      }
+    },
+    {
+      "name": "ollama at LAN IPv4",
+      "input": {
+        "preset": "ollama",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://192.168.1.5/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": false
+      }
+    },
+    {
+      "name": "ollama at LAN IPv6",
+      "input": {
+        "preset": "ollama",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://[fd12::1]/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": false
+      }
+    },
+    {
+      "name": "ollama at external",
+      "input": {
+        "preset": "ollama",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://models.example.com/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": true
+      }
+    },
+    {
+      "name": "lmstudio at loopback IPv4",
+      "input": {
+        "preset": "lmstudio",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://127.42.1.2/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": false
+      }
+    },
+    {
+      "name": "lmstudio at loopback IPv6",
+      "input": {
+        "preset": "lmstudio",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://[::1]/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": false
+      }
+    },
+    {
+      "name": "lmstudio at LAN IPv4",
+      "input": {
+        "preset": "lmstudio",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://192.168.1.5/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": false
+      }
+    },
+    {
+      "name": "lmstudio at LAN IPv6",
+      "input": {
+        "preset": "lmstudio",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://[fd12::1]/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": false
+      }
+    },
+    {
+      "name": "lmstudio at external",
+      "input": {
+        "preset": "lmstudio",
+        "rawModel": {
+          "id": "model"
+        },
+        "variant": "high",
+        "baseUrl": "https://models.example.com/v1"
+      },
+      "expected": {
+        "variants": [
+          "none"
+        ],
+        "params": {},
+        "needsKey": true
+      }
     }
   ]
 }

@@ -1789,6 +1789,74 @@ describe("connection operations", () => {
     expect(removeOrigin).not.toHaveBeenCalled();
   });
 
+  it("refuses external keyless presets and a saved empty key before checking models", async () => {
+    const { handlers, info } = multi();
+    for (const preset of ["ollama", "lmstudio"] as const) {
+      const res = await handlers.saveProvider({
+        ...ollama,
+        preset,
+        baseUrl: "https://external.example/v1",
+      });
+      expect(res.status).toMatchObject({ state: "error", kind: "provider_auth" });
+    }
+    await connectionsStore.setAll([
+      {
+        ...ollama,
+        kind: "provider",
+        id: "saved",
+        baseUrl: "https://external.example/v1",
+        pageModel: null,
+        selectionModel: null,
+      },
+    ]);
+    const res = await handlers.saveProvider({
+      ...ollama,
+      id: "saved",
+      baseUrl: "https://external.example/v1",
+    });
+    expect(res.status).toMatchObject({ state: "error", kind: "provider_auth" });
+    expect(info).not.toHaveBeenCalled();
+    expect(await saved()).toHaveLength(1);
+  });
+
+  it("edits a keyless loopback connection onto another port", async () => {
+    const { handlers } = multi();
+    const first = await handlers.saveProvider(ollama);
+    const res = await handlers.saveProvider({
+      ...ollama,
+      id: first.connections[0]?.id,
+      baseUrl: "http://localhost:11435/v1",
+    });
+    expect(res.status.state).toBe("connected");
+  });
+
+  it("manual opencode requires a password only for external hosts", async () => {
+    const { handlers, info } = multi();
+    expect(
+      await handlers.connectManual({ ...conn, url: "https://external.example", password: "" }),
+    ).toMatchObject({ state: "error", kind: "unauthorized" });
+    expect(info).not.toHaveBeenCalled();
+    for (const url of [
+      "http://127.42.1.2",
+      "http://[::1]",
+      "http://192.168.1.5",
+      "http://model.local",
+    ]) {
+      expect((await handlers.connectManual({ ...conn, url, password: "" })).state).toBe(
+        "connected",
+      );
+    }
+    expect(
+      (
+        await handlers.connectManual({
+          ...conn,
+          url: "https://external.example",
+          password: "secret",
+        })
+      ).state,
+    ).toBe("connected");
+  });
+
   it("a new provider without a key is refused when the preset needs one", async () => {
     const { handlers, info } = multi();
     const res = await handlers.saveProvider({ ...deepseek, apiKey: "" });

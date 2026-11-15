@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import { isLocalOrigin, originOf } from "../connections/list";
+import { isLanOrigin, isLocalOrigin } from "../connections/list";
 import type { ProviderPreset } from "../connections/types";
 import type { modelRawSchema } from "./schemas";
 
@@ -16,14 +16,14 @@ export const PRESETS: Record<ProviderPreset, { baseUrl: string; needsKey: boolea
 };
 
 export function needsKey(preset: ProviderPreset, baseUrl: string): boolean {
-  if (preset === "custom") {
+  if (preset === "custom" || preset === "ollama" || preset === "lmstudio") {
     try {
-      if (isLocalOrigin(originOf(baseUrl))) return false;
+      return !(isLocalOrigin(baseUrl) || (preset !== "custom" && isLanOrigin(baseUrl)));
     } catch {
       return true;
     }
   }
-  return PRESETS[preset].needsKey;
+  return true;
 }
 
 export function effortVariants(preset: ProviderPreset, raw: RawModel): string[] {

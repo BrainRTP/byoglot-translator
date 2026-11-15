@@ -2,7 +2,7 @@ use crate::{
     i18n::{Msg, language_name, tr, tr_with},
     services::Services,
     ui::main_window::{banner, combo, page_box, scroll},
-    view_state::{RequestState, editor_input, template_target, validate_editor_text},
+    view_state::{RequestState, editor_input, template_target, validate_open_text},
 };
 use adw::prelude::*;
 use byoglot_core::{SettingsRepository, Template, contracts, editor_input_limit};
@@ -78,7 +78,7 @@ pub fn build(
             value.and_then(|v| v.str()),
         ) {
             stack.set_visible_child_name("translate");
-            if let Err(problem) = validate_editor_text(text) {
+            if let Err(problem) = validate_open_text(text) {
                 super::main_window::show_error(&error_load, &problem);
                 return;
             }
@@ -136,6 +136,36 @@ pub fn build(
             button.clipboard().set_text(&result.text());
         }
     });
+    let state = Rc::new(RefCell::new(RequestState::default()));
+    let task = Rc::new(RefCell::new(None::<glib::JoinHandle<()>>));
+    let invalidate = {
+        let state = state.clone();
+        let task = task.clone();
+        let button = translate.downgrade();
+        let result = result.downgrade();
+        let copy = copy.downgrade();
+        Rc::new(move || {
+            state.borrow_mut().cancel();
+            if let Some(task) = task.borrow_mut().take() {
+                task.abort();
+            }
+            if let Some(button) = button.upgrade() {
+                button.set_label(tr(Msg::Translate));
+            }
+            if let Some(result) = result.upgrade() {
+                result.set_visible(false);
+            }
+            if let Some(copy) = copy.upgrade() {
+                copy.set_visible(false);
+            }
+        })
+    };
+    let changed = invalidate.clone();
+    input.buffer().connect_changed(move |_| changed());
+    for row in [&source, &target, &template] {
+        let changed = invalidate.clone();
+        row.connect_selected_notify(move |_| changed());
+    }
     let source_codes = Rc::new(source_codes);
     let target_codes = Rc::new(RefCell::new(target_codes));
     let templates = Rc::new(RefCell::new(Vec::<Template>::new()));
@@ -179,9 +209,7 @@ pub fn build(
         });
     }
     let ids = templates.clone();
-    let service = services.clone();
     let guard = loading.clone();
-    let error_template = error.clone();
     let target_template = target.clone();
     let target_languages = target_codes.clone();
     template.connect_selected_notify(move |row| {
@@ -202,29 +230,15 @@ pub fn build(
             .iter()
             .position(|code| *code == language)
         {
+            guard.set(true);
             target_template.set_selected(index as u32);
+            guard.set(false);
         }
-        let id = template.id;
-        let service = service.clone();
-        let error = error_template.clone();
-        glib::spawn_future_local(async move {
-            if let Err(problem) = service
-                .change(move |mut s| {
-                    s.globals.default_template_id = id;
-                    s
-                })
-                .await
-            {
-                show_error(&error, &problem);
-            }
-        });
     });
     let source_run = source.clone();
     let target_run = target.clone();
     let source_ids = source_codes.clone();
     let target_ids = target_codes.clone();
-    let state = Rc::new(RefCell::new(RequestState::default()));
-    let task = Rc::new(RefCell::new(None::<glib::JoinHandle<()>>));
     let running = task.clone();
     let request_state = state.clone();
     let services_run = services.clone();
@@ -248,8 +262,7 @@ pub fn build(
             .text(&buffer.start_iter(), &buffer.end_iter(), false)
             .to_string();
         let source = source_ids[source_run.selected() as usize].clone();
-        let target = target_ids.borrow()[target_run.selected() as usize].clone();
-        let request_target = target.clone();
+        let request_target = target_ids.borrow()[target_run.selected() as usize].clone();
         let request = request_state.borrow_mut().begin();
         let template_id = templates_run
             .borrow()
@@ -270,7 +283,6 @@ pub fn build(
             let output = match services
                 .change(move |mut s| {
                     s.globals.source_lang = source;
-                    s.globals.target_lang = target;
                     s
                 })
                 .await
@@ -300,12 +312,7 @@ pub fn build(
         }));
     });
     let root = scroll(&content);
-    root.connect_unrealize(move |_| {
-        state.borrow_mut().cancel();
-        if let Some(task) = task.borrow_mut().take() {
-            task.abort();
-        }
-    });
+    root.connect_unrealize(move |_| invalidate());
     let weak_source = source.downgrade();
     let weak_target = target.downgrade();
     root.connect_map(move |_| {

@@ -179,7 +179,7 @@ async fn insecure_remote_origins_are_refused_even_after_consent() {
             s.consented_origins.push("http://evil.example".into());
         }
         let (result, transport) = run(s.clone(), None, input()).await;
-        assert!(matches!(result, Err(RunnerError::Backend(_))));
+        assert_eq!(result, Err(RunnerError::InvalidUrl));
         assert!(transport.requests.lock().unwrap().is_empty());
     }
 }

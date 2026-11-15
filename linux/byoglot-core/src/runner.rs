@@ -1,5 +1,5 @@
 use crate::{
-    BackendError, ErrorKind, HttpTransport, ModelRef, ProviderClient, SecretError, SecretStore,
+    BackendError, HttpTransport, ModelRef, ProviderClient, SecretError, SecretStore,
     SettingsRepository, TextRequest, Translator, contracts, effective, language_prompt_text,
     needs_key,
 };
@@ -26,6 +26,8 @@ pub enum RunnerError {
     Empty,
     #[error("settings or key storage unavailable")]
     Storage,
+    #[error("invalid or insecure base URL")]
+    InvalidUrl,
     #[error(transparent)]
     Backend(#[from] BackendError),
 }
@@ -171,9 +173,7 @@ pub(crate) fn secret_failure(error: SecretError) -> RunnerError {
     }
 }
 pub(crate) fn invalid_base_url() -> RunnerError {
-    let mut error = BackendError::new(ErrorKind::Incompatible);
-    error.detail = Some("invalid base URL".into());
-    error.into()
+    RunnerError::InvalidUrl
 }
 
 #[cfg(test)]

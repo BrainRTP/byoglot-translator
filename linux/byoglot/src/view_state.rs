@@ -131,14 +131,14 @@ pub fn delete_template(settings: &mut AppSettings, id: &str) -> bool {
 mod tests {
     use super::*;
     #[test]
-    fn opening_editor_text_accepts_its_own_limit_and_counts_utf16() {
-        assert!(validate_editor_text(&"x".repeat(byoglot_core::QUICK_INPUT_LIMIT + 1)).is_ok());
-        let text = "😀".repeat(byoglot_core::editor_input_limit() / 2);
-        assert!(validate_editor_text(&text).is_ok());
+    fn external_text_uses_the_selection_limit_and_counts_utf16() {
+        assert!(validate_open_text(&"x".repeat(byoglot_core::QUICK_INPUT_LIMIT + 1)).is_err());
+        let text = "😀".repeat(byoglot_core::contracts::limits().max_selection / 2);
+        assert!(validate_open_text(&text).is_ok());
         assert_eq!(
-            validate_editor_text(&(text + "x")),
+            validate_open_text(&(text + "x")),
             Err(byoglot_core::RunnerError::TooLong {
-                limit: byoglot_core::editor_input_limit()
+                limit: byoglot_core::contracts::limits().max_selection
             })
         );
     }
@@ -279,10 +279,10 @@ pub fn editor_input(
     }
 }
 
-pub fn validate_editor_text(text: &str) -> Result<(), byoglot_core::RunnerError> {
-    if text.encode_utf16().count() > byoglot_core::editor_input_limit() {
+pub fn validate_open_text(text: &str) -> Result<(), byoglot_core::RunnerError> {
+    if text.encode_utf16().count() > byoglot_core::contracts::limits().max_selection {
         Err(byoglot_core::RunnerError::TooLong {
-            limit: byoglot_core::editor_input_limit(),
+            limit: byoglot_core::contracts::limits().max_selection,
         })
     } else {
         Ok(())

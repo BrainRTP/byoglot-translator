@@ -4,6 +4,24 @@ import Testing
 
 struct HTTPDestinationPolicyTests {
     @Test(arguments: [
+        "010.1.2.3", "010.0.0.1", "172.016.0.1", "172.017.0.1", "127.000.0.1",
+        "0x7f.0.0.1", "0x0a.0.0.1", "2130706433", "167772161", "127.1", "10.1",
+        "localhost.evil.com", "127.0.0.1.evil.com",
+    ])
+    func ambiguousIPv4AndLookalikeNamesAreExternal(_ host: String) throws {
+        let url = try #require(URL(string: "https://\(host)/v1"))
+        let parsedHost = try #require(url.host)
+        for candidate in [host, parsedHost] {
+            #expect(!HTTPDestinationPolicy.isLoopback(candidate))
+            #expect(!HTTPDestinationPolicy.isLocalOrLAN(candidate))
+        }
+        for preset in [ProviderPreset.custom, .ollama, .lmstudio] {
+            #expect(ProviderEffort.needsKey(preset: preset, baseUrl: url.absoluteString))
+        }
+        #expect(!HTTPDestinationPolicy.permits(try #require(URL(string: "http://\(host)/v1"))))
+    }
+
+    @Test(arguments: [
         "localhost", "127.0.0.1", "127.255.255.254", "10.0.0.1", "10.255.255.254",
         "172.16.0.1", "172.31.255.254", "192.168.0.1", "169.254.0.1", "model.local",
         "[::1]", "[0:0:0:0:0:0:0:1]", "[fc00::1]", "[fdff::1]", "[fe80::1]", "[febf::1]",
@@ -37,15 +55,31 @@ struct HTTPDestinationPolicyTests {
         #expect(await recording.lastRequest == nil)
     }
 
-    @Test func customKeyRequirementsKeepTheTypeScriptRules() {
-        for host in ["localhost", "127.0.0.1"] {
+    @Test func loopbackConsentAndCustomKeyRequirements() {
+        for host in ["localhost", "127.0.0.1", "127.0.0.2", "127.255.255.254", "[::1]", "[0:0:0:0:0:0:0:1]"] {
+            #expect(HTTPDestinationPolicy.isLoopback(host))
             #expect(!ProviderEffort.needsKey(preset: .custom, baseUrl: "http://\(host)/v1"))
         }
-        for host in ["127.0.0.2", "10.0.0.1", "172.16.0.1", "192.168.0.1", "169.254.0.1", "model.local", "[::1]", "[fd00::1]", "[fe80::1]"] {
+        for host in ["10.0.0.1", "172.16.0.1", "192.168.0.1", "169.254.0.1", "model.local", "[fd00::1]", "[fe80::1]", "models.example.com"] {
+            #expect(!HTTPDestinationPolicy.isLoopback(host))
             #expect(ProviderEffort.needsKey(preset: .custom, baseUrl: "http://\(host)/v1"))
         }
         #expect(!ProviderEffort.needsKey(preset: .custom, baseUrl: "ftp://localhost/v1"))
         #expect(HTTPDestinationPolicy.permits(URL(string: "https://models.example.com/v1")!))
         #expect(!HTTPDestinationPolicy.permits(URL(string: "ftp://localhost/v1")!))
+    }
+
+    @Test(arguments: [ProviderPreset.ollama, .lmstudio])
+    func localPresetsNeedKeysOnlyAtExternalHosts(_ preset: ProviderPreset) {
+        for host in ["localhost", "127.0.0.1", "127.0.0.2", "[::1]", "10.0.0.1", "172.16.0.1", "192.168.0.1", "169.254.0.1", "model.local", "[fc00::1]", "[fe80::1]"] {
+            #expect(!ProviderEffort.needsKey(preset: preset, baseUrl: "https://\(host)/v1"))
+        }
+        for host in ["models.example.com", "8.8.8.8", "172.15.255.255", "172.32.0.1", "[2001:4860::1]", "[fec0::1]"] {
+            #expect(ProviderEffort.needsKey(preset: preset, baseUrl: "https://\(host)/v1"))
+        }
+        #expect(ProviderEffort.needsKey(preset: preset, baseUrl: "invalid"))
+        for preset in [ProviderPreset.deepseek, .openrouter, .openai, .mistral] {
+            #expect(ProviderEffort.needsKey(preset: preset, baseUrl: "https://localhost/v1"))
+        }
     }
 }

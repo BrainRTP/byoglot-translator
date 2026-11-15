@@ -9,17 +9,26 @@ public enum HTTPDestinationPolicy {
 
     public static func isLocalOrLAN(_ rawHost: String) -> Bool {
         let host = rawHost.hasSuffix(".") ? String(rawHost.dropLast()) : rawHost
-        if host == "localhost" || host.hasSuffix(".local") { return true }
+        if isLoopback(host) || host.hasSuffix(".local") { return true }
         if let bytes = ipv4(host) { return localIPv4(bytes) }
         let literal = host.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
         let address = String(literal.prefix { $0 != "%" })
         guard let words = ipv6(address) else { return false }
-        if words.dropLast().allSatisfy({ $0 == 0 }), words.last == 1 { return true }
         if words[0] & 0xfe00 == 0xfc00 || words[0] & 0xffc0 == 0xfe80 { return true }
         if words.prefix(5).allSatisfy({ $0 == 0 }), words[5] == 0xffff {
             return localIPv4([UInt8(words[6] >> 8), UInt8(words[6] & 255), UInt8(words[7] >> 8), UInt8(words[7] & 255)])
         }
         return false
+    }
+
+    public static func isLoopback(_ rawHost: String) -> Bool {
+        let host = (rawHost.hasSuffix(".") ? String(rawHost.dropLast()) : rawHost).lowercased()
+        if host == "localhost" { return true }
+        if let bytes = ipv4(host) { return bytes[0] == 127 }
+        let literal = host.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        let address = String(literal.prefix { $0 != "%" })
+        guard let words = ipv6(address) else { return false }
+        return words.dropLast().allSatisfy({ $0 == 0 }) && words.last == 1
     }
 
     private static func localIPv4(_ bytes: [UInt8]) -> Bool {

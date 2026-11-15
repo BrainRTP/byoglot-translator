@@ -1,5 +1,6 @@
 @testable import ByoGlotAppKit
 import ByoGlotCore
+import ByoGlotStore
 import Foundation
 import Testing
 
@@ -81,17 +82,31 @@ struct AppProviderURLPolicyTests {
     }
 
     @Test(arguments: ["https://192.168.1.2/v1", "https://provider.local/v1"])
-    func httpsOnlyAcceptsLocalNetworkProvidersWithoutRemoteConsent(_ base: String) async throws {
+    func httpsOnlyAcceptsLANProvidersAfterConsent(_ base: String) async throws {
         let f = AppFixture()
         let editor = ConnectionEditor(settings: f.settings, secrets: f.secrets, transport: f.transport, urlPolicy: .httpsOnly)
         let draft = ConnectionDraft(preset: .custom, name: "Provider", baseUrl: base, apiKey: "fixture-key")
         #expect(editor.validate(draft, hasStoredKey: false) == nil)
-        let saved = try await editor.save(draft, consent: false)
+        let origin = try #require(originOf(base))
+        await #expect(throws: RunnerError.consentNeeded(origin: origin)) { try await editor.save(draft, consent: false) }
+        #expect(await f.transport.requests.isEmpty)
+        let saved = try await editor.save(draft, consent: true)
+        #expect(try await editor.models(connectionId: saved.id).map(\.id) == ["model"])
+        let runner = TranslationRunner(settings: f.settings, secrets: f.secrets, transport: f.transport, urlPolicy: .httpsOnly)
+        #expect(try await runner.translate(RunnerInput(text: "hello", limit: 100)).text == "translated")
+        #expect(try await f.settings.read().consentedOrigins == [origin])
+        #expect(await f.transport.requests.count == 3)
+    }
+
+    @Test(arguments: ["localhost", "127.0.0.1", "127.0.0.2", "[::1]"])
+    func httpsOnlyAcceptsLoopbackWithoutKeyOrConsent(_ host: String) async throws {
+        let f = AppFixture()
+        let editor = ConnectionEditor(settings: f.settings, secrets: f.secrets, transport: f.transport, urlPolicy: .httpsOnly)
+        let saved = try await editor.save(ConnectionDraft(preset: .custom, name: "Loopback", baseUrl: "https://\(host)/v1"), consent: false)
         #expect(try await editor.models(connectionId: saved.id).map(\.id) == ["model"])
         let runner = TranslationRunner(settings: f.settings, secrets: f.secrets, transport: f.transport, urlPolicy: .httpsOnly)
         #expect(try await runner.translate(RunnerInput(text: "hello", limit: 100)).text == "translated")
         #expect(try await f.settings.read().consentedOrigins.isEmpty)
-        #expect(await f.transport.requests.count == 3)
     }
 
     @Test func localHTTPRemainsUsableWithTheDesktopPolicy() async throws {
@@ -99,7 +114,7 @@ struct AppProviderURLPolicyTests {
         let editor = ConnectionEditor(settings: f.settings, secrets: f.secrets, transport: f.transport, urlPolicy: .allowLocalHTTP)
         let draft = ConnectionDraft(preset: .custom, name: "Provider", baseUrl: "http://192.168.1.2/v1", apiKey: "fixture-key")
         #expect(editor.validate(draft, hasStoredKey: false) == nil)
-        _ = try await editor.save(draft, consent: false)
+        _ = try await editor.save(draft, consent: true)
         let runner = TranslationRunner(settings: f.settings, secrets: f.secrets, transport: f.transport, urlPolicy: .allowLocalHTTP)
         #expect(try await runner.translate(RunnerInput(text: "hello", limit: 100)).text == "translated")
         #expect(await f.transport.requests.count == 2)

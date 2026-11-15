@@ -200,7 +200,7 @@ public actor TranslationRunner {
         let target = input.targetLang ?? effective.targetLang
         let language = LanguageProfiles.text(enabled: state.globals.languagePromptEnabled, profile: state.globals.languageProfile, targetLang: target, builtins: Contracts.builtinProfiles, overrides: state.profileOverrides)
         let request = TextRequest(text: text, context: input.context, appName: input.appName, sourceLang: input.sourceLang ?? state.globals.sourceLang, targetLang: target, prePrompt: input.prePrompt ?? effective.prePrompt, languagePrompt: language, model: model)
-        return Prepared(request: request, connection: connection, secret: secret, origin: origin, consented: HTTPDestinationPolicy.isLocalOrLAN(url.host ?? "") || state.consentedOrigins.contains(origin), key: try TranslationCacheKey(connection: connection, request: request))
+        return Prepared(request: request, connection: connection, secret: secret, origin: origin, consented: HTTPDestinationPolicy.isLoopback(url.host ?? "") || state.consentedOrigins.contains(origin), key: try TranslationCacheKey(connection: connection, request: request))
     }
 
     private func authorize(_ prepared: Prepared, networkAvailable: Bool) throws -> Translator {

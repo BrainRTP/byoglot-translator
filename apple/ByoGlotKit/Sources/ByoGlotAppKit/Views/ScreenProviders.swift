@@ -22,7 +22,8 @@ public struct ScreenProviders: View {
                         Text(AppStrings.text("providers.saved")).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
                         VStack(spacing: 0) {
                             ForEach(model.settings.connections) { connection in
-                                ListRow(connection.name, subtitle: connection.baseUrl, value: AppStrings.text(model.keyStates[connection.id] == true ? "key.ok" : "providers.keyMissing")) {
+                                let needsKey = ProviderEffort.needsKey(preset: connection.preset, baseUrl: connection.baseUrl)
+                                ListRow(connection.name, subtitle: connection.baseUrl, value: AppStrings.text(model.keyStates[connection.id] == true ? "key.ok" : needsKey ? "providers.keyMissing" : "providers.keyNotRequired")) {
                                     selected = ProviderRoute(preset: connection.preset, connectionId: connection.id)
                                 }
                                 Rectangle().fill(ByoColor.border).frame(height: 1)
@@ -135,7 +136,7 @@ private struct ProviderKeyScreen: View {
     }
     private var keyField: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(AppStrings.text("key.label")).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
+            Text(AppStrings.text(ProviderEffort.needsKey(preset: route.preset, baseUrl: baseURL) ? "key.label" : "providers.optionalKey")).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
             HStack(spacing: 0) {
                 Group {
                     if showKey { TextField(AppStrings.text("key.label"), text: $key) }
@@ -153,12 +154,13 @@ private struct ProviderKeyScreen: View {
     }
     @ViewBuilder private var savedContent: some View {
         if let connection {
+            let keyMissing = !hasKey && ProviderEffort.needsKey(preset: connection.preset, baseUrl: connection.baseUrl)
             if let failure {
-                Banner(title: AppStrings.text("err.generic"), message: AppStrings.error(failure), actionTitle: "err.retry", action: deleteSavedConnection)
+                Banner(title: AppStrings.text("err.generic"), message: AppStrings.error(failure), actionTitle: "err.retry", action: check)
             }
-            Label(AppStrings.text(hasKey ? "key.ok" : "providers.keyMissing"), systemImage: hasKey ? "checkmark.circle.fill" : "exclamationmark.circle")
-                .foregroundStyle(hasKey ? ByoColor.success : ByoColor.error)
-            Text("••••••••").modifier(ByoTypography(14, mono: true)).accessibilityLabel(AppStrings.text("key.label"))
+            Label(AppStrings.text(hasKey ? "key.ok" : keyMissing ? "providers.keyMissing" : "providers.keyNotRequired"), systemImage: keyMissing ? "exclamationmark.circle" : "checkmark.circle.fill")
+                .foregroundStyle(keyMissing ? ByoColor.error : ByoColor.success)
+            if hasKey { Text("••••••••").modifier(ByoTypography(14, mono: true)).accessibilityLabel(AppStrings.text("key.label")) }
             if let list = model.models[connection.id] {
                 Text(AppStrings.format(list.count == 1 ? "key.okModel" : "key.okModels", ["provider": connection.name, "n": String(list.count)]))
                     .modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
@@ -176,7 +178,11 @@ private struct ProviderKeyScreen: View {
                 }
             }
             if let error = model.catalogueErrors[connection.id] {
-                Banner(title: AppStrings.text("providers.modelsError"), message: AppStrings.error(error), actionTitle: "err.retry") { Task { await model.warmModels(connectionId: connection.id) } }
+                if case .consentNeeded = error {
+                    Banner(title: AppStrings.text("providers.modelsError"), message: AppStrings.error(error), actionTitle: "consent.allow", action: check)
+                } else {
+                    Banner(title: AppStrings.text("providers.modelsError"), message: AppStrings.error(error), actionTitle: "err.retry") { Task { await model.warmModels(connectionId: connection.id) } }
+                }
             }
             ByoButton("key.replace") { replacing = true; key = ""; showKey = false }
             ByoButton("key.recheck") { Task { await model.warmModels(connectionId: connection.id) } }
@@ -217,7 +223,7 @@ private struct ProviderKeyScreen: View {
         guard problem == nil else { if problem == .apiKey { failure = .keyMissing }; return }
         guard model.online else { failure = .backend(BackendError(kind: .offline)); return }
         guard let origin = originOf(baseURL), let url = URL(string: origin) else { return }
-        if !HTTPDestinationPolicy.isLocalOrLAN(url.host ?? ""), !model.settings.consentedOrigins.contains(origin) { consentOrigin = origin }
+        if !HTTPDestinationPolicy.isLoopback(url.host ?? ""), !model.settings.consentedOrigins.contains(origin) { consentOrigin = origin }
         else { save(consent: true) }
     }
     private func save(consent: Bool) {

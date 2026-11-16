@@ -1,0 +1,77 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "About" : {
+      "localizations" : {
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "О приложении" } }
+      }
+    },
+    "Allow ByoGlot in Login Items to launch it at login." : {
+      "localizations" : {
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Разрешите ByoGlot в объектах входа для запуска при входе в систему." } }
+      }
+    },
+    "ByoGlot" : { "shouldTranslate" : false },
+    "Connections" : {
+      "localizations" : {
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Подключения" } }
+      }
+    },
+    "Export and Import..." : {
+      "localizations" : {
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Экспорт и импорт..." } }
+      }
+    },
+    "General" : {
+      "localizations" : {
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Основные" } }
+      }
+    },
+    "Launch at login" : {
+      "localizations" : {
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Запускать при входе в систему" } }
+      }
+    },
+    "Open Login Items Settings" : {
+      "localizations" : {
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Открыть настройки объектов входа" } }
+      }
+    },
+    "Open Translator" : {
+      "localizations" : {
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Открыть переводчик" } }
+      }
+    },
+    "Quit ByoGlot" : {
+      "localizations" : {
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Завершить ByoGlot" } }
+      }
+    },
+    "Settings..." : {
+      "localizations" : {
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Настройки..." } }
+      }
+    },
+    "Templates" : {
+      "localizations" : {
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Шаблоны" } }
+      }
+    },
+    "Translate" : {
+      "localizations" : {
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Перевод" } }
+      }
+    },
+    "Translate Clipboard" : {
+      "localizations" : {
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Перевести из буфера обмена" } }
+      }
+    },
+    "Translate on double copy (Cmd+C twice)" : {
+      "localizations" : {
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Переводить при двойном копировании (Cmd+C дважды)" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

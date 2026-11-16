@@ -106,7 +106,12 @@ private struct ProviderKeyScreen: View {
                     ByoButton(checking ? "key.checking" : "key.check", kind: .primary, busy: checking, action: check)
                         .disabled(!canCheck)
                 }
-                Text(AppStrings.text("key.storeIos")).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
+                #if os(macOS)
+                let storageKey = "key.storeMac"
+                #else
+                let storageKey = "key.storeIos"
+                #endif
+                Text(AppStrings.text(storageKey)).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
                     .padding(12).frame(maxWidth: .infinity, alignment: .leading)
                     .background(ByoColor.surface, in: RoundedRectangle(cornerRadius: 6))
                 if connection != nil { deleteSection }

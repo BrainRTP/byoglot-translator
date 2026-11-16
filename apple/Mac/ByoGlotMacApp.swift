@@ -1,0 +1,109 @@
+import AppKit
+import ByoGlotAppKit
+import ByoGlotCore
+import ByoGlotStore
+import Network
+import SwiftUI
+
+@main
+@MainActor
+final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
+    let runner: TranslationRunner
+    let model: AppModel
+    private let network = NWPathMonitor()
+    private var scenes: NSHostingSceneRepresentation<MacScenes>?
+
+    override init() {
+        let settings = SettingsStore(directory: URL.applicationSupportDirectory)
+        let secrets = KeychainSecretStore()
+        let transport = URLSessionTransport()
+        let capabilities = ModelCapabilitiesCache()
+        runner = TranslationRunner(settings: settings, secrets: secrets, transport: transport, modelCapabilities: capabilities, urlPolicy: .allowLocalHTTP)
+        let editor = ConnectionEditor(settings: settings, secrets: secrets, transport: transport, modelCapabilities: capabilities, urlPolicy: .allowLocalHTTP)
+        model = AppModel(settings: settings, editor: editor, runner: runner)
+        super.init()
+    }
+
+    static func main() {
+        let application = NSApplication.shared
+        let delegate = ByoGlotMacApp()
+        application.delegate = delegate
+        application.run()
+        withExtendedLifetime(delegate) {}
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let scenes = NSHostingSceneRepresentation { MacScenes(app: self) }
+        self.scenes = scenes
+        NSApp.addSceneRepresentation(scenes)
+        network.pathUpdateHandler = { [weak model] path in
+            let online = path.status == .satisfied
+            Task { @MainActor in model?.setNetworkAvailable(online) }
+        }
+        network.start(queue: DispatchQueue(label: "io.github.brainrtp.byoglot.network"))
+        Task {
+            await model.refresh()
+            if !model.loaded || model.settings.connections.isEmpty { showSettings(.connections) }
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        model.stop()
+        network.cancel()
+    }
+
+    func showTranslator() {
+        scenes?.environment.openWindow(id: "translator")
+        NSApp.activate()
+    }
+
+    func showSettings(_ tab: MacSettingsTab? = nil) {
+        if let tab { UserDefaults.standard.set(tab.rawValue, forKey: "mac.settingsTab") }
+        scenes?.environment.openSettings()
+        NSApp.activate()
+    }
+}
+
+private struct MacScenes: Scene {
+    let app: ByoGlotMacApp
+    var body: some Scene {
+        MenuBarExtra("ByoGlot", systemImage: "character.bubble") {
+            MenuContent(openTranslator: app.showTranslator, openSettings: { app.showSettings() })
+                .environment(\.locale, AppStrings.locale)
+        }
+        Window(AppStrings.text("main.title"), id: "translator") {
+            MacContent(model: app.model) {
+                NavigationStack {
+                    ScreenMain(model: app.model, openProviders: { app.showSettings(.connections) }, openSettings: { app.showSettings() }, openTemplates: { app.showSettings(.templates) })
+                }
+            }.frame(minWidth: 560, minHeight: 600)
+        }
+        .defaultSize(width: 760, height: 720)
+        .defaultLaunchBehavior(.suppressed)
+        .restorationBehavior(.disabled)
+        Settings {
+            MacContent(model: app.model) { MacSettingsView(model: app.model) }
+                .frame(minWidth: 620, minHeight: 520)
+        }
+        .defaultSize(width: 700, height: 620)
+    }
+}
+
+private struct MacContent<Content: View>: View {
+    @Bindable var model: AppModel
+    @ViewBuilder let content: Content
+    private var scheme: ColorScheme? {
+        switch model.settings.theme { case .system: nil; case .light: .light; case .dark: .dark }
+    }
+    var body: some View {
+        Group {
+            if let error = model.storageError {
+                Banner(title: AppStrings.text("err.generic"), message: AppStrings.error(error), actionTitle: "err.retry") { Task { await model.refresh() } }.padding(16)
+            } else if !model.loaded { ProgressView() }
+            else { content }
+        }
+        .tint(ByoColor.accent)
+        .preferredColorScheme(scheme)
+        .environment(\.locale, AppStrings.locale)
+    }
+}

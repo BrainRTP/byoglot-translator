@@ -1,0 +1,22 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSLocalNetworkUsageDescription" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ByoGlot connects to a provider on your local network when you add its address."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ByoGlot подключается к провайдеру в локальной сети, когда вы добавляете его адрес."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

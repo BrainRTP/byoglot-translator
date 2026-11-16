@@ -13,6 +13,6 @@ else
 fi
 case "$build" in ''|*[!0-9]*|0) fail 'BUILD_NUMBER must be a positive integer.' ;; esac
 plist="$DERIVED_FILE_DIR/ByoGlot-Info.plist"
-/bin/cp "$SRCROOT/iOS/Info.plist" "$plist"
+/bin/cp "${SCRIPT_INPUT_FILE_0:-$SRCROOT/iOS/Info.plist}" "$plist"
 /usr/bin/plutil -replace CFBundleShortVersionString -string "$version" "$plist"
 /usr/bin/plutil -replace CFBundleVersion -string "$build" "$plist"

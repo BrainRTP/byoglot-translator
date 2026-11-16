@@ -3,6 +3,7 @@ options:
   minimumXcodeGenVersion: 2.46.0
   deploymentTarget:
     iOS: '27.1'
+    macOS: '27.0'
 packages:
   ByoGlotKit:
     path: ByoGlotKit
@@ -46,11 +47,50 @@ targets:
           - $(SRCROOT)/../package.json
         outputFiles:
           - $(DERIVED_FILE_DIR)/ByoGlot-Info.plist
+  ByoGlotMac:
+    type: application
+    platform: macOS
+    deploymentTarget: '27.0'
+    sources:
+      - path: Mac
+        excludes: [Info.plist, Mac.entitlements]
+    dependencies:
+      - package: ByoGlotKit
+        product: ByoGlotAppKit
+      - package: ByoGlotKit
+        product: ByoGlotCore
+      - package: ByoGlotKit
+        product: ByoGlotStore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.brainrtp.byoglot.desktop
+        PRODUCT_NAME: ByoGlot
+        ARCHS: arm64
+        CODE_SIGN_ENTITLEMENTS: Mac/Mac.entitlements
+        INFOPLIST_FILE: $(DERIVED_FILE_DIR)/ByoGlot-Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+    preBuildScripts:
+      - name: Set version from repository
+        path: scripts/app-version.sh
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(SRCROOT)/Mac/Info.plist
+          - $(SRCROOT)/../package.json
+        outputFiles:
+          - $(DERIVED_FILE_DIR)/ByoGlot-Info.plist
 schemes:
   ByoGlotiOS:
     build:
       targets:
         ByoGlotiOS: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  ByoGlotMac:
+    build:
+      targets:
+        ByoGlotMac: all
     run:
       config: Debug
     archive:

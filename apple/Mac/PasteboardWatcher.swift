@@ -22,7 +22,8 @@ final class PasteboardWatcher {
         let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                if self.detector.observe(changeCount: NSPasteboard.general.changeCount, at: .now) { self.onDoubleCopy() }
+                let modifiers = NSEvent.modifierFlags
+                if self.detector.observe(changeCount: NSPasteboard.general.changeCount, commandPressed: modifiers.contains(.command), otherModifiersPressed: !modifiers.intersection([.shift, .option, .control]).isEmpty, at: .now) { self.onDoubleCopy() }
             }
         }
         timer.tolerance = 0.005
@@ -42,6 +43,7 @@ final class PasteboardWatcher {
 
     func ignoreCurrentChange() {
         detector = DoubleCopyDetector()
-        _ = detector.observe(changeCount: NSPasteboard.general.changeCount, at: .now)
+        let modifiers = NSEvent.modifierFlags
+        _ = detector.observe(changeCount: NSPasteboard.general.changeCount, commandPressed: modifiers.contains(.command), otherModifiersPressed: !modifiers.intersection([.shift, .option, .control]).isEmpty, at: .now)
     }
 }

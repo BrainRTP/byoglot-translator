@@ -42,6 +42,7 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
         self.scenes = scenes
         NSApp.addSceneRepresentation(scenes)
         installMainMenu()
+        NotificationCenter.default.addObserver(self, selector: #selector(windowWillClose(_:)), name: NSWindow.willCloseNotification, object: nil)
         quick.start()
         NSApp.servicesProvider = ServiceProvider(coordinator: quick)
         network.pathUpdateHandler = { [weak model] path in
@@ -57,6 +58,7 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        NotificationCenter.default.removeObserver(self)
         quick.stop()
         model.stop()
         network.cancel()
@@ -76,12 +78,20 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = menu
     }
 
+    @objc private func windowWillClose(_ notification: Notification) {
+        guard let closing = notification.object as? NSWindow, closing.canBecomeMain else { return }
+        let anotherWindow = NSApp.windows.contains { $0 !== closing && $0.canBecomeMain && ($0.isVisible || $0.isMiniaturized) }
+        if !anotherWindow { NSApp.setActivationPolicy(.accessory) }
+    }
+
     func showTranslator() {
+        NSApp.setActivationPolicy(.regular)
         scenes?.environment.openWindow(id: "translator")
         NSApp.activate()
     }
 
     func showSettings(_ tab: MacSettingsTab? = nil) {
+        NSApp.setActivationPolicy(.regular)
         if let tab { UserDefaults.standard.set(tab.rawValue, forKey: "mac.settingsTab") }
         scenes?.environment.openSettings()
         NSApp.activate()

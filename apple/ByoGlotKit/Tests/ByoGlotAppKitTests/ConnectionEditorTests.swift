@@ -2,9 +2,23 @@ import ByoGlotAppKit
 import ByoGlotCore
 import ByoGlotStore
 import Foundation
+import Security
 import Testing
 
 struct ConnectionEditorTests {
+    #if os(macOS)
+    @Test func keychainSaveFailureIsReportedAsStorageFailure() async throws {
+        let f = AppFixture()
+        let editor = ConnectionEditor(settings: f.settings, secrets: LockedSecrets(error: .keychain(errSecMissingEntitlement)), transport: f.transport, urlPolicy: .allowLocalHTTP)
+        await #expect(throws: RunnerError.keychain(errSecMissingEntitlement)) {
+            try await editor.save(ConnectionDraft(preset: .deepseek, name: "DeepSeek", baseUrl: "https://api.deepseek.com", apiKey: "fixture-key"), consent: true)
+        }
+        #expect(try await f.settings.read().connections.isEmpty)
+        #expect(AppStrings.error(.keychain(errSecMissingEntitlement)).contains("-34018"))
+        #expect(AppStrings.error(.keychain(errSecMissingEntitlement)) != AppStrings.error(.keyMissing))
+    }
+    #endif
+
     @Test func validateTableAndPresetOrder() {
         let f = AppFixture()
         let editor = f.editor

@@ -10,6 +10,9 @@ public let extensionTimeoutSeconds = 55
 public enum RunnerError: Error, Equatable, Sendable {
     case noConnection, noModel, keyMissing, consentNeeded(origin: String), deviceLocked, tooLong(limit: Int), empty, appGroupUnavailable, interrupted
     case backend(BackendError)
+    #if os(macOS)
+    case keychain(OSStatus)
+    #endif
 }
 
 public enum ModelPair: Sendable { case main, external }
@@ -218,6 +221,9 @@ public actor TranslationRunner {
 
 func secretRunnerError(_ error: SecretError) -> RunnerError {
     if error == .keychain(errSecInteractionNotAllowed) { return .deviceLocked }
+    #if os(macOS)
+    if case .keychain(let status) = error { return .keychain(status) }
+    #endif
     return .keyMissing
 }
 

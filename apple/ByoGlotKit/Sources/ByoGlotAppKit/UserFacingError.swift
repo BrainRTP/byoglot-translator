@@ -5,6 +5,9 @@ public enum UserFacingError {
     public static func message(_ error: RunnerError) -> LocalizedStringResource {
         let bundle = LocalizedStringResource.BundleDescription.atURL(Bundle.module.bundleURL)
         switch error {
+        #if os(macOS)
+        case .keychain(let status): return LocalizedStringResource(stringLiteral: AppStrings.format("mac.keychainError", ["code": String(status)]))
+        #endif
         case .interrupted: return LocalizedStringResource("Translation was interrupted. Retry to translate again.", bundle: bundle)
         case .appGroupUnavailable: return LocalizedStringResource("ByoGlot cannot access shared storage.", bundle: bundle)
         case .noConnection: return LocalizedStringResource("Add a provider in ByoGlot first.", bundle: bundle)

@@ -41,6 +41,7 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
         let scenes = NSHostingSceneRepresentation { MacScenes(app: self) }
         self.scenes = scenes
         NSApp.addSceneRepresentation(scenes)
+        installMainMenu()
         quick.start()
         NSApp.servicesProvider = ServiceProvider(coordinator: quick)
         network.pathUpdateHandler = { [weak model] path in
@@ -59,6 +60,20 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
         quick.stop()
         model.stop()
         network.cancel()
+    }
+
+    private func installMainMenu() {
+        let menu = NSMenu()
+        let appMenu = NSMenu(title: "ByoGlot")
+        appMenu.addItem(withTitle: AppStrings.text("mac.quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "ByoGlot", action: nil, keyEquivalent: "").submenu = appMenu
+        let editMenu = NSMenu(title: AppStrings.text("mac.edit"))
+        editMenu.addItem(withTitle: AppStrings.text("mac.cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: AppStrings.text("main.copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: AppStrings.text("main.paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: AppStrings.text("mac.selectAll"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        menu.addItem(withTitle: editMenu.title, action: nil, keyEquivalent: "").submenu = editMenu
+        NSApp.mainMenu = menu
     }
 
     func showTranslator() {
@@ -113,6 +128,7 @@ private struct MacContent<Content: View>: View {
             else { content }
         }
         .tint(ByoColor.accent)
+        .textSelection(.enabled)
         .preferredColorScheme(scheme)
         .environment(\.locale, AppStrings.locale)
     }

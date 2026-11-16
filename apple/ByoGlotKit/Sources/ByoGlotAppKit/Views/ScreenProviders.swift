@@ -79,6 +79,12 @@ private struct ProviderKeyScreen: View {
     private var connection: Connection? { model.settings.connections.first { $0.id == (savedID ?? route.connectionId) } }
     private var stored: Bool { connection != nil && !replacing }
     private var hasKey: Bool { connection.map { model.keyStates[$0.id] == true } ?? false }
+    private var failureTitle: String {
+        #if os(macOS)
+        if case .keychain = failure { return AppStrings.text("mac.keychainTitle") }
+        #endif
+        return AppStrings.text("err.generic")
+    }
     private var authError: Bool {
         guard case .backend(let error) = failure else { return false }
         return error.kind == .unauthorized || error.kind == .providerAuth || error.status == 401 || error.status == 403
@@ -101,10 +107,13 @@ private struct ProviderKeyScreen: View {
                     keyField
                     if let failure {
                         let network = failure == .backend(BackendError(kind: .offline))
-                        Banner(title: AppStrings.text(authError ? "key.bad" : network ? "err.net.t" : "err.generic"), message: authError ? AppStrings.text("providers.badBody") : network ? AppStrings.text("providers.netBody") : AppStrings.error(failure), actionTitle: "err.retry", action: check)
+                        Banner(title: authError ? AppStrings.text("key.bad") : network ? AppStrings.text("err.net.t") : failureTitle, message: authError ? AppStrings.text("providers.badBody") : network ? AppStrings.text("providers.netBody") : AppStrings.error(failure), actionTitle: "err.retry", action: check)
                     }
                     ByoButton(checking ? "key.checking" : "key.check", kind: .primary, busy: checking, action: check)
                         .disabled(!canCheck)
+                        #if os(macOS)
+                        .keyboardShortcut(.defaultAction)
+                        #endif
                 }
                 #if os(macOS)
                 let storageKey = "key.storeMac"
@@ -148,6 +157,9 @@ private struct ProviderKeyScreen: View {
                     else { SecureField(AppStrings.text("key.label"), text: $key) }
                 }.textFieldStyle(.plain).modifier(ByoTypography(14, mono: true))
                     .focused($keyFocused).padding(.leading, 12)
+                    #if os(macOS)
+                    .onSubmit { if canCheck { check() } }
+                    #endif
                     #if os(iOS)
                     .textInputAutocapitalization(.never).autocorrectionDisabled().textContentType(nil)
                     #endif
@@ -161,7 +173,7 @@ private struct ProviderKeyScreen: View {
         if let connection {
             let keyMissing = !hasKey && ProviderEffort.needsKey(preset: connection.preset, baseUrl: connection.baseUrl)
             if let failure {
-                Banner(title: AppStrings.text("err.generic"), message: AppStrings.error(failure), actionTitle: "err.retry", action: check)
+                Banner(title: failureTitle, message: AppStrings.error(failure), actionTitle: "err.retry", action: check)
             }
             Label(AppStrings.text(hasKey ? "key.ok" : keyMissing ? "providers.keyMissing" : "providers.keyNotRequired"), systemImage: keyMissing ? "exclamationmark.circle" : "checkmark.circle.fill")
                 .foregroundStyle(keyMissing ? ByoColor.error : ByoColor.success)

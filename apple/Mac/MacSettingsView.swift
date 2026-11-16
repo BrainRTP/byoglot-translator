@@ -16,16 +16,11 @@ struct MacSettingsView: View {
             Tab(AppStrings.text("mac.connections"), systemImage: "network", value: .connections) {
                 NavigationStack { ScreenProviders(model: model) }
             }
-            Tab(AppStrings.text("mac.templates"), systemImage: "text.badge.star", value: .templates) {
+            Tab(AppStrings.text("settings.templates"), systemImage: "text.badge.star", value: .templates) {
                 NavigationStack { ScreenTemplateSettings(model: model) }
             }
-            Tab(AppStrings.text("mac.about"), systemImage: "info.circle", value: .about) {
-                VStack(spacing: 16) {
-                    Text("ByoGlot").font(.title)
-                    Text(AppStrings.format("about.version", ["version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "", "build": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""]))
-                    Link(AppStrings.text("about.privacy"), destination: URL(string: "https://github.com/BrainRTP/byoglot-translator/blob/main/PRIVACY.md")!)
-                    Link(AppStrings.text("about.source"), destination: URL(string: "https://github.com/BrainRTP/byoglot-translator")!)
-                }.padding(32).frame(maxWidth: .infinity, maxHeight: .infinity)
+            Tab(AppStrings.text("settings.about"), systemImage: "info.circle", value: .about) {
+                NavigationStack { ScreenAbout(model: model) }
             }
         }.padding(16)
     }
@@ -50,7 +45,6 @@ private struct MacGeneralSettings: View {
             Section {
                 NavigationLink(AppStrings.text("settings.language")) { ScreenLanguageSettings(model: model) }
                 NavigationLink(AppStrings.text("settings.prompt")) { ScreenLanguagePrompt(model: model) }
-                NavigationLink(AppStrings.text("mac.exportImport")) { ScreenAbout(model: model) }
             }
         }
         .formStyle(.grouped)

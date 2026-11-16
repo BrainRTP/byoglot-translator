@@ -4045,23 +4045,6 @@
       },
       "extractionState": "manual"
     },
-    "mac.about": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "About"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "О приложении"
-          }
-        }
-      }
-    },
     "mac.loginApproval": {
       "extractionState": "manual",
       "localizations": {
@@ -4092,23 +4075,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Подключения"
-          }
-        }
-      }
-    },
-    "mac.exportImport": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Export and Import..."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Экспорт и импорт..."
           }
         }
       }
@@ -4211,40 +4177,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Настройки..."
-          }
-        }
-      }
-    },
-    "mac.templates": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Templates"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Шаблоны"
-          }
-        }
-      }
-    },
-    "mac.translate": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Translate"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Перевод"
           }
         }
       }

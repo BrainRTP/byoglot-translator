@@ -71,7 +71,7 @@ private struct MacScenes: Scene {
             MenuContent(openTranslator: app.showTranslator, openSettings: { app.showSettings() })
                 .environment(\.locale, AppStrings.locale)
         }
-        Window(AppStrings.text("mac.translate"), id: "translator") {
+        Window(AppStrings.text("main.title"), id: "translator") {
             MacContent(model: app.model) {
                 NavigationStack {
                     ScreenMain(model: app.model, openProviders: { app.showSettings(.connections) }, openSettings: { app.showSettings() }, openTemplates: { app.showSettings(.templates) })

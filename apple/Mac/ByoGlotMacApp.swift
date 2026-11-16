@@ -13,7 +13,6 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
     lazy var quick = QuickTranslateCoordinator(runner: runner, model: model) { [weak self] text in
         guard let self else { return }
         self.model.edit(text)
-        self.model.translate()
         self.showTranslator()
     }
     private let network = NWPathMonitor()

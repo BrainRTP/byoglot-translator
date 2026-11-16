@@ -4504,23 +4504,6 @@
         }
       }
     },
-    "mac.keyClear": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Clear"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Очистить"
-          }
-        }
-      }
-    },
     "mac.keyVolumeUp": {
       "extractionState": "manual",
       "localizations": {

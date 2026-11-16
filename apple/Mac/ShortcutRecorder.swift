@@ -5,7 +5,7 @@ import Carbon
 import SwiftUI
 
 func localizedShortcut(_ shortcut: Shortcut) -> String {
-    let names = ["Space": "mac.keySpace", "Clear": "mac.keyClear", "Volume Up": "mac.keyVolumeUp", "Volume Down": "mac.keyVolumeDown", "Mute": "mac.keyMute", "Menu": "mac.keyMenu", "Help": "mac.keyHelp", "Key ": "mac.keyUnknown"]
+    let names = ["Space": "mac.keySpace", "Clear": "main.clear", "Volume Up": "mac.keyVolumeUp", "Volume Down": "mac.keyVolumeDown", "Mute": "mac.keyMute", "Menu": "mac.keyMenu", "Help": "mac.keyHelp", "Key ": "mac.keyUnknown"]
     return names.reduce(shortcut.display) { $0.replacingOccurrences(of: $1.key, with: AppStrings.text($1.value)) }
 }
 

@@ -15,7 +15,6 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
     private let panel = QuickPanel(contentRect: NSRect(x: 0, y: 0, width: 380, height: 240), styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView, .closable, .resizable], backing: .buffered, defer: true)
     private var localMonitor: Any?
     private var globalMonitor: Any?
-    private let escape = HotKeyCenter()
     private weak var coordinator: QuickTranslateCoordinator?
 
     override init() {
@@ -24,12 +23,13 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
         panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.becomesKeyOnlyIfNeeded = true
+        panel.becomesKeyOnlyIfNeeded = false
         panel.isReleasedWhenClosed = false
         panel.isRestorable = false
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.minSize = NSSize(width: 320, height: 220)
+        panel.contentView = nil
         panel.delegate = self
         panel.onDismiss = { [weak self] in self?.coordinator?.dismiss() }
     }
@@ -37,7 +37,9 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
     func show(_ coordinator: QuickTranslateCoordinator, reposition: Bool) {
         self.coordinator = coordinator
         panel.title = AppStrings.text("main.title")
-        panel.contentView = NSHostingView(rootView: QuickPanelContent(coordinator: coordinator))
+        if panel.contentView == nil {
+            panel.contentView = NSHostingView(rootView: QuickPanelContent(coordinator: coordinator))
+        }
         if reposition {
             let mouse = NSEvent.mouseLocation
             let screen = NSScreen.screens.first {
@@ -50,7 +52,7 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
                 let handled = MainActor.assumeIsolated {
                     guard let self else { return false }
                     if event.type == .keyDown {
-                        if event.keyCode == 53 { self.coordinator?.dismiss(); return true }
+                        if event.window === self.panel, event.keyCode == 53 { self.panel.cancelOperation(nil); return true }
                     } else if event.window !== self.panel { self.dismissOutside() }
                     return false
                 }
@@ -59,8 +61,6 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
             globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
                 MainActor.assumeIsolated { self?.dismissOutside() }
             }
-            // Carbon handles Escape while the source app keeps keyboard focus.
-            _ = escape.register(Shortcut(keyCode: 53, modifiers: 0)) { [weak self] in self?.coordinator?.dismiss() }
         }
         panel.orderFrontRegardless()
     }
@@ -74,9 +74,7 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
         if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
         localMonitor = nil
         globalMonitor = nil
-        escape.unregister()
         panel.orderOut(nil)
-        panel.contentView = nil
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {

@@ -65,14 +65,21 @@ final class QuickTranslateCoordinator {
 
     func setShortcut(_ value: Shortcut) -> Bool {
         guard value.isValid else { shortcutError = AppStrings.text("mac.shortcutInvalid"); return false }
+        guard registerShortcut(value) else {
+            registerShortcut()
+            shortcutError = AppStrings.text("mac.shortcutInUse")
+            return false
+        }
         shortcut = value
         UserDefaults.standard.set(try? JSONEncoder().encode(value), forKey: "mac.shortcut")
         return true
     }
 
-    private func registerShortcut() {
-        let registered = hotKey.register(shortcut) { [weak self] in self?.translateClipboard() }
+    @discardableResult
+    private func registerShortcut(_ value: Shortcut? = nil) -> Bool {
+        let registered = hotKey.register(value ?? shortcut) { [weak self] in self?.translateClipboard() }
         shortcutError = registered ? nil : AppStrings.text("mac.shortcutInUse")
+        return registered
     }
 
     func translateClipboard() {

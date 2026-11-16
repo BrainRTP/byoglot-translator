@@ -43,3 +43,7 @@ Consent, keys and transport are separate checks. Only loopback hosts (`localhost
 The current app includes the main translator, provider setup, parameter, model, language and template sheets, and settings for templates, language profiles, model defaults, theme, result animation and cache. Settings also provides portable JSON export and import through the system share sheet and file picker. No extension targets are included.
 
 Import uses `fileImporter` with JSON files. The app registers no document types or exported UTIs; a future custom extension must be a single component such as `.byoglot`, since `.byoglot.json` cannot be registered as a filename extension.
+
+## Running the Mac app locally
+
+Generate the project with `xcodegen generate`, open `ByoGlot.xcodeproj`, and select the `ByoGlotMac` scheme. In the target's Signing & Capabilities settings, enable automatic signing and choose your development team before running. A signed build with a development team is required for the Keychain; an unsigned build cannot save provider keys. Signing follows the iOS target: the repository does not set a development team.

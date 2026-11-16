@@ -69,9 +69,9 @@ private struct MacScenes: Scene {
     var body: some Scene {
         MenuBarExtra("ByoGlot", systemImage: "character.bubble") {
             MenuContent(openTranslator: app.showTranslator, openSettings: { app.showSettings() })
-                .environment(\.locale, app.model.interfaceLanguage == "system" ? .current : Locale(identifier: app.model.interfaceLanguage))
+                .environment(\.locale, AppStrings.locale)
         }
-        Window("Translate", id: "translator") {
+        Window(AppStrings.text("mac.translate"), id: "translator") {
             MacContent(model: app.model) {
                 NavigationStack {
                     ScreenMain(model: app.model, openProviders: { app.showSettings(.connections) }, openSettings: { app.showSettings() }, openTemplates: { app.showSettings(.templates) })
@@ -104,6 +104,6 @@ private struct MacContent<Content: View>: View {
         }
         .tint(ByoColor.accent)
         .preferredColorScheme(scheme)
-        .environment(\.locale, model.interfaceLanguage == "system" ? .current : Locale(identifier: model.interfaceLanguage))
+        .environment(\.locale, AppStrings.locale)
     }
 }

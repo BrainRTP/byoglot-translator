@@ -1,15 +1,15 @@
 import AppKit
+import ByoGlotAppKit
 import SwiftUI
 
 struct MenuContent: View {
     let openTranslator: () -> Void
     let openSettings: () -> Void
     var body: some View {
-        Button("Translate Clipboard") {}.keyboardShortcut(.space, modifiers: .option).disabled(true)
-        Button("Open Translator", action: openTranslator)
+        Button(AppStrings.text("mac.openTranslator"), action: openTranslator)
         Divider()
-        Button("Settings...", action: openSettings).keyboardShortcut(",")
+        Button(AppStrings.text("mac.settings"), action: openSettings).keyboardShortcut(",")
         Divider()
-        Button("Quit ByoGlot") { NSApp.terminate(nil) }.keyboardShortcut("q")
+        Button(AppStrings.text("mac.quit")) { NSApp.terminate(nil) }.keyboardShortcut("q")
     }
 }

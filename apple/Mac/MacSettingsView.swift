@@ -10,16 +10,16 @@ struct MacSettingsView: View {
     @AppStorage("mac.settingsTab") private var tab: MacSettingsTab = .general
     var body: some View {
         TabView(selection: $tab) {
-            Tab("General", systemImage: "gearshape", value: .general) {
+            Tab(AppStrings.text("mac.general"), systemImage: "gearshape", value: .general) {
                 NavigationStack { MacGeneralSettings(model: model) }
             }
-            Tab("Connections", systemImage: "network", value: .connections) {
+            Tab(AppStrings.text("mac.connections"), systemImage: "network", value: .connections) {
                 NavigationStack { ScreenProviders(model: model) }
             }
-            Tab("Templates", systemImage: "text.badge.star", value: .templates) {
+            Tab(AppStrings.text("mac.templates"), systemImage: "text.badge.star", value: .templates) {
                 NavigationStack { ScreenTemplateSettings(model: model) }
             }
-            Tab("About", systemImage: "info.circle", value: .about) {
+            Tab(AppStrings.text("mac.about"), systemImage: "info.circle", value: .about) {
                 VStack(spacing: 16) {
                     Text("ByoGlot").font(.title)
                     Text(AppStrings.format("about.version", ["version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "", "build": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""]))
@@ -33,30 +33,28 @@ struct MacSettingsView: View {
 
 private struct MacGeneralSettings: View {
     @Bindable var model: AppModel
-    @AppStorage("mac.translateOnDoubleCopy") private var doubleCopy = false
     @State private var loginStatus = SMAppService.mainApp.status
     @State private var changingLogin = false
     @State private var loginError: String?
     var body: some View {
         Form {
             Section {
-                Toggle("Launch at login", isOn: Binding(get: { loginStatus == .enabled }, set: setLaunchAtLogin))
+                Toggle(AppStrings.text("mac.launchAtLogin"), isOn: Binding(get: { loginStatus == .enabled || loginStatus == .requiresApproval }, set: setLaunchAtLogin))
                     .disabled(changingLogin)
                 if loginStatus == .requiresApproval {
-                    Text("Allow ByoGlot in Login Items to launch it at login.").foregroundStyle(.secondary)
-                    Button("Open Login Items Settings") { SMAppService.openSystemSettingsLoginItems() }
+                    Text(AppStrings.text("mac.loginApproval")).foregroundStyle(.secondary)
+                    Button(AppStrings.text("mac.openLoginSettings")) { SMAppService.openSystemSettingsLoginItems() }
                 }
                 if let loginError { Text(loginError).foregroundStyle(ByoColor.error).textSelection(.enabled) }
-                Toggle("Translate on double copy (Cmd+C twice)", isOn: $doubleCopy)
             }
             Section {
                 NavigationLink(AppStrings.text("settings.language")) { ScreenLanguageSettings(model: model) }
                 NavigationLink(AppStrings.text("settings.prompt")) { ScreenLanguagePrompt(model: model) }
-                NavigationLink("Export and Import...") { ScreenAbout(model: model) }
+                NavigationLink(AppStrings.text("mac.exportImport")) { ScreenAbout(model: model) }
             }
         }
         .formStyle(.grouped)
-        .navigationTitle(Text("General"))
+        .navigationTitle(AppStrings.text("mac.general"))
         .onAppear { loginStatus = SMAppService.mainApp.status }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in loginStatus = SMAppService.mainApp.status }
     }

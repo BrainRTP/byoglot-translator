@@ -10,6 +10,12 @@ import SwiftUI
 final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
     let runner: TranslationRunner
     let model: AppModel
+    lazy var quick = QuickTranslateCoordinator(runner: runner, model: model) { [weak self] text in
+        guard let self else { return }
+        self.model.edit(text)
+        self.model.translate()
+        self.showTranslator()
+    }
     private let network = NWPathMonitor()
     private var scenes: NSHostingSceneRepresentation<MacScenes>?
 
@@ -36,6 +42,7 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
         let scenes = NSHostingSceneRepresentation { MacScenes(app: self) }
         self.scenes = scenes
         NSApp.addSceneRepresentation(scenes)
+        quick.start()
         network.pathUpdateHandler = { [weak model] path in
             let online = path.status == .satisfied
             Task { @MainActor in model?.setNetworkAvailable(online) }
@@ -48,6 +55,7 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        quick.stop()
         model.stop()
         network.cancel()
     }
@@ -68,13 +76,14 @@ private struct MacScenes: Scene {
     let app: ByoGlotMacApp
     var body: some Scene {
         MenuBarExtra("ByoGlot", systemImage: "character.bubble") {
-            MenuContent(openTranslator: app.showTranslator, openSettings: { app.showSettings() })
+            MenuContent(quick: app.quick, openTranslator: app.showTranslator, openSettings: { app.showSettings() })
                 .environment(\.locale, AppStrings.locale)
         }
         Window(AppStrings.text("main.title"), id: "translator") {
             MacContent(model: app.model) {
                 NavigationStack {
                     ScreenMain(model: app.model, openProviders: { app.showSettings(.connections) }, openSettings: { app.showSettings() }, openTemplates: { app.showSettings(.templates) })
+                        .id(app.quick.editorRevision)
                 }
             }.frame(minWidth: 560, minHeight: 600)
         }
@@ -82,7 +91,7 @@ private struct MacScenes: Scene {
         .defaultLaunchBehavior(.suppressed)
         .restorationBehavior(.disabled)
         Settings {
-            MacContent(model: app.model) { MacSettingsView(model: app.model) }
+            MacContent(model: app.model) { MacSettingsView(model: app.model, quick: app.quick) }
                 .frame(minWidth: 620, minHeight: 520)
         }
         .defaultSize(width: 700, height: 620)

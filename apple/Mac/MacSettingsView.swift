@@ -7,11 +7,12 @@ enum MacSettingsTab: String { case general, connections, templates, about }
 
 struct MacSettingsView: View {
     @Bindable var model: AppModel
+    let quick: QuickTranslateCoordinator
     @AppStorage("mac.settingsTab") private var tab: MacSettingsTab = .general
     var body: some View {
         TabView(selection: $tab) {
             Tab(AppStrings.text("mac.general"), systemImage: "gearshape", value: .general) {
-                NavigationStack { MacGeneralSettings(model: model) }
+                NavigationStack { MacGeneralSettings(model: model, quick: quick) }
             }
             Tab(AppStrings.text("mac.connections"), systemImage: "network", value: .connections) {
                 NavigationStack { ScreenProviders(model: model) }
@@ -28,6 +29,7 @@ struct MacSettingsView: View {
 
 private struct MacGeneralSettings: View {
     @Bindable var model: AppModel
+    let quick: QuickTranslateCoordinator
     @State private var loginStatus = SMAppService.mainApp.status
     @State private var changingLogin = false
     @State private var loginError: String?
@@ -41,6 +43,12 @@ private struct MacGeneralSettings: View {
                     Button(AppStrings.text("mac.openLoginSettings")) { SMAppService.openSystemSettingsLoginItems() }
                 }
                 if let loginError { Text(loginError).foregroundStyle(ByoColor.error).textSelection(.enabled) }
+            }
+            Section {
+                LabeledContent(AppStrings.text("mac.shortcut")) { ShortcutRecorder(coordinator: quick) }
+                Text(AppStrings.text("mac.shortcutHelp")).foregroundStyle(.secondary)
+                if let error = quick.shortcutError { Text(error).foregroundStyle(ByoColor.error) }
+                Toggle(AppStrings.text("mac.doubleCopy"), isOn: Binding(get: { quick.doubleCopyEnabled }, set: quick.setDoubleCopy))
             }
             Section {
                 NavigationLink(AppStrings.text("settings.language")) { ScreenLanguageSettings(model: model) }

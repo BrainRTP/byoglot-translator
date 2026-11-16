@@ -234,6 +234,7 @@ public struct TranslatorBlock: View {
         UIPasteboard.general.setItems([["public.utf8-plain-text": model.result]], options: [.localOnly: true, .expirationDate: Date.now.addingTimeInterval(60)])
         #else
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString(model.result, forType: .string)
+        NotificationCenter.default.post(name: Notification.Name("ByoGlotDidCopy"), object: nil)
         #endif
     }
 }

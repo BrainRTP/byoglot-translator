@@ -15,6 +15,15 @@ public enum ClipboardText {
         "net.antelle.keeweb",
     ]
 
+    public static func readStable(limit: Int, changeCount: () -> Int, types: () -> [String], string: () -> String?) -> ClipboardRead {
+        for _ in 0..<2 {
+            let before = changeCount()
+            let result = read(types: types(), limit: limit, string: string)
+            if changeCount() == before { return result }
+        }
+        return .empty
+    }
+
     public static func read(types: [String], limit: Int, string: () -> String?) -> ClipboardRead {
         guard !types.contains(where: concealedTypes.contains) else { return .concealed }
         guard types.contains(NSPasteboard.PasteboardType.string.rawValue),

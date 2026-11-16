@@ -43,7 +43,6 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
         NSApp.addSceneRepresentation(scenes)
         quick.start()
         NSApp.servicesProvider = ServiceProvider(coordinator: quick)
-        NSUpdateDynamicServices()
         network.pathUpdateHandler = { [weak model] path in
             let online = path.status == .satisfied
             Task { @MainActor in model?.setNetworkAvailable(online) }

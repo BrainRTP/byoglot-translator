@@ -44,7 +44,5 @@ jobs:
       - run: apple/scripts/install-xcodegen.sh
       - run: xcodegen generate
         working-directory: apple
-      - run: >-
-          xcodebuild -project ByoGlot.xcodeproj -scheme ByoGlotMac -configuration Debug CODE_SIGNING_ALLOWED=NO
-          MARKETING_VERSION=$(node -p "require('../package.json').version") CURRENT_PROJECT_VERSION=$(git rev-list --count HEAD) build
+      - run: xcodebuild -project ByoGlot.xcodeproj -scheme ByoGlotMac -configuration Debug CODE_SIGNING_ALLOWED=NO build
         working-directory: apple

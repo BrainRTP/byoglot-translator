@@ -4605,6 +4605,74 @@
           }
         }
       }
+    },
+    "mac.services": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Services"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Службы"
+          }
+        }
+      }
+    },
+    "mac.translateSelection": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Translate with ByoGlot"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перевести с помощью ByoGlot"
+          }
+        }
+      }
+    },
+    "mac.servicesHelp": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows a translation of selected text from another app in the quick panel."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показывает перевод выделенного текста из другого приложения в быстрой панели."
+          }
+        }
+      }
+    },
+    "mac.setServiceShortcut": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set a Shortcut..."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Назначить сочетание клавиш..."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

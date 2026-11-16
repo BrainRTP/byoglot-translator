@@ -50,6 +50,13 @@ private struct MacGeneralSettings: View {
                 if let error = quick.shortcutError { Text(error).foregroundStyle(ByoColor.error) }
                 Toggle(AppStrings.text("mac.doubleCopy"), isOn: Binding(get: { quick.doubleCopyEnabled }, set: quick.setDoubleCopy))
             }
+            Section(AppStrings.text("mac.services")) {
+                Text(AppStrings.text("mac.translateSelection"))
+                Text(AppStrings.text("mac.servicesHelp")).foregroundStyle(.secondary)
+                Button(AppStrings.text("mac.setServiceShortcut")) {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") { NSWorkspace.shared.open(url) }
+                }
+            }
             Section {
                 NavigationLink(AppStrings.text("settings.language")) { ScreenLanguageSettings(model: model) }
                 NavigationLink(AppStrings.text("settings.prompt")) { ScreenLanguagePrompt(model: model) }

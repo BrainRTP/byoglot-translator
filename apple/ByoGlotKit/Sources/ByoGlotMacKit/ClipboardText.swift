@@ -7,9 +7,16 @@ public enum ClipboardRead: Equatable, Sendable {
 }
 
 public enum ClipboardText {
+    private static let concealedTypes: Set<String> = [
+        "org.nspasteboard.ConcealedType",
+        "org.nspasteboard.TransientType",
+        "com.agilebits.onepassword",
+        "de.petermaurer.TransientPasteboardType",
+        "net.antelle.keeweb",
+    ]
+
     public static func read(types: [String], limit: Int, string: () -> String?) -> ClipboardRead {
-        guard !types.contains("org.nspasteboard.ConcealedType"),
-              !types.contains("org.nspasteboard.TransientType") else { return .concealed }
+        guard !types.contains(where: concealedTypes.contains) else { return .concealed }
         guard types.contains(NSPasteboard.PasteboardType.string.rawValue),
               let value = string() else { return .empty }
         let text = jsTrim(value)

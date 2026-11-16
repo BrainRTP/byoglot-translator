@@ -18,7 +18,16 @@ public struct Shortcut: Codable, Hashable, Sendable {
     }
 
     public var isValid: Bool {
-        modifiers & UInt32(cmdKey | optionKey | controlKey) != 0
+        guard modifiers & ~UInt32(cmdKey | shiftKey | optionKey | controlKey) == 0 else { return false }
+        if modifiers & UInt32(cmdKey | controlKey) != 0 { return true }
+        guard modifiers & UInt32(optionKey) != 0 else { return false }
+        switch keyCode {
+        case 49, 64, 79, 80, 90, 96, 97, 98, 99, 100, 101, 103, 105, 106, 107, 109, 111, 113, 118, 120, 122,
+             123, 124, 125, 126:
+            return true
+        default:
+            return false
+        }
     }
 
     // shortcut: Printable key names use US positions, use layout translation when localized labels are needed.

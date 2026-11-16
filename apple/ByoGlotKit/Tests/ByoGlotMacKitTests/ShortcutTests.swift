@@ -15,9 +15,16 @@ struct ShortcutTests {
     @Test func aBareKeyIsInvalid() {
         #expect(!Shortcut(keyCode: UInt32(kVK_ANSI_T), modifiers: 0).isValid)
         #expect(!Shortcut(keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(shiftKey)).isValid)
-        for modifier in [cmdKey, optionKey, controlKey] {
+        for modifier in [cmdKey, controlKey] {
             #expect(Shortcut(keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(modifier)).isValid)
         }
+    }
+
+    @Test func shortcutModifiersAreValidated() {
+        #expect(!Shortcut(keyCode: UInt32(kVK_ANSI_E), modifiers: UInt32(optionKey)).isValid)
+        #expect(Shortcut(keyCode: UInt32(kVK_Space), modifiers: UInt32(optionKey)).isValid)
+        #expect(Shortcut(keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(cmdKey | shiftKey)).isValid)
+        #expect(!Shortcut(keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(cmdKey | alphaLock)).isValid)
     }
 }
 #endif

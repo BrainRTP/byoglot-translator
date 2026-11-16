@@ -11,7 +11,7 @@ struct DoubleCopyDetectorTests {
     }
 
     @Test func twoChangesInsideTheWindowFire() {
-        for interval in [200, 500, 600] {
+        for interval in [200, 500, 700] {
             var detector = DoubleCopyDetector()
             let start = ContinuousClock.now
             #expect(detector.observe(changeCount: 10, at: start) == false)
@@ -25,7 +25,7 @@ struct DoubleCopyDetectorTests {
         let start = ContinuousClock.now
         #expect(detector.observe(changeCount: 10, at: start) == false)
         #expect(detector.observe(changeCount: 11, at: start + .milliseconds(100)) == false)
-        #expect(detector.observe(changeCount: 12, at: start + .milliseconds(800)) == false)
+        #expect(detector.observe(changeCount: 12, at: start + .milliseconds(900)) == false)
     }
 
     @Test func aThirdQuickChangeDoesNotFireAgain() {
@@ -43,7 +43,7 @@ struct DoubleCopyDetectorTests {
         #expect(detector.observe(changeCount: 10, at: start) == false)
         #expect(detector.observe(changeCount: 11, at: start + .milliseconds(100)) == false)
         #expect(detector.observe(changeCount: 11, at: start + .milliseconds(500)) == false)
-        #expect(detector.observe(changeCount: 12, at: start + .milliseconds(800)) == false)
+        #expect(detector.observe(changeCount: 12, at: start + .milliseconds(900)) == false)
     }
 
     @Test func aNewPairAfterAQuietWindowFires() {

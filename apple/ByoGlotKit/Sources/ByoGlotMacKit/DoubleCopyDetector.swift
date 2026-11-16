@@ -5,7 +5,7 @@ public struct DoubleCopyDetector: Sendable {
     private var lastChange: ContinuousClock.Instant?
     private var fired = false
 
-    public init(window: Duration = .milliseconds(600)) {
+    public init(window: Duration = .milliseconds(700)) {
         self.window = window
     }
 

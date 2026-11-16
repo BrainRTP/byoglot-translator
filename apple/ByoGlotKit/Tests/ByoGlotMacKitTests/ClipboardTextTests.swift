@@ -22,6 +22,16 @@ struct ClipboardTextTests {
         #expect(result == .concealed)
     }
 
+    @Test func passwordManagerTypesAreNeverRead() {
+        for type in ["com.agilebits.onepassword", "de.petermaurer.TransientPasteboardType", "net.antelle.keeweb"] {
+            let result = ClipboardText.read(types: [stringType, type], limit: 5000) {
+                Issue.record("Password manager clipboard content was read")
+                return "secret"
+            }
+            #expect(result == .concealed)
+        }
+    }
+
     @Test func noStringTypeIsEmpty() {
         let result = ClipboardText.read(types: ["public.png"], limit: 5000) {
             Issue.record("Clipboard without a string type was read")

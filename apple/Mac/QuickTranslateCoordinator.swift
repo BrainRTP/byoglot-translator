@@ -9,6 +9,7 @@ final class QuickTranslateCoordinator {
     private(set) var state = QuickState.hidden
     private(set) var shortcut: Shortcut
     private(set) var shortcutError: String?
+    private(set) var shortcutActive = false
     private(set) var doubleCopyEnabled: Bool
     private(set) var pasteDenied = false
     private(set) var editorRevision = 0
@@ -78,13 +79,12 @@ final class QuickTranslateCoordinator {
     @discardableResult
     private func registerShortcut(_ value: Shortcut? = nil) -> Bool {
         let registered = hotKey.register(value ?? shortcut) { [weak self] in self?.translateClipboard() }
+        shortcutActive = registered
         shortcutError = registered ? nil : AppStrings.text("mac.shortcutInUse")
         return registered
     }
 
     func translateClipboard() {
-        request?.cancel()
-        requestID = UUID()
         appName = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
         let pasteboard = NSPasteboard.general
         var stringWasUnavailable = false

@@ -120,7 +120,7 @@ public struct ScreenTemplateSheet: View {
 
 func templateIsBuiltin(_ value: Template) -> Bool { value.builtin || value.id == Contracts.builtinTemplate.id }
 
-func templateLabel(_ value: Template) -> String { templateIsBuiltin(value) ? AppStrings.text("main.builtinTemplate") : value.name }
+public func templateLabel(_ value: Template) -> String { templateIsBuiltin(value) ? AppStrings.text("main.builtinTemplate") : value.name }
 
 public struct ScreenParamsSheet: View {
     @Bindable var model: AppModel

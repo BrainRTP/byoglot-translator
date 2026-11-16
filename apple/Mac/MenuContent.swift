@@ -8,7 +8,7 @@ struct MenuContent: View {
     let openSettings: () -> Void
     var body: some View {
         Button(action: quick.translateClipboard) {
-            Text(AppStrings.text("mac.translateClipboard") + (quick.shortcutError == nil ? "\t" + localizedShortcut(quick.shortcut) : ""))
+            Text(AppStrings.text("mac.translateClipboard") + (quick.shortcutActive ? "\t" + localizedShortcut(quick.shortcut) : ""))
         }
         Button(AppStrings.text("mac.openTranslator"), action: openTranslator)
         Divider()

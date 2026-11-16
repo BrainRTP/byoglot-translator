@@ -93,10 +93,10 @@ private struct QuickPanelContent: View {
             HStack {
                 Menu {
                     ForEach(coordinator.templates, id: \.id) { template in
-                        Button(template.builtin ? AppStrings.text("main.builtinTemplate") : template.name) { coordinator.chooseTemplate(template) }
+                        Button(templateLabel(template)) { coordinator.chooseTemplate(template) }
                     }
                 } label: {
-                    Text(coordinator.selectedTemplate.builtin ? AppStrings.text("main.builtinTemplate") : coordinator.selectedTemplate.name)
+                    Text(templateLabel(coordinator.selectedTemplate))
                 }
                 .accessibilityLabel(AppStrings.text("main.template"))
                 .disabled(coordinator.source == nil)

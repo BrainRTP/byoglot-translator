@@ -42,14 +42,17 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
         self.scenes = scenes
         NSApp.addSceneRepresentation(scenes)
         quick.start()
+        NSApp.servicesProvider = ServiceProvider(coordinator: quick)
+        NSUpdateDynamicServices()
         network.pathUpdateHandler = { [weak model] path in
             let online = path.status == .satisfied
             Task { @MainActor in model?.setNetworkAvailable(online) }
         }
         network.start(queue: DispatchQueue(label: "io.github.brainrtp.byoglot.network"))
+        let isDefaultLaunch = notification.userInfo?[NSApplication.launchIsDefaultUserInfoKey] as? Bool == true
         Task {
             await model.refresh()
-            if !model.loaded || model.settings.connections.isEmpty { showSettings(.connections) }
+            if isDefaultLaunch && (!model.loaded || model.settings.connections.isEmpty) { showSettings(.connections) }
         }
     }
 

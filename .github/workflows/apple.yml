@@ -32,3 +32,19 @@ jobs:
         working-directory: apple
       - run: xcodebuild -project ByoGlot.xcodeproj -scheme ByoGlotiOS -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
         working-directory: apple
+  mac:
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - run: xcodebuild -version
+      - run: apple/scripts/install-xcodegen.sh
+      - run: xcodegen generate
+        working-directory: apple
+      - run: >-
+          xcodebuild -project ByoGlot.xcodeproj -scheme ByoGlotMac -configuration Debug CODE_SIGNING_ALLOWED=NO
+          MARKETING_VERSION=$(node -p "require('../package.json').version") CURRENT_PROJECT_VERSION=$(git rev-list --count HEAD) build
+        working-directory: apple

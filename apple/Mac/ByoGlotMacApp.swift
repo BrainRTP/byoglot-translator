@@ -18,6 +18,7 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
     }
     private let network = NWPathMonitor()
     private var scenes: NSHostingSceneRepresentation<MacScenes>?
+    private var translatorWindow: NSWindow?
 
     override init() {
         let settings = SettingsStore(directory: URL.applicationSupportDirectory)
@@ -99,7 +100,17 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
 
     func showTranslator() {
         NSApp.setActivationPolicy(.regular)
-        scenes?.environment.openWindow(id: "translator")
+        if translatorWindow == nil {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 720), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+            window.title = AppStrings.text("main.title")
+            window.contentMinSize = NSSize(width: 560, height: 600)
+            window.isReleasedWhenClosed = false
+            window.isRestorable = false
+            window.contentView = NSHostingView(rootView: MacTranslatorContent(app: self))
+            window.center()
+            translatorWindow = window
+        }
+        translatorWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate()
     }
 
@@ -118,22 +129,23 @@ private struct MacScenes: Scene {
             MenuContent(quick: app.quick, openTranslator: app.showTranslator, openSettings: { app.showSettings() })
                 .environment(\.locale, AppStrings.locale)
         }
-        Window(AppStrings.text("main.title"), id: "translator") {
-            MacContent(model: app.model) {
-                NavigationStack {
-                    ScreenMain(model: app.model, openProviders: { app.showSettings(.connections) }, openSettings: { app.showSettings() }, openTemplates: { app.showSettings(.templates) })
-                        .id(app.quick.editorRevision)
-                }
-            }.frame(minWidth: 560, minHeight: 600)
-        }
-        .defaultSize(width: 760, height: 720)
-        .defaultLaunchBehavior(.suppressed)
-        .restorationBehavior(.disabled)
         Settings {
             MacContent(model: app.model) { MacSettingsView(model: app.model, quick: app.quick) }
                 .frame(minWidth: 620, minHeight: 520)
         }
         .defaultSize(width: 700, height: 620)
+    }
+}
+
+private struct MacTranslatorContent: View {
+    let app: ByoGlotMacApp
+    var body: some View {
+        MacContent(model: app.model) {
+            NavigationStack {
+                ScreenMain(model: app.model, openProviders: { app.showSettings(.connections) }, openSettings: { app.showSettings() }, openTemplates: { app.showSettings(.templates) })
+                    .id(app.quick.editorRevision)
+            }
+        }.frame(minWidth: 560, minHeight: 600)
     }
 }
 

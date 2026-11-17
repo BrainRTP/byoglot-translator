@@ -2,6 +2,7 @@ import AppKit
 import ByoGlotAppKit
 import ByoGlotCore
 import ByoGlotStore
+import Carbon
 import Network
 import SwiftUI
 
@@ -51,10 +52,22 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
         }
         network.start(queue: DispatchQueue(label: "io.github.brainrtp.byoglot.network"))
         let isDefaultLaunch = notification.userInfo?[NSApplication.launchIsDefaultUserInfoKey] as? Bool == true
+        let launchEvent = NSAppleEventManager.shared().currentAppleEvent
+        let backgroundLaunch = launchEvent?.paramDescriptor(forKeyword: AEKeyword(keyAELaunchedAsLogInItem)) != nil || launchEvent?.paramDescriptor(forKeyword: AEKeyword(keyAELaunchedAsServiceItem)) != nil
         Task {
             await model.refresh()
-            if isDefaultLaunch && (!model.loaded || model.settings.connections.isEmpty) { showSettings(.connections) }
+            if isDefaultLaunch && !backgroundLaunch { showPrimaryWindow() }
         }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showPrimaryWindow()
+        return false
+    }
+
+    private func showPrimaryWindow() {
+        if !model.loaded || model.settings.connections.isEmpty { showSettings(.connections) }
+        else { showTranslator() }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

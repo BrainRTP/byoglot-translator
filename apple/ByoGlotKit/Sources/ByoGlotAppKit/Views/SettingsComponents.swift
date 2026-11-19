@@ -244,6 +244,24 @@ struct MacLanguagePicker: View {
     }
 }
 
+struct MacModelMenuItems: View {
+    let model: AppModel
+    let connections: [Connection]
+    let selected: ModelRef?
+    var query = ""
+    let choose: (ModelRef) -> Void
+    var body: some View {
+        ForEach(connections) { connection in
+            Section(connection.name) {
+                ForEach((model.models[connection.id] ?? []).filter { query.isEmpty || $0.id.localizedCaseInsensitiveContains(query) }, id: \.id) { info in
+                    Button(info.id) { choose(ModelRef(providerID: info.providerID, id: info.id, variant: "none", connectionId: connection.id)) }
+                        .disabled(selected?.connectionId == connection.id && selected?.providerID == info.providerID && selected?.id == info.id)
+                }
+            }
+        }
+    }
+}
+
 struct MacModelPicker: View {
     let model: AppModel
     let selected: ModelRef?
@@ -260,14 +278,7 @@ struct MacModelPicker: View {
         LabeledContent(AppStrings.text(connectionID == nil ? "model.title" : "providers.defaultModel")) {
             Menu(selected?.id ?? AppStrings.text(inherit ? "template.inherit" : "main.chooseModel")) {
                 if inherit { Button(AppStrings.text("template.inherit")) { choose(nil) } }
-                ForEach(connections) { connection in
-                    Section(connection.name) {
-                        ForEach((model.models[connection.id] ?? []).filter { query.isEmpty || $0.id.localizedCaseInsensitiveContains(query) }, id: \.id) { info in
-                            Button(info.id) { choose(ModelRef(providerID: info.providerID, id: info.id, variant: "none", connectionId: connection.id)) }
-                                .disabled(selected?.connectionId == connection.id && selected?.providerID == info.providerID && selected?.id == info.id)
-                        }
-                    }
-                }
+                MacModelMenuItems(model: model, connections: connections, selected: selected, query: query) { choose($0) }
             }.disabled(model.settings.connections.isEmpty).help(selected?.id ?? AppStrings.text("main.chooseModel"))
         }.task { if connectionID == nil && enabled { for connection in connections { await model.warmMissingModels(connectionId: connection.id) } } }
         if connectionID == nil {

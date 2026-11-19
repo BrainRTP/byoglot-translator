@@ -245,9 +245,7 @@ public struct ByoBottomSheet<Content: View>: View {
         }.frame(minWidth: 480, idealWidth: 560, minHeight: 320, idealHeight: 480)
         #else
         VStack(spacing: 0) {
-            #if !os(macOS)
             Capsule().fill(ByoColor.strongBorder).frame(width: 36, height: 5).padding(.top, 6).padding(.bottom, 2).accessibilityHidden(true)
-            #endif
             HStack {
                 Text(AppStrings.text(title)).modifier(ByoTypography(17, weight: .semibold)).frame(maxWidth: .infinity, alignment: .leading).accessibilityAddTraits(.isHeader)
                 ByoIconButton(title: "common.close", symbol: "xmark", action: close)
@@ -256,9 +254,6 @@ public struct ByoBottomSheet<Content: View>: View {
         }.background(ByoColor.background).foregroundStyle(ByoColor.text)
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16))
             .shadow(color: ByoColor.shadow, radius: 10, y: 6)
-            #if os(macOS)
-            .frame(minWidth: 480, idealWidth: 560, minHeight: 320, idealHeight: 480)
-            #endif
             .presentationDetents([.medium, .fraction(0.9)]).presentationDragIndicator(.hidden).presentationCornerRadius(16)
             .accessibilityAddTraits(.isModal)
         #endif

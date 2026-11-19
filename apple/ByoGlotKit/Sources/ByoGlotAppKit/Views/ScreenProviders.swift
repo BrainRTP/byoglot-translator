@@ -147,14 +147,9 @@ private struct ProviderKeyScreen: View {
                 if route.preset == .custom && !stored {
                     ByoTextField("providers.name", text: $name)
                     ByoTextField("custom.baseUrl", text: $baseURL, mono: true, invalid: invalidURL)
-                        #if os(iOS)
                         .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
-                        #endif
                     Text(AppStrings.text(invalidURL ? model.editor.urlPolicy.invalidURLKey : model.editor.urlPolicy.providerURLHelpKey))
                         .modifier(ByoTypography(13)).foregroundStyle(invalidURL ? ByoColor.error : ByoColor.muted)
-                        #if os(macOS)
-                        .textSelection(.enabled)
-                        #endif
                 }
                 if stored {
                     savedContent
@@ -163,16 +158,8 @@ private struct ProviderKeyScreen: View {
                     if let failure { keyFailure(failure) }
                     ByoButton(checking ? "key.checking" : "key.check", kind: .primary, busy: checking, action: check)
                         .disabled(!canCheck)
-                        #if os(macOS)
-                        .keyboardShortcut(.defaultAction)
-                        #endif
                 }
-                #if os(macOS)
-                let storageKey = "key.storeMac"
-                #else
-                let storageKey = "key.storeIos"
-                #endif
-                Text(AppStrings.text(storageKey)).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
+                Text(AppStrings.text("key.storeIos")).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
                     .padding(12).frame(maxWidth: .infinity, alignment: .leading)
                     .background(ByoColor.surface, in: RoundedRectangle(cornerRadius: 6))
                 if connection != nil { deleteSection }
@@ -232,12 +219,7 @@ private struct ProviderKeyScreen: View {
                     else { SecureField(AppStrings.text("key.label"), text: $key) }
                 }.textFieldStyle(.plain).modifier(ByoTypography(14, mono: true))
                     .focused($keyFocused).padding(.leading, 12)
-                    #if os(macOS)
-                    .onSubmit { if canCheck { check() } }
-                    #endif
-                    #if os(iOS)
                     .textInputAutocapitalization(.never).autocorrectionDisabled().textContentType(nil)
-                    #endif
                 ByoIconButton(title: showKey ? "key.hide" : "key.show", symbol: showKey ? "eye.slash" : "eye") { showKey.toggle() }
                 ByoPasteButton(iconOnly: true, label: "key.paste") { key = $0 }
             }.frame(minHeight: 48).overlay { RoundedRectangle(cornerRadius: 6).stroke(authError ? ByoColor.error : keyFocused ? ByoColor.accent : ByoColor.strongBorder, lineWidth: keyFocused ? 2 : 1) }

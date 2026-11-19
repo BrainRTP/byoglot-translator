@@ -75,13 +75,14 @@ public struct ScreenModelSheet: View {
                     Section(connection.name) {
                         ModelCatalogueError(model: model, connection: connection)
                         ForEach((model.models[connection.id] ?? []).filter { query.isEmpty || $0.id.localizedCaseInsensitiveContains(query) }, id: \.id) { info in
+                            let same = selected?.connectionId == connection.id && selected?.providerID == info.providerID && selected?.id == info.id
                             Button { choose(ModelRef(providerID: info.providerID, id: info.id, variant: "none", connectionId: connection.id)) } label: {
                                 HStack {
                                     Text(info.id).font(.system(.body, design: .monospaced))
                                     Spacer()
-                                    if selected?.connectionId == connection.id && selected?.providerID == info.providerID && selected?.id == info.id { Image(systemName: "checkmark") }
+                                    if same { Image(systemName: "checkmark") }
                                 }
-                            }.disabled(selected?.connectionId == connection.id && selected?.providerID == info.providerID && selected?.id == info.id)
+                            }.disabled(same)
                         }
                     }
                 }

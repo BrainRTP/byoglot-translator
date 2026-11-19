@@ -84,30 +84,17 @@ public struct ScreenMain: View {
         Button { sheet = "params" } label: {
             HStack(spacing: 6) {
                 Text(templateLabel(model.template)).fontWeight(.semibold)
-                    #if os(macOS)
-                    .lineLimit(1).truncationMode(.tail)
-                    #endif
                 Image(systemName: "chevron.down").font(.caption).accessibilityHidden(true)
             }
                 .modifier(ByoTypography(15)).frame(minHeight: 44)
         }.buttonStyle(.plain).accessibilityLabel(AppStrings.text("main.template") + ": " + templateLabel(model.template)).modifier(ByoFocusRing())
-            #if os(macOS)
-            .help(templateLabel(model.template))
-            #endif
         #endif
     }
     @ViewBuilder private var changedChip: some View { if model.changed { Chip(title: "main.changed") } }
     private var modelButton: some View {
         #if os(macOS)
         Menu {
-            ForEach(model.settings.connections) { connection in
-                Section(connection.name) {
-                    ForEach(model.models[connection.id] ?? [], id: \.id) { info in
-                        Button(info.id) { model.chooseModel(ModelRef(providerID: info.providerID, id: info.id, variant: "none", connectionId: connection.id)) }
-                            .disabled(model.model?.connectionId == connection.id && model.model?.providerID == info.providerID && model.model?.id == info.id)
-                    }
-                }
-            }
+            MacModelMenuItems(model: model, connections: model.settings.connections, selected: model.model) { model.chooseModel($0) }
             Divider()
             Button(AppStrings.text("mac.searchModels")) { sheet = "model" }
         } label: { Text(model.model.map { "\($0.id) · \(AppStrings.effort($0.variant))" } ?? AppStrings.text("main.chooseModel")).lineLimit(1) }
@@ -116,13 +103,7 @@ public struct ScreenMain: View {
         Button { sheet = "model" } label: {
             Text(model.model.map { "\($0.id) · \(AppStrings.effort($0.variant))" } ?? AppStrings.text("main.chooseModel"))
                 .modifier(ByoTypography(13, mono: true)).foregroundStyle(ByoColor.muted).frame(minHeight: 44).contentShape(Rectangle())
-                #if os(macOS)
-                .lineLimit(1).truncationMode(.tail)
-                #endif
         }.buttonStyle(.plain).accessibilityLabel(AppStrings.text("model.title")).modifier(ByoFocusRing())
-            #if os(macOS)
-            .help(model.model.map { "\($0.id) · \(AppStrings.effort($0.variant))" } ?? AppStrings.text("main.chooseModel"))
-            #endif
         #endif
     }
     private func leaveSheet(_ action: @escaping () -> Void) { afterSheet = action; sheet = "" }

@@ -220,6 +220,7 @@ public struct ScreenLanguagePrompt: View {
                 InlineConfirm(text: AppStrings.text("prompt.resetConfirm"), confirm: { Task { if await model.updateSettings({ [id] in $0.profileOverrides[id] = nil }) { draft = base; resetting = false } } }, cancel: { resetting = false })
             } else { ByoButton("prompt.reset", kind: .text) { resetting = true }.disabled(saved == base && !dirty) }
         }
+        .onAppear { if draftID != id { draftID = id; draft = saved } }
         #if os(macOS)
         .modifier(MacSettingsNavigation(cancelAction: !discarding && !resetting, back: { if dirty { pendingProfile = nil; discarding = true } else { dismiss() } }))
         #else
@@ -231,8 +232,6 @@ public struct ScreenLanguagePrompt: View {
                 }
             }
         }
-        #endif
-        .onAppear { if draftID != id { draftID = id; draft = saved } }
         .sheet(isPresented: $profiles) {
             ByoBottomSheet("prompt.profile", close: { profiles = false }) {
                 ByoGroup { ForEach(["auto", Contracts.genericProfileId] + Contracts.builtinProfiles.keys.filter { $0 != Contracts.genericProfileId }.sorted(), id: \.self) { profile in
@@ -244,6 +243,7 @@ public struct ScreenLanguagePrompt: View {
                 } }
             }
         }
+        #endif
     }
     @ViewBuilder private var saveButtons: some View {
         ByoButton("common.save") { Task { if await model.saveProfile(id: id, text: draft) { draft = saved } } }.disabled(!dirty || draft.utf16.count > Contracts.limits.maxProfileText || !model.settings.globals.languagePromptEnabled)

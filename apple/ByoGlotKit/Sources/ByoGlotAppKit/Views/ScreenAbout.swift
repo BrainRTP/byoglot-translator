@@ -23,18 +23,27 @@ public struct ScreenAbout: View {
     public init(model: AppModel) { self.model = model }
     public var body: some View {
         SettingsPage(title: "settings.about") {
+            #if os(macOS)
+            Section {
+                Text("ByoGlot").font(.title2).fontWeight(.semibold)
+                Text(AppStrings.format("about.version", ["version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "", "build": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""])).modifier(ByoTypography())
+            }
+            Section {
+                Note(text: AppStrings.text("about.exportHelp"))
+                transferActions
+            }
+            Section {
+                Link(AppStrings.text("about.privacy"), destination: URL(string: "https://github.com/BrainRTP/byoglot-translator/blob/main/PRIVACY.md")!)
+                Link(AppStrings.text("about.source"), destination: URL(string: "https://github.com/BrainRTP/byoglot-translator")!)
+            }
+            #else
             Text("ByoGlot").modifier(ByoTypography(22, weight: .semibold))
             Text(AppStrings.format("about.version", ["version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "", "build": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""])).modifier(ByoTypography())
             Note(text: AppStrings.text("about.exportHelp"))
-            ByoButton("about.export") { Task {
-                do { document = SettingsDocument(data: try await model.exportData()); exporting = true; failure = nil }
-                catch { failure = AppStrings.text("about.fileError") }
-            } }
-            ByoButton("about.import", busy: reading) { importing = true; success = false; failure = nil }
-            if let failure { Banner(title: AppStrings.text("about.fileError"), message: failure, actionTitle: "common.close") { self.failure = nil } }
-            if success { Note(text: AppStrings.text("about.imported")) }
+            transferActions
             Link(AppStrings.text("about.privacy"), destination: URL(string: "https://github.com/BrainRTP/byoglot-translator/blob/main/PRIVACY.md")!).frame(minHeight: 44)
             Link(AppStrings.text("about.source"), destination: URL(string: "https://github.com/BrainRTP/byoglot-translator")!).frame(minHeight: 44)
+            #endif
         }.fileImporter(isPresented: $importing, allowedContentTypes: [.json], allowsMultipleSelection: false) { result in
             switch result {
             case .success(let urls):
@@ -56,21 +65,51 @@ public struct ScreenAbout: View {
         }
         .sheet(isPresented: Binding(get: { review != nil }, set: { if !$0 && !applying { review = nil } })) {
             if let review {
-                ByoBottomSheet("about.importReview", close: { if !applying { self.review = nil } }) {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Note(text: AppStrings.text("about.replaceHelp"))
-                        importDetails(review)
-                        ByoButton("about.applyImport", kind: .primary, busy: applying) { Task {
-                            applying = true
-                            if await model.applyImport(review) { self.review = nil; success = true }
-                            else { failure = AppStrings.text("about.fileError") }
-                            applying = false
-                        } }
-                        ByoButton("common.cancel") { self.review = nil }.disabled(applying)
-                    }
+                ByoBottomSheet("about.importReview", close: { if !applying { self.review = nil } }, canClose: !applying) {
+                    importReview(review)
                 }.interactiveDismissDisabled(applying)
             }
         }
+    }
+    @ViewBuilder private var transferActions: some View {
+        ByoButton("about.export") { Task {
+            do { document = SettingsDocument(data: try await model.exportData()); exporting = true; failure = nil }
+            catch { failure = AppStrings.text("about.fileError") }
+        } }
+        ByoButton("about.import", busy: reading) { importing = true; success = false; failure = nil }
+        if let failure { Banner(title: AppStrings.text("about.fileError"), message: failure, actionTitle: "common.close") { self.failure = nil } }
+        if success { Note(text: AppStrings.text("about.imported")) }
+    }
+    private func importReview(_ review: ExportFile) -> some View {
+        Group {
+            #if os(macOS)
+            Form { reviewContent(review) }.formStyle(.grouped)
+            #else
+            VStack(alignment: .leading, spacing: 16) { reviewContent(review) }
+            #endif
+        }
+    }
+    @ViewBuilder private func reviewContent(_ review: ExportFile) -> some View {
+        Note(text: AppStrings.text("about.replaceHelp"))
+        importDetails(review)
+        ByoButton("about.applyImport", kind: .primary, busy: applying) {
+            #if os(macOS)
+            guard !applying else { return }
+            applying = true
+            #endif
+            Task {
+                #if !os(macOS)
+                applying = true
+                #endif
+                if await model.applyImport(review) { self.review = nil; success = true }
+                else { failure = AppStrings.text("about.fileError") }
+                applying = false
+            }
+        }
+        #if os(macOS)
+        .keyboardShortcut(.defaultAction)
+        #endif
+        ByoButton("common.cancel") { self.review = nil }.disabled(applying)
     }
     private func importDetails(_ file: ExportFile) -> some View {
         let replaced = file.templates.filter { imported in model.settings.templates.contains { $0.id == imported.id } }.map(templateLabel)
@@ -89,9 +128,13 @@ public struct ScreenAbout: View {
         }
     }
     private func detail(_ title: String, values: [String]) -> some View {
+        #if os(macOS)
+        LabeledContent(AppStrings.text(title), value: values.isEmpty ? AppStrings.text("about.nothing") : values.joined(separator: ", "))
+        #else
         VStack(alignment: .leading, spacing: 4) {
             SectionLabel(title)
             Text(values.isEmpty ? AppStrings.text("about.nothing") : values.joined(separator: ", ")).modifier(ByoTypography())
         }
+        #endif
     }
 }

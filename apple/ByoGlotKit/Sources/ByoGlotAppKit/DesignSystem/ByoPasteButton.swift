@@ -14,10 +14,16 @@ public struct ByoPasteButton: View {
         #if canImport(UIKit)
         NativePasteControl(iconOnly: iconOnly, label: label, action: action).fixedSize()
         #else
-        PasteButton(payloadType: String.self) { values in if let text = values.first { action(text) } }
-            .buttonStyle(.plain).frame(minWidth: 44, minHeight: 44).accessibilityLabel(AppStrings.text(label))
+        if iconOnly { paste.labelStyle(.iconOnly) }
+        else { paste.labelStyle(.titleAndIcon) }
         #endif
     }
+    #if os(macOS)
+    private var paste: some View {
+        PasteButton(payloadType: String.self) { values in if let text = values.first { action(text) } }
+            .accessibilityLabel(AppStrings.text(label)).help(AppStrings.text(label))
+    }
+    #endif
 }
 
 #if canImport(UIKit)

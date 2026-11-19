@@ -13,6 +13,21 @@ public struct ScreenTemplateSettings: View {
     public init(model: AppModel) { self.model = model }
     public var body: some View {
         SettingsPage(title: "settings.templates") {
+            #if os(macOS)
+            Section { ByoTextField("template.search", text: $query) }
+            ForEach([true, false], id: \.self) { builtin in
+                Section(AppStrings.text(builtin ? "template.builtins" : "template.own")) {
+                    ForEach(model.settings.templates.filter { templateIsBuiltin($0) == builtin && (query.isEmpty || templateLabel($0).localizedCaseInsensitiveContains(query)) }) { template in
+                        LabeledContent {
+                            if template.id == model.settings.globals.defaultTemplateId { Text(AppStrings.text("template.default")).foregroundStyle(ByoColor.muted) }
+                        } label: {
+                            Button(templateLabel(template)) { editing = TemplateEditorRoute(templateID: template.id) }
+                        }
+                    }
+                }
+            }
+            Section { ByoButton("template.new") { editing = TemplateEditorRoute(templateID: nil) } }
+            #else
             ByoTextField("template.search", text: $query)
             ForEach([true, false], id: \.self) { builtin in
                 SectionLabel(builtin ? "template.builtins" : "template.own")
@@ -25,6 +40,7 @@ public struct ScreenTemplateSettings: View {
                 }
             }
             ByoButton("template.new") { editing = TemplateEditorRoute(templateID: nil) }
+            #endif
         }.navigationDestination(item: $editing) { route in
             ScreenTemplateEditor(model: model, original: route.templateID.flatMap { id in model.settings.templates.first { $0.id == id } })
 
@@ -51,7 +67,9 @@ public struct ScreenTemplateEditor: View {
     @Bindable var model: AppModel
     let original: Template?
     @Environment(\.dismiss) private var dismiss
+    #if !os(macOS)
     @SceneStorage("template.editor.sheet") private var sheet = ""
+    #endif
     @State private var draft: TemplateDraft
     @State private var deleting = false
     @State private var busy = false
@@ -67,6 +85,17 @@ public struct ScreenTemplateEditor: View {
     private var ref: ModelRef? { draft.value.settings.pageModel }
     public var body: some View {
         SettingsPage(title: draft.base.map(templateLabel) ?? AppStrings.text("template.new")) {
+            #if os(macOS)
+            Section {
+                if readOnly { Note(text: AppStrings.text("template.readOnly")) }
+                else { ByoTextField("template.name", text: name) }
+                DraftEditor(label: "template.prePrompt", text: prompt).disabled(readOnly)
+                MacLanguagePicker(label: "lang.dstTitle", selection: Binding(get: { target }, set: { draft.value.settings.targetLang = $0.isEmpty ? nil : $0 }), inherit: true).disabled(readOnly)
+                MacModelPicker(model: model, selected: ref, inherit: true, choose: setModel).disabled(readOnly)
+                if let ref { EffortSegment(model: model, ref: ref, choose: setModel).disabled(readOnly) }
+                Text(AppStrings.text("template.inheritHelp")).foregroundStyle(ByoColor.muted)
+            }
+            #else
             if readOnly { Chip(title: "template.builtin"); Note(text: AppStrings.text("template.readOnly")) }
             else { ByoTextField("template.name", text: name) }
             DraftEditor(label: "template.prePrompt", text: prompt).disabled(readOnly)
@@ -77,45 +106,86 @@ public struct ScreenTemplateEditor: View {
                 EffortSegment(model: model, ref: ref, choose: setModel).disabled(readOnly)
                 if !readOnly { ByoButton("template.inherit", kind: .text) { setModel(nil) } }
             }
-            if !readOnly {
-                ByoButton("common.save", kind: .primary, busy: busy) { save() }.disabled(jsTrim(draft.value.name).isEmpty)
+            #endif
+            editorActions
+                #if os(macOS)
+                .disabled(busy)
+                #endif
+        }
+            #if os(macOS)
+            .modifier(MacSettingsNavigation(busy: busy, cancelAction: !deleting))
+            #endif
+            .onAppear { if let latest { draft.rebase(on: latest) } }
+            .onChange(of: latest) { _, value in if let value { draft.rebase(on: value) } }
+            #if !os(macOS)
+            .sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } })) {
+                if sheet == "language" {
+                    ScreenLanguageSheet(selected: target, inherit: true, choose: { draft.value.settings.targetLang = $0.isEmpty ? nil : $0; sheet = "" }, close: { sheet = "" })
+                } else { ScreenModelSheet(model: model, selected: ref, choose: { setModel($0) }, close: { sheet = "" }) }
             }
-            if let original = latest ?? original {
-                ByoButton("template.duplicate", busy: busy) { Task {
+            #endif
+    }
+    @ViewBuilder private var editorActions: some View {
+        if !readOnly {
+            ByoButton("common.save", kind: .primary, busy: busy) { save() }.disabled(jsTrim(draft.value.name).isEmpty)
+                #if os(macOS)
+                .keyboardShortcut(.defaultAction)
+                #endif
+        }
+        if let original = latest ?? original {
+            ByoButton("template.duplicate", busy: busy) {
+                #if os(macOS)
+                guard !busy else { return }
+                busy = true
+                #endif
+                Task {
+                    #if !os(macOS)
                     busy = true
+                    #endif
                     var copy = original
                     copy.id = UUID().uuidString
                     copy.name = AppStrings.format("template.copyName", ["name": templateLabel(original)])
                     copy.builtin = false
                     if await model.saveTemplate(copy) { dismiss() }
                     busy = false
-                } }
-                ByoButton("template.makeDefault") { Task { await model.chooseTemplate(original) } }.disabled(model.settings.globals.defaultTemplateId == original.id)
-                if !readOnly {
-                    if deleting {
-                        InlineConfirm(text: AppStrings.format("template.deleteConfirm", ["name": original.name]), danger: true, confirm: { Task { if await model.deleteTemplate(original.id) { dismiss() } } }, cancel: { deleting = false })
-                    } else { ByoButton("common.delete", kind: .danger) { deleting = true } }
                 }
             }
-        }.onAppear { if let latest { draft.rebase(on: latest) } }
-            .onChange(of: latest) { _, value in if let value { draft.rebase(on: value) } }
-            .sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } })) {
-                if sheet == "language" {
-                    ScreenLanguageSheet(selected: target, inherit: true, choose: { draft.value.settings.targetLang = $0.isEmpty ? nil : $0; sheet = "" }, close: { sheet = "" })
-                } else { ScreenModelSheet(model: model, selected: ref, choose: { setModel($0) }, close: { sheet = "" }) }
+            ByoButton("template.makeDefault") { Task { await model.chooseTemplate(original) } }.disabled(model.settings.globals.defaultTemplateId == original.id)
+            if !readOnly {
+                if deleting {
+                    InlineConfirm(text: AppStrings.format("template.deleteConfirm", ["name": original.name]), danger: true, confirm: {
+                        #if os(macOS)
+                        guard !busy else { return }
+                        busy = true
+                        #endif
+                        Task {
+                            #if os(macOS)
+                            defer { busy = false }
+                            #endif
+                            if await model.deleteTemplate(original.id) { dismiss() }
+                        }
+                    }, cancel: { deleting = false })
+                } else { ByoButton("common.delete", kind: .danger) { deleting = true } }
             }
+        }
     }
     private func setModel(_ value: ModelRef?) {
         draft.value.settings.pageModel = value
         draft.value.settings.selectionModel = value
     }
     private func save() {
+        #if os(macOS)
+        guard !busy else { return }
+        busy = true
+        #endif
         var value = draft.value
         value.name = jsTrim(value.name)
         let saved = value
         let base = draft.base
         Task {
+            #if !os(macOS)
             busy = true
+            #endif
             if await model.saveTemplate(saved, base: base) { dismiss() }
             busy = false
         }

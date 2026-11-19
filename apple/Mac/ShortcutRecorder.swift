@@ -15,6 +15,8 @@ struct ShortcutRecorder: NSViewRepresentable {
     func makeNSView(context: Context) -> ShortcutButton {
         let button = ShortcutButton()
         button.bezelStyle = .rounded
+        button.controlSize = .regular
+        button.font = .systemFont(ofSize: NSFont.systemFontSize)
         button.target = button
         button.action = #selector(ShortcutButton.beginRecording)
         button.onBegin = coordinator.beginRecording

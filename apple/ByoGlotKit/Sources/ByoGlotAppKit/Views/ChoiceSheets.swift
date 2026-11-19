@@ -1,6 +1,7 @@
 import ByoGlotCore
 import SwiftUI
 
+#if !os(macOS)
 public struct ScreenLanguageSheet: View {
     let source: Bool
     let selected: String
@@ -47,6 +48,7 @@ public struct ScreenLanguageSheet: View {
     }
 
 }
+#endif
 
 public struct ScreenModelSheet: View {
     @Bindable var model: AppModel
@@ -55,27 +57,45 @@ public struct ScreenModelSheet: View {
     let close: () -> Void
     let providers: (() -> Void)?
     @State private var loading = true
+    @State private var query = ""
     public init(model: AppModel, selected: ModelRef?, choose: @escaping (ModelRef) -> Void, close: @escaping () -> Void, providers: (() -> Void)? = nil) {
         self.model = model; self.selected = selected; self.choose = choose; self.close = close; self.providers = providers
     }
     public var body: some View {
         ByoBottomSheet("model.title", close: close) {
+            #if os(macOS)
+            Form {
+                Section {
+                    TextField(AppStrings.text("mac.searchModels"), text: $query).textFieldStyle(.roundedBorder)
+                    EffortSegment(model: model, ref: selected, choose: choose)
+                    if loading { ProgressView().accessibilityLabel(AppStrings.text("providers.loadingModels")) }
+                    if model.settings.connections.isEmpty { Note(text: AppStrings.text("providers.firstBody")) }
+                }
+                ForEach(model.settings.connections) { connection in
+                    Section(connection.name) {
+                        ModelCatalogueError(model: model, connection: connection)
+                        ForEach((model.models[connection.id] ?? []).filter { query.isEmpty || $0.id.localizedCaseInsensitiveContains(query) }, id: \.id) { info in
+                            let same = selected?.connectionId == connection.id && selected?.providerID == info.providerID && selected?.id == info.id
+                            Button { choose(ModelRef(providerID: info.providerID, id: info.id, variant: "none", connectionId: connection.id)) } label: {
+                                HStack {
+                                    Text(info.id).font(.system(.body, design: .monospaced))
+                                    Spacer()
+                                    if same { Image(systemName: "checkmark") }
+                                }
+                            }.disabled(same)
+                        }
+                    }
+                }
+                if let providers { ByoButton("providers.title", action: providers) }
+            }.formStyle(.grouped)
+            #else
             VStack(alignment: .leading, spacing: 16) {
                 EffortSegment(model: model, ref: selected, choose: choose)
                 if loading { ProgressView().frame(maxWidth: .infinity).accessibilityLabel(AppStrings.text("providers.loadingModels")) }
                 if model.settings.connections.isEmpty { Note(text: AppStrings.text("providers.firstBody")) }
                 ForEach(model.settings.connections) { connection in
                     SectionLabel(connection.name)
-                    if let error = model.catalogueErrors[connection.id] {
-                        if case .consentNeeded(let origin) = error {
-                            Note(text: AppStrings.format("consent.body", ["origin": origin]))
-                            ByoButton("consent.allow") { Task {
-                                if await model.updateSettings({ if !$0.consentedOrigins.contains(origin) { $0.consentedOrigins.append(origin) } }) { await model.warmModels(connectionId: connection.id) }
-                            } }
-                        } else {
-                            Banner(title: AppStrings.text("providers.modelsError"), message: AppStrings.error(error), actionTitle: "err.retry") { Task { await model.warmModels(connectionId: connection.id) } }
-                        }
-                    }
+                    ModelCatalogueError(model: model, connection: connection)
                     ByoGroup {
                         ForEach(model.models[connection.id] ?? [], id: \.id) { info in
                             let same = selected?.connectionId == connection.id && selected?.providerID == info.providerID && selected?.id == info.id
@@ -88,13 +108,16 @@ public struct ScreenModelSheet: View {
                 }
                 if let providers { ByoButton("providers.title", kind: .text, action: providers) }
             }
+            #endif
         }.task {
             for connection in model.settings.connections { await model.warmModels(connectionId: connection.id) }
             loading = false
         }
     }
+
 }
 
+#if !os(macOS)
 public struct ScreenTemplateSheet: View {
     let templates: [Template]
     let selected: String
@@ -117,6 +140,7 @@ public struct ScreenTemplateSheet: View {
         }
     }
 }
+#endif
 
 func templateIsBuiltin(_ value: Template) -> Bool { value.builtin || value.id == Contracts.builtinTemplate.id }
 
@@ -139,7 +163,33 @@ public struct ScreenParamsSheet: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     public init(model: AppModel, close: @escaping () -> Void, providers: @escaping () -> Void, manageTemplates: (() -> Void)? = nil) { self.model = model; self.close = close; self.providers = providers; self.manageTemplates = manageTemplates }
     public var body: some View {
-        ByoBottomSheet("params.title", close: finish) {
+        ByoBottomSheet("params.title", close: finish, canClose: !confirming) {
+            #if os(macOS)
+            Form {
+                Section {
+                    Picker(AppStrings.text("main.template"), selection: Binding(get: { model.template.id }, set: { id in
+                        if let value = model.settings.templates.first(where: { $0.id == id }) { Task { await model.chooseTemplate(value); promptDraft = model.prePrompt } }
+                    })) { ForEach(model.settings.templates) { Text(templateLabel($0)).tag($0.id) } }
+                    if model.changed || (promptReady && promptDraft != model.prePrompt) { changedActions }
+                    DraftEditor(label: "template.prePrompt", text: $promptDraft, focusChanged: { focused in promptFocused = focused; if !focused { commitPrompt() } })
+                    Text(AppStrings.text("params.promptNote")).foregroundStyle(ByoColor.muted)
+                }
+                Section {
+                    MacModelPicker(model: model, selected: model.model) { if let ref = $0 { model.chooseModel(ref) } }
+                    EffortSegment(model: model, ref: model.model, choose: model.chooseModel)
+                    if let missing = model.missingTemplateModel {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(AppStrings.text("model.missing")).fontWeight(.semibold)
+                            Text(AppStrings.format("model.fallback", ["model": missing.id, "fallback": model.model?.id ?? AppStrings.text("main.chooseModel")]))
+                        }.foregroundStyle(ByoColor.warning)
+                    }
+                }
+                Section {
+                    ByoButton("providers.title") { finish(); providers() }
+                    if let manageTemplates { ByoButton("template.manage") { finish(); manageTemplates() } }
+                }
+            }.formStyle(.grouped)
+            #else
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 12) {
                     PickerField(label: "main.template", value: templateLabel(model.template)) { sheet = "templates" }
@@ -161,6 +211,7 @@ public struct ScreenParamsSheet: View {
                     Banner(title: AppStrings.text("model.missing"), message: AppStrings.format("model.fallback", ["model": missing.id, "fallback": model.model?.id ?? AppStrings.text("main.chooseModel")]), warning: true, actionTitle: "err.otherModel") { sheet = "model" }
                 }
             }
+            #endif
         }
         .onAppear { promptDraft = model.prePrompt; promptReady = true }
         .onChange(of: model.prePrompt) { _, value in if promptReady && !promptFocused { promptDraft = value } }
@@ -174,6 +225,7 @@ public struct ScreenParamsSheet: View {
             confirming = false
             sheet = ""
         }
+        #if !os(macOS)
         .sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } }), onDismiss: {
             let destination = pendingDestination
             pendingDestination = ""
@@ -189,6 +241,7 @@ public struct ScreenParamsSheet: View {
                 ScreenModelSheet(model: model, selected: model.model, choose: model.chooseModel, close: { sheet = "" }, providers: { pendingDestination = "providers"; sheet = "" })
             }
         }
+        #endif
     }
     @ViewBuilder private var modelFields: some View {
         PickerField(label: "model.title", value: model.model?.id ?? AppStrings.text("main.chooseModel"), mono: true) { sheet = "model" }
@@ -204,6 +257,9 @@ public struct ScreenParamsSheet: View {
         if saving {
             ByoTextField("template.name", text: $name)
             ByoButton("common.save") { let savedName = name; Task { if await model.storeCurrentTemplate(name: savedName) { saving = false; name = "" } } }.disabled(jsTrim(name).isEmpty)
+                #if os(macOS)
+                .keyboardShortcut(.defaultAction)
+                #endif
         } else { ByoButton("template.saveNew") { saving = true } }
         ByoButton("template.reset", kind: .text) { model.resetParameters(); promptDraft = model.prePrompt }
     }

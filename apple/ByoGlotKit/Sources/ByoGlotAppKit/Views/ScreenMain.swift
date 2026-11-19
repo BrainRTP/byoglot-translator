@@ -40,8 +40,10 @@ public struct ScreenMain: View {
         }) {
             switch sheet {
             case "params": ScreenParamsSheet(model: model, close: { sheet = "" }, providers: { leaveSheet(openProviders) }, manageTemplates: openTemplates.map { action in { leaveSheet(action) } })
+            #if !os(macOS)
             case "source": ScreenLanguageSheet(source: true, selected: model.sourceLang, recent: model.recentLanguages, detected: model.detectedSourceLang, choose: { code in sheet = ""; Task { await model.chooseSource(code) } }, close: { sheet = "" })
             case "target": ScreenLanguageSheet(selected: model.targetLang, recent: model.recentLanguages, choose: { code in sheet = ""; Task { await model.chooseTarget(code) } }, close: { sheet = "" })
+            #endif
             default: ScreenModelSheet(model: model, selected: model.model, choose: model.chooseModel, close: { sheet = "" }, providers: { leaveSheet(openProviders) })
             }
         }
@@ -68,32 +70,41 @@ public struct ScreenMain: View {
         #endif
     }
     private var templateButton: some View {
+        #if os(macOS)
+        Menu {
+            Picker(AppStrings.text("main.template"), selection: Binding(get: { model.template.id }, set: { id in
+                if let template = model.settings.templates.first(where: { $0.id == id }) { Task { await model.chooseTemplate(template) } }
+            })) { ForEach(model.settings.templates) { Text(templateLabel($0)).tag($0.id) } }
+            Divider()
+            Button(AppStrings.text("params.title")) { sheet = "params" }
+        } label: { Text(templateLabel(model.template)).lineLimit(1).fontWeight(.semibold) }
+            .accessibilityLabel(AppStrings.text("main.template") + ": " + templateLabel(model.template))
+            .help(templateLabel(model.template))
+        #else
         Button { sheet = "params" } label: {
             HStack(spacing: 6) {
                 Text(templateLabel(model.template)).fontWeight(.semibold)
-                    #if os(macOS)
-                    .lineLimit(1).truncationMode(.tail)
-                    #endif
                 Image(systemName: "chevron.down").font(.caption).accessibilityHidden(true)
             }
                 .modifier(ByoTypography(15)).frame(minHeight: 44)
         }.buttonStyle(.plain).accessibilityLabel(AppStrings.text("main.template") + ": " + templateLabel(model.template)).modifier(ByoFocusRing())
-            #if os(macOS)
-            .help(templateLabel(model.template))
-            #endif
+        #endif
     }
     @ViewBuilder private var changedChip: some View { if model.changed { Chip(title: "main.changed") } }
     private var modelButton: some View {
+        #if os(macOS)
+        Menu {
+            MacModelMenuItems(model: model, connections: model.settings.connections, selected: model.model) { model.chooseModel($0) }
+            Divider()
+            Button(AppStrings.text("mac.searchModels")) { sheet = "model" }
+        } label: { Text(model.model.map { "\($0.id) · \(AppStrings.effort($0.variant))" } ?? AppStrings.text("main.chooseModel")).lineLimit(1) }
+            .accessibilityLabel(AppStrings.text("model.title"))
+        #else
         Button { sheet = "model" } label: {
             Text(model.model.map { "\($0.id) · \(AppStrings.effort($0.variant))" } ?? AppStrings.text("main.chooseModel"))
                 .modifier(ByoTypography(13, mono: true)).foregroundStyle(ByoColor.muted).frame(minHeight: 44).contentShape(Rectangle())
-                #if os(macOS)
-                .lineLimit(1).truncationMode(.tail)
-                #endif
         }.buttonStyle(.plain).accessibilityLabel(AppStrings.text("model.title")).modifier(ByoFocusRing())
-            #if os(macOS)
-            .help(model.model.map { "\($0.id) · \(AppStrings.effort($0.variant))" } ?? AppStrings.text("main.chooseModel"))
-            #endif
+        #endif
     }
     private func leaveSheet(_ action: @escaping () -> Void) { afterSheet = action; sheet = "" }
 
@@ -121,15 +132,29 @@ public struct LangBar: View {
             .accessibilityElement(children: .contain)
     }
     private var sourceMenu: some View {
+        #if os(macOS)
+        Menu {
+            MacLanguagePicker(label: "lang.srcTitle", selection: Binding(get: { model.sourceLang }, set: { code in Task { await model.chooseSource(code) } }), source: true).pickerStyle(.inline)
+        } label: { languageLabel(sourceLabel) }
+            .accessibilityLabel(AppStrings.text("lang.srcTitle") + ": " + sourceLabel)
+        #else
         Button { openLanguage(true) } label: { languageLabel(sourceLabel) }.buttonStyle(.plain)
             .accessibilityLabel(AppStrings.text("lang.srcTitle") + ": " + sourceLabel)
+        #endif
     }
     private var swapButton: some View {
         ByoIconButton(title: "main.swap", symbol: "arrow.left.arrow.right", action: swap).disabled(!model.canSwap)
     }
     private var targetMenu: some View {
+        #if os(macOS)
+        Menu {
+            MacLanguagePicker(label: "lang.dstTitle", selection: Binding(get: { model.targetLang }, set: { code in Task { await model.chooseTarget(code) } })).pickerStyle(.inline)
+        } label: { languageLabel(AppStrings.language(model.targetLang)) }
+            .accessibilityLabel(AppStrings.text("lang.dstTitle") + ": " + AppStrings.language(model.targetLang))
+        #else
         Button { openLanguage(false) } label: { languageLabel(AppStrings.language(model.targetLang)) }.buttonStyle(.plain)
             .accessibilityLabel(AppStrings.text("lang.dstTitle") + ": " + AppStrings.language(model.targetLang))
+        #endif
     }
     private func languageLabel(_ label: String) -> some View {
         HStack(spacing: ByoSpace.tiny) { Text(label).lineLimit(typeSize.isAccessibilitySize ? 2 : 1); Image(systemName: "chevron.down").font(.caption2).accessibilityHidden(true) }

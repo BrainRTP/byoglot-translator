@@ -34,6 +34,7 @@ public final class AppModel {
     public private(set) var keyStates: [String: Bool] = [:]
     #if os(macOS)
     public private(set) var keyErrors: [String: RunnerError] = [:]
+    @ObservationIgnored private var requestedModelCatalogues: Set<String> = []
     #endif
     public private(set) var catalogueErrors: [String: RunnerError] = [:]
     public private(set) var recentLanguages: [String] = []
@@ -565,6 +566,14 @@ public final class AppModel {
         schedule()
         return nil
     }
+
+    #if os(macOS)
+    func warmMissingModels(connectionId: String) async {
+        guard models[connectionId] == nil, catalogueErrors[connectionId] == nil,
+              requestedModelCatalogues.insert(connectionId).inserted else { return }
+        await warmModels(connectionId: connectionId)
+    }
+    #endif
 
     public func warmModels(connectionId: String) async {
         guard online else { catalogueErrors[connectionId] = .backend(BackendError(kind: .offline)); return }

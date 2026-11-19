@@ -164,6 +164,7 @@ private struct MacScenes: Scene {
         Settings {
             MacContent(model: app.model) { MacSettingsView(model: app.model, quick: app.quick) }
                 .frame(minWidth: 620, minHeight: 520)
+                .background(SettingsWindowPrivacy())
         }
         .defaultSize(width: 700, height: 620)
     }
@@ -197,5 +198,17 @@ private struct MacContent<Content: View>: View {
         .tint(ByoColor.accent)
         .preferredColorScheme(scheme)
         .environment(\.locale, AppStrings.locale)
+    }
+}
+
+private struct SettingsWindowPrivacy: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { PrivateView() }
+    func updateNSView(_ view: NSView, context: Context) {}
+    private final class PrivateView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            window?.isRestorable = false
+            window?.disableSnapshotRestoration()
+        }
     }
 }

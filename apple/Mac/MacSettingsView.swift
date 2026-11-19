@@ -23,7 +23,7 @@ struct MacSettingsView: View {
             Tab(AppStrings.text("settings.about"), systemImage: "info.circle", value: .about) {
                 NavigationStack { ScreenAbout(model: model) }
             }
-        }.padding(16)
+        }.environment(\.byoSettingsControls, true)
     }
 }
 
@@ -39,26 +39,26 @@ private struct MacGeneralSettings: View {
                 Toggle(AppStrings.text("mac.launchAtLogin"), isOn: Binding(get: { loginStatus == .enabled || loginStatus == .requiresApproval }, set: setLaunchAtLogin))
                     .disabled(changingLogin)
                 if loginStatus == .requiresApproval {
-                    Text(AppStrings.text("mac.loginApproval")).foregroundStyle(.secondary)
+                    Text(AppStrings.text("mac.loginApproval")).foregroundStyle(ByoColor.muted)
                     Button(AppStrings.text("mac.openLoginSettings")) { SMAppService.openSystemSettingsLoginItems() }
                 }
                 if let loginError { Text(loginError).foregroundStyle(ByoColor.error).textSelection(.enabled) }
             }
             Section {
-                LabeledContent(AppStrings.text("mac.shortcut")) { ShortcutRecorder(coordinator: quick) }
-                Text(AppStrings.text("mac.shortcutHelp")).foregroundStyle(.secondary)
+                LabeledContent(AppStrings.text("mac.shortcut")) { ShortcutRecorder(coordinator: quick).fixedSize() }
+                Text(AppStrings.text("mac.shortcutHelp")).foregroundStyle(ByoColor.muted)
                 if let error = quick.shortcutError { Text(error).foregroundStyle(ByoColor.error).textSelection(.enabled) }
                 Toggle(AppStrings.text("mac.doubleCopy"), isOn: Binding(get: { quick.doubleCopyEnabled }, set: quick.setDoubleCopy))
             }
             Section(AppStrings.text("mac.services")) {
                 Text(AppStrings.text("mac.translateSelection"))
-                Text(AppStrings.text("mac.servicesHelp")).foregroundStyle(.secondary)
+                Text(AppStrings.text("mac.servicesHelp")).foregroundStyle(ByoColor.muted)
                 Button(AppStrings.text("mac.setServiceShortcut")) {
                     if let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") { NSWorkspace.shared.open(url) }
                 }
             }
             Section {
-                NavigationLink(AppStrings.text("settings.language")) { ScreenLanguageSettings(model: model) }
+                NavigationLink(AppStrings.text("settings.language")) { ScreenLanguageSettings(model: model).modifier(MacSettingsNavigation()) }
                 NavigationLink(AppStrings.text("settings.prompt")) { ScreenLanguagePrompt(model: model) }
             }
         }

@@ -132,9 +132,7 @@ private struct ProviderKeyScreen: View {
                     if stored { savedContent }
                     else {
                         keyField
-                        if let failure {
-                            Banner(title: authError ? AppStrings.text("key.bad") : failureTitle, message: AppStrings.error(failure), actionTitle: "err.retry", action: check)
-                        }
+                        if let failure { keyFailure(failure) }
                         ByoButton(checking ? "key.checking" : "key.check", busy: checking, action: check)
                             .disabled(!canCheck).keyboardShortcut(.defaultAction)
                     }
@@ -162,10 +160,7 @@ private struct ProviderKeyScreen: View {
                     savedContent
                 } else {
                     keyField
-                    if let failure {
-                        let network = failure == .backend(BackendError(kind: .offline))
-                        Banner(title: authError ? AppStrings.text("key.bad") : network ? AppStrings.text("err.net.t") : failureTitle, message: authError ? AppStrings.text("providers.badBody") : network ? AppStrings.text("providers.netBody") : AppStrings.error(failure), actionTitle: "err.retry", action: check)
-                    }
+                    if let failure { keyFailure(failure) }
                     ByoButton(checking ? "key.checking" : "key.check", kind: .primary, busy: checking, action: check)
                         .disabled(!canCheck)
                         #if os(macOS)
@@ -207,6 +202,10 @@ private struct ProviderKeyScreen: View {
                 }
             }
     }
+    private func keyFailure(_ failure: RunnerError) -> some View {
+        let network = failure == .backend(BackendError(kind: .offline))
+        return Banner(title: authError ? AppStrings.text("key.bad") : network ? AppStrings.text("err.net.t") : failureTitle, message: authError ? AppStrings.text("providers.badBody") : network ? AppStrings.text("providers.netBody") : AppStrings.error(failure), actionTitle: "err.retry", action: check)
+    }
     private var canCheck: Bool {
         !checking && (!key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || hasKey || !ProviderEffort.needsKey(preset: route.preset, baseUrl: baseURL)) && (route.preset != .custom || !baseURL.isEmpty)
     }
@@ -217,7 +216,7 @@ private struct ProviderKeyScreen: View {
                 Group {
                     if showKey { TextField(AppStrings.text("key.label"), text: $key) }
                     else { SecureField(AppStrings.text("key.label"), text: $key) }
-                }.labelsHidden().font(.system(.body, design: .monospaced)).focused($keyFocused)
+                }.labelsHidden().textFieldStyle(.roundedBorder).font(.system(.body, design: .monospaced)).focused($keyFocused)
                     .onSubmit { if canCheck { check() } }
                 Button { showKey.toggle() } label: { Image(systemName: showKey ? "eye.slash" : "eye") }
                     .accessibilityLabel(AppStrings.text(showKey ? "key.hide" : "key.show"))

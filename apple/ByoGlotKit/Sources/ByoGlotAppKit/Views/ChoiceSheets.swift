@@ -1,6 +1,7 @@
 import ByoGlotCore
 import SwiftUI
 
+#if !os(macOS)
 public struct ScreenLanguageSheet: View {
     let source: Bool
     let selected: String
@@ -21,18 +22,6 @@ public struct ScreenLanguageSheet: View {
     }
     public var body: some View {
         ByoBottomSheet(source ? "lang.srcTitle" : "lang.dstTitle", close: close) {
-            #if os(macOS)
-            Form {
-                Section { TextField(AppStrings.text("lang.search"), text: $query) }
-                if inherit { row("", title: AppStrings.text("template.inherit")) }
-                if source { row("auto", title: AppStrings.text("lang.auto")) }
-                if query.isEmpty && !recent.isEmpty {
-                    Section(AppStrings.text("lang.recent")) { ForEach(recent.filter { Contracts.languageCodes.contains($0) }, id: \.self) { row($0) } }
-                }
-                Section(AppStrings.text("lang.all")) { ForEach(languages, id: \.self) { row($0) } }
-                if languages.isEmpty { Note(text: AppStrings.text("search.empty")) }
-            }.formStyle(.grouped)
-            #else
             VStack(alignment: .leading, spacing: 16) {
                 ByoTextField("lang.search", text: $query)
                 if inherit { row("", title: AppStrings.text("template.inherit")) }
@@ -47,17 +36,10 @@ public struct ScreenLanguageSheet: View {
                 ByoGroup { ForEach(languages, id: \.self) { row($0) } }
                 if languages.isEmpty { Note(text: AppStrings.text("search.empty")) }
             }
-            #endif
         }.onDisappear { query = "" }
     }
     private func row(_ code: String, title: String? = nil) -> some View {
-        #if os(macOS)
-        Button { select(code) } label: {
-            HStack { Text(title ?? AppStrings.language(code)); Spacer(); if selected == code { Image(systemName: "checkmark") } }
-        }
-        #else
         ListRow(title ?? AppStrings.language(code), selected: selected == code, disclosure: false) { select(code) }
-        #endif
     }
     private func select(_ code: String) {
         guard !choosing else { return }
@@ -66,6 +48,7 @@ public struct ScreenLanguageSheet: View {
     }
 
 }
+#endif
 
 public struct ScreenModelSheet: View {
     @Bindable var model: AppModel
@@ -83,9 +66,9 @@ public struct ScreenModelSheet: View {
             #if os(macOS)
             Form {
                 Section {
-                    TextField(AppStrings.text("mac.searchModels"), text: $query)
+                    TextField(AppStrings.text("mac.searchModels"), text: $query).textFieldStyle(.roundedBorder)
                     EffortSegment(model: model, ref: selected, choose: choose)
-                    if loading { ProgressView() }
+                    if loading { ProgressView().accessibilityLabel(AppStrings.text("providers.loadingModels")) }
                     if model.settings.connections.isEmpty { Note(text: AppStrings.text("providers.firstBody")) }
                 }
                 ForEach(model.settings.connections) { connection in
@@ -133,6 +116,7 @@ public struct ScreenModelSheet: View {
 
 }
 
+#if !os(macOS)
 public struct ScreenTemplateSheet: View {
     let templates: [Template]
     let selected: String
@@ -155,6 +139,7 @@ public struct ScreenTemplateSheet: View {
         }
     }
 }
+#endif
 
 func templateIsBuiltin(_ value: Template) -> Bool { value.builtin || value.id == Contracts.builtinTemplate.id }
 
@@ -177,7 +162,7 @@ public struct ScreenParamsSheet: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     public init(model: AppModel, close: @escaping () -> Void, providers: @escaping () -> Void, manageTemplates: (() -> Void)? = nil) { self.model = model; self.close = close; self.providers = providers; self.manageTemplates = manageTemplates }
     public var body: some View {
-        ByoBottomSheet("params.title", close: finish) {
+        ByoBottomSheet("params.title", close: finish, canClose: !confirming) {
             #if os(macOS)
             Form {
                 Section {
@@ -191,7 +176,12 @@ public struct ScreenParamsSheet: View {
                 Section {
                     MacModelPicker(model: model, selected: model.model) { if let ref = $0 { model.chooseModel(ref) } }
                     EffortSegment(model: model, ref: model.model, choose: model.chooseModel)
-                    if let missing = model.missingTemplateModel { Text(AppStrings.format("model.fallback", ["model": missing.id, "fallback": model.model?.id ?? AppStrings.text("main.chooseModel")])).foregroundStyle(ByoColor.warning) }
+                    if let missing = model.missingTemplateModel {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(AppStrings.text("model.missing")).fontWeight(.semibold)
+                            Text(AppStrings.format("model.fallback", ["model": missing.id, "fallback": model.model?.id ?? AppStrings.text("main.chooseModel")]))
+                        }.foregroundStyle(ByoColor.warning)
+                    }
                 }
                 Section {
                     ByoButton("providers.title") { finish(); providers() }

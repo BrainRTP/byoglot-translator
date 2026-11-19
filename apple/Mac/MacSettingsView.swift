@@ -23,7 +23,7 @@ struct MacSettingsView: View {
             Tab(AppStrings.text("settings.about"), systemImage: "info.circle", value: .about) {
                 NavigationStack { ScreenAbout(model: model) }
             }
-        }
+        }.environment(\.byoSettingsControls, true)
     }
 }
 

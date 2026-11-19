@@ -67,7 +67,9 @@ public struct ScreenTemplateEditor: View {
     @Bindable var model: AppModel
     let original: Template?
     @Environment(\.dismiss) private var dismiss
+    #if !os(macOS)
     @SceneStorage("template.editor.sheet") private var sheet = ""
+    #endif
     @State private var draft: TemplateDraft
     @State private var deleting = false
     @State private var busy = false
@@ -115,11 +117,13 @@ public struct ScreenTemplateEditor: View {
             #endif
             .onAppear { if let latest { draft.rebase(on: latest) } }
             .onChange(of: latest) { _, value in if let value { draft.rebase(on: value) } }
+            #if !os(macOS)
             .sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } })) {
                 if sheet == "language" {
                     ScreenLanguageSheet(selected: target, inherit: true, choose: { draft.value.settings.targetLang = $0.isEmpty ? nil : $0; sheet = "" }, close: { sheet = "" })
                 } else { ScreenModelSheet(model: model, selected: ref, choose: { setModel($0) }, close: { sheet = "" }) }
             }
+            #endif
     }
     @ViewBuilder private var editorActions: some View {
         if !readOnly {
@@ -129,25 +133,38 @@ public struct ScreenTemplateEditor: View {
                 #endif
         }
         if let original = latest ?? original {
-            ByoButton("template.duplicate", busy: busy) { Task {
+            ByoButton("template.duplicate", busy: busy) {
+                #if os(macOS)
+                guard !busy else { return }
                 busy = true
-                var copy = original
-                copy.id = UUID().uuidString
-                copy.name = AppStrings.format("template.copyName", ["name": templateLabel(original)])
-                copy.builtin = false
-                if await model.saveTemplate(copy) { dismiss() }
-                busy = false
-            } }
+                #endif
+                Task {
+                    #if !os(macOS)
+                    busy = true
+                    #endif
+                    var copy = original
+                    copy.id = UUID().uuidString
+                    copy.name = AppStrings.format("template.copyName", ["name": templateLabel(original)])
+                    copy.builtin = false
+                    if await model.saveTemplate(copy) { dismiss() }
+                    busy = false
+                }
+            }
             ByoButton("template.makeDefault") { Task { await model.chooseTemplate(original) } }.disabled(model.settings.globals.defaultTemplateId == original.id)
             if !readOnly {
                 if deleting {
-                    InlineConfirm(text: AppStrings.format("template.deleteConfirm", ["name": original.name]), danger: true, confirm: { Task {
+                    InlineConfirm(text: AppStrings.format("template.deleteConfirm", ["name": original.name]), danger: true, confirm: {
                         #if os(macOS)
+                        guard !busy else { return }
                         busy = true
-                        defer { busy = false }
                         #endif
-                        if await model.deleteTemplate(original.id) { dismiss() }
-                    } }, cancel: { deleting = false })
+                        Task {
+                            #if os(macOS)
+                            defer { busy = false }
+                            #endif
+                            if await model.deleteTemplate(original.id) { dismiss() }
+                        }
+                    }, cancel: { deleting = false })
                 } else { ByoButton("common.delete", kind: .danger) { deleting = true } }
             }
         }
@@ -157,12 +174,18 @@ public struct ScreenTemplateEditor: View {
         draft.value.settings.selectionModel = value
     }
     private func save() {
+        #if os(macOS)
+        guard !busy else { return }
+        busy = true
+        #endif
         var value = draft.value
         value.name = jsTrim(value.name)
         let saved = value
         let base = draft.base
         Task {
+            #if !os(macOS)
             busy = true
+            #endif
             if await model.saveTemplate(saved, base: base) { dismiss() }
             busy = false
         }

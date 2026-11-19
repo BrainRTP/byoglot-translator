@@ -92,19 +92,24 @@ public struct ScreenAbout: View {
     @ViewBuilder private func reviewContent(_ review: ExportFile) -> some View {
         Note(text: AppStrings.text("about.replaceHelp"))
         importDetails(review)
-        ByoButton("about.applyImport", kind: .primary, busy: applying) { Task {
+        ByoButton("about.applyImport", kind: .primary, busy: applying) {
+            #if os(macOS)
+            guard !applying else { return }
             applying = true
-            if await model.applyImport(review) { self.review = nil; success = true }
-            else { failure = AppStrings.text("about.fileError") }
-            applying = false
-        } }
+            #endif
+            Task {
+                #if !os(macOS)
+                applying = true
+                #endif
+                if await model.applyImport(review) { self.review = nil; success = true }
+                else { failure = AppStrings.text("about.fileError") }
+                applying = false
+            }
+        }
         #if os(macOS)
         .keyboardShortcut(.defaultAction)
         #endif
         ByoButton("common.cancel") { self.review = nil }.disabled(applying)
-            #if os(macOS)
-            .keyboardShortcut(.cancelAction)
-            #endif
     }
     private func importDetails(_ file: ExportFile) -> some View {
         let replaced = file.templates.filter { imported in model.settings.templates.contains { $0.id == imported.id } }.map(templateLabel)

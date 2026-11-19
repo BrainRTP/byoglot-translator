@@ -12,9 +12,7 @@ struct ByoGroup<Content: View>: View {
     var body: some View {
         VStack(spacing: 0) { content }
             .background(ByoColor.background, in: RoundedRectangle(cornerRadius: 8))
-            #if !os(macOS)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            #endif
             .overlay { RoundedRectangle(cornerRadius: 8).stroke(ByoColor.border).allowsHitTesting(false) }
     }
 }
@@ -60,6 +58,9 @@ struct InlineConfirm: View {
                 VStack(alignment: .leading) { buttons }
             }
         }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+            #if os(macOS)
+            .fixedSize(horizontal: false, vertical: true)
+            #endif
             .overlay { RoundedRectangle(cornerRadius: 6).stroke(ByoColor.strongBorder) }
             .accessibilityElement(children: .contain).onAppear { focused = true }
     }
@@ -170,6 +171,9 @@ struct EffortSegment: View {
         })) {
             ForEach(levels, id: \.self) { Text(AppStrings.effort($0)).tag($0) }
         }.disabled(ref == nil)
+        if model.modelInfo(ref) == nil { Note(text: AppStrings.text(ref == nil ? "model.chooseForEffort" : "model.capabilitiesUnknown")) }
+        else if levels.count == 1 { Note(text: AppStrings.text("model.noThinking")) }
+        else if selected != "none" { Note(text: AppStrings.text("model.thinkingNote")) }
         #else
         VStack(alignment: .leading, spacing: 8) {
             SectionLabel("model.effort")
@@ -248,12 +252,15 @@ struct MacModelPicker: View {
     let choose: (ModelRef?) -> Void
     @Environment(\.isEnabled) private var enabled
     @State private var query = ""
+    private var connections: [Connection] { model.settings.connections.filter { connectionID == nil || $0.id == connectionID } }
     var body: some View {
-        if model.models.values.reduce(0, { $0 + $1.count }) > 20 { TextField(AppStrings.text("mac.searchModels"), text: $query) }
+        if connections.reduce(0, { $0 + (model.models[$1.id]?.count ?? 0) }) > 20 {
+            TextField(AppStrings.text("mac.searchModels"), text: $query).textFieldStyle(.roundedBorder)
+        }
         LabeledContent(AppStrings.text(connectionID == nil ? "model.title" : "providers.defaultModel")) {
             Menu(selected?.id ?? AppStrings.text(inherit ? "template.inherit" : "main.chooseModel")) {
                 if inherit { Button(AppStrings.text("template.inherit")) { choose(nil) } }
-                ForEach(model.settings.connections.filter { connectionID == nil || $0.id == connectionID }) { connection in
+                ForEach(connections) { connection in
                     Section(connection.name) {
                         ForEach((model.models[connection.id] ?? []).filter { query.isEmpty || $0.id.localizedCaseInsensitiveContains(query) }, id: \.id) { info in
                             Button(info.id) { choose(ModelRef(providerID: info.providerID, id: info.id, variant: "none", connectionId: connection.id)) }
@@ -262,7 +269,7 @@ struct MacModelPicker: View {
                     }
                 }
             }.disabled(model.settings.connections.isEmpty).help(selected?.id ?? AppStrings.text("main.chooseModel"))
-        }.task { if connectionID == nil && enabled { for connection in model.settings.connections { await model.warmModels(connectionId: connection.id) } } }
+        }.task { if connectionID == nil && enabled { for connection in connections { await model.warmMissingModels(connectionId: connection.id) } } }
         if connectionID == nil {
             ForEach(model.settings.connections) { connection in ModelCatalogueError(model: model, connection: connection) }
         }

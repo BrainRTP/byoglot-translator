@@ -39,6 +39,28 @@ private actor ModelStream {
     return model
 }
 
+#if os(macOS)
+@MainActor @Test func missingMacCataloguesLoadOnceUntilExplicitRetry() async throws {
+    let fixture = AppFixture()
+    let model = try await makeModel(fixture, ModelStream())
+    await fixture.transport.configure(status: 500)
+    async let first: Void = model.warmMissingModels(connectionId: "c1")
+    async let repeated: Void = model.warmMissingModels(connectionId: "c1")
+    _ = await (first, repeated)
+    await model.warmMissingModels(connectionId: "c1")
+    #expect(await fixture.transport.requests.count == 1)
+    #expect(model.catalogueErrors["c1"] != nil)
+
+    await fixture.transport.configure()
+    await model.warmModels(connectionId: "c1")
+    let cached = AppModel(settings: fixture.settings, editor: fixture.editor, runner: fixture.runner, online: true)
+    await cached.refresh()
+    #expect(cached.models["c1"] != nil)
+    await cached.warmMissingModels(connectionId: "c1")
+    #expect(await fixture.transport.requests.count == 2)
+}
+#endif
+
 @MainActor @Test func modelRunsStreamsAndAnnouncesCompletionOnce() async throws {
     let f = AppFixture(); let stream = ModelStream(); let model = try await makeModel(f, stream)
     model.edit("Hello")

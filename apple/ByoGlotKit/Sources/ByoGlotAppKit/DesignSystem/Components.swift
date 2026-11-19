@@ -1,5 +1,11 @@
 import SwiftUI
 
+#if os(macOS)
+public extension EnvironmentValues {
+    @Entry var byoSettingsControls = false
+}
+#endif
+
 public struct ByoButton: View {
     public enum Kind { case primary, ordinary, text, danger }
     let title: String
@@ -7,19 +13,28 @@ public struct ByoButton: View {
     let kind: Kind
     let busy: Bool
     let action: () -> Void
+    #if os(macOS)
+    @Environment(\.byoSettingsControls) private var settingsControls
+    #endif
     public init(_ title: String, icon: String? = nil, kind: Kind = .ordinary, busy: Bool = false, action: @escaping () -> Void) {
         self.title = title; self.icon = icon; self.kind = kind; self.busy = busy; self.action = action
     }
     public var body: some View {
         #if os(macOS)
-        Button(role: kind == .danger ? .destructive : nil, action: action) {
-            HStack {
-                if busy { ProgressView().controlSize(.small) }
-                if let icon { Image(systemName: icon).accessibilityHidden(true) }
-                Text(AppStrings.text(title))
-            }
-        }.disabled(busy)
+        if settingsControls {
+            Button(role: kind == .danger ? .destructive : nil, action: action) {
+                HStack {
+                    if busy { ProgressView().controlSize(.small) }
+                    if let icon { Image(systemName: icon).accessibilityHidden(true) }
+                    Text(AppStrings.text(title))
+                }
+            }.foregroundStyle(kind == .danger ? ByoColor.error : ByoColor.text).disabled(busy)
+        } else { customButton }
         #else
+        customButton
+        #endif
+    }
+    private var customButton: some View {
         Button(action: action) {
             HStack(spacing: 8) {
                 if busy { ProgressView().controlSize(.small) }
@@ -33,7 +48,6 @@ public struct ByoButton: View {
         }
         .buttonStyle(ControlStyle(kind: kind))
         .disabled(busy)
-        #endif
     }
 
     private struct ControlStyle: ButtonStyle {
@@ -97,6 +111,7 @@ public struct ByoTextField: View {
         #if os(macOS)
         LabeledContent(AppStrings.text(label)) {
             TextField(AppStrings.text(label), text: $text).labelsHidden()
+                .textFieldStyle(.roundedBorder)
                 .font(mono ? .system(.body, design: .monospaced) : .body)
                 .focused($focused)
         }
@@ -223,7 +238,7 @@ public struct ByoBottomSheet<Content: View>: View {
                 Spacer()
                 Button(action: close) { Image(systemName: "xmark") }
                     .accessibilityLabel(AppStrings.text("common.close"))
-                    .keyboardShortcut(.cancelAction)
+                    .keyboardShortcut(canClose ? .cancelAction : nil)
                     .disabled(!canClose)
             }.padding(20)
             content.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

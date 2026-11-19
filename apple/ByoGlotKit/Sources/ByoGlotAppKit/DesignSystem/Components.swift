@@ -11,6 +11,15 @@ public struct ByoButton: View {
         self.title = title; self.icon = icon; self.kind = kind; self.busy = busy; self.action = action
     }
     public var body: some View {
+        #if os(macOS)
+        Button(role: kind == .danger ? .destructive : nil, action: action) {
+            HStack {
+                if busy { ProgressView().controlSize(.small) }
+                if let icon { Image(systemName: icon).accessibilityHidden(true) }
+                Text(AppStrings.text(title))
+            }
+        }.disabled(busy)
+        #else
         Button(action: action) {
             HStack(spacing: 8) {
                 if busy { ProgressView().controlSize(.small) }
@@ -24,7 +33,9 @@ public struct ByoButton: View {
         }
         .buttonStyle(ControlStyle(kind: kind))
         .disabled(busy)
+        #endif
     }
+
     private struct ControlStyle: ButtonStyle {
         @Environment(\.isEnabled) private var enabled
         let kind: Kind
@@ -63,9 +74,12 @@ public struct ByoIconButton: View {
 #if os(macOS)
 struct ByoIconLabel: View {
     let symbol: String
+    @State private var hovered = false
     var body: some View {
         Image(systemName: symbol).font(.system(size: 20)).frame(width: 44, height: 44)
             .contentShape(RoundedRectangle(cornerRadius: ByoRadius.control))
+            .background(hovered ? ByoColor.accentTint : .clear, in: RoundedRectangle(cornerRadius: ByoRadius.control))
+            .onHover { hovered = $0 }
     }
 }
 #endif
@@ -80,6 +94,13 @@ public struct ByoTextField: View {
         self.label = label; _text = text; self.mono = mono; self.invalid = invalid
     }
     public var body: some View {
+        #if os(macOS)
+        LabeledContent(AppStrings.text(label)) {
+            TextField(AppStrings.text(label), text: $text).labelsHidden()
+                .font(mono ? .system(.body, design: .monospaced) : .body)
+                .focused($focused)
+        }
+        #else
         VStack(alignment: .leading, spacing: 6) {
             Text(AppStrings.text(label)).modifier(ByoTypography(13, relativeTo: .caption)).foregroundStyle(ByoColor.muted)
             TextField(AppStrings.text(label), text: $text)
@@ -89,6 +110,7 @@ public struct ByoTextField: View {
                 .overlay { RoundedRectangle(cornerRadius: 6).stroke(invalid ? ByoColor.error : focused ? ByoColor.accent : ByoColor.strongBorder, lineWidth: focused ? 2 : 1) }
                 .focused($focused).accessibilityLabel(AppStrings.text(label))
         }
+        #endif
     }
 }
 
@@ -188,11 +210,25 @@ public struct ListRow: View {
 public struct ByoBottomSheet<Content: View>: View {
     let title: String
     let close: () -> Void
+    let canClose: Bool
     let content: Content
-    public init(_ title: String, close: @escaping () -> Void, @ViewBuilder content: () -> Content) {
-        self.title = title; self.close = close; self.content = content()
+    public init(_ title: String, close: @escaping () -> Void, canClose: Bool = true, @ViewBuilder content: () -> Content) {
+        self.title = title; self.close = close; self.canClose = canClose; self.content = content()
     }
     public var body: some View {
+        #if os(macOS)
+        VStack(spacing: 0) {
+            HStack {
+                Text(AppStrings.text(title)).font(.headline)
+                Spacer()
+                Button(action: close) { Image(systemName: "xmark") }
+                    .accessibilityLabel(AppStrings.text("common.close"))
+                    .keyboardShortcut(.cancelAction)
+                    .disabled(!canClose)
+            }.padding(20)
+            content.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }.frame(minWidth: 480, idealWidth: 560, minHeight: 320, idealHeight: 480)
+        #else
         VStack(spacing: 0) {
             #if !os(macOS)
             Capsule().fill(ByoColor.strongBorder).frame(width: 36, height: 5).padding(.top, 6).padding(.bottom, 2).accessibilityHidden(true)
@@ -210,5 +246,6 @@ public struct ByoBottomSheet<Content: View>: View {
             #endif
             .presentationDetents([.medium, .fraction(0.9)]).presentationDragIndicator(.hidden).presentationCornerRadius(16)
             .accessibilityAddTraits(.isModal)
+        #endif
     }
 }

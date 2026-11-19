@@ -10,8 +10,8 @@ import AppKit
 public enum ByoColor {
     public static let background = adaptive(0xffffff, 0x16181b)
     public static let surface = adaptive(0xf5f6f7, 0x1d2024)
-    public static let border = adaptive(0xd9dce0, 0x33373d)
-    public static let strongBorder = adaptive(0x8a929c, 0x6c737d)
+    public static let border = adaptive(0xd9dce0, 0x33373d, contrastLight: 0x8a929c, contrastDark: 0xa3aab4)
+    public static let strongBorder = adaptive(0x8a929c, 0x6c737d, contrastLight: 0x566070, contrastDark: 0xa3aab4)
     public static let text = adaptive(0x14171a, 0xeceef0)
     public static let muted = adaptive(0x566070, 0xa3aab4)
     public static let accent = adaptive(0x1d5bd1, 0x7aa7ff)
@@ -27,7 +27,7 @@ public enum ByoColor {
     public static let scrim = adaptive(0x14171a, 0x000000, lightAlpha: 0.4, darkAlpha: 0.6)
     public static let shadow = adaptive(0x14171a, 0x000000, lightAlpha: 0.14, darkAlpha: 0.5)
 
-    private static func adaptive(_ light: UInt, _ dark: UInt, lightAlpha: Double = 1, darkAlpha: Double = 1) -> Color {
+    private static func adaptive(_ light: UInt, _ dark: UInt, lightAlpha: Double = 1, darkAlpha: Double = 1, contrastLight: UInt? = nil, contrastDark: UInt? = nil) -> Color {
         #if canImport(UIKit)
         Color(uiColor: UIColor { traits in
             let isDark = traits.userInterfaceStyle == .dark
@@ -35,13 +35,26 @@ public enum ByoColor {
             return UIColor(red: Double((hex >> 16) & 255) / 255, green: Double((hex >> 8) & 255) / 255, blue: Double(hex & 255) / 255, alpha: isDark ? darkAlpha : lightAlpha)
         })
         #else
-        Color(nsColor: NSColor(name: nil) { appearance in
-            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            let hex = isDark ? dark : light
-            return NSColor(red: Double((hex >> 16) & 255) / 255, green: Double((hex >> 8) & 255) / 255, blue: Double(hex & 255) / 255, alpha: isDark ? darkAlpha : lightAlpha)
-        })
+        Color(MacPaletteColor(light: light, dark: dark, lightAlpha: lightAlpha, darkAlpha: darkAlpha, contrastLight: contrastLight, contrastDark: contrastDark))
         #endif
     }
+
+    #if os(macOS)
+    private struct MacPaletteColor: ShapeStyle, Hashable {
+        let light: UInt
+        let dark: UInt
+        let lightAlpha: Double
+        let darkAlpha: Double
+        let contrastLight: UInt?
+        let contrastDark: UInt?
+        func resolve(in environment: EnvironmentValues) -> Color.Resolved {
+            let isDark = environment.colorScheme == .dark
+            let highContrast = environment.colorSchemeContrast == .increased
+            let hex = highContrast ? (isDark ? contrastDark ?? dark : contrastLight ?? light) : (isDark ? dark : light)
+            return Color(red: Double((hex >> 16) & 255) / 255, green: Double((hex >> 8) & 255) / 255, blue: Double(hex & 255) / 255, opacity: isDark ? darkAlpha : lightAlpha).resolve(in: environment)
+        }
+    }
+    #endif
 }
 
 public enum ByoSpace {
@@ -112,7 +125,13 @@ struct ByoFocusRing: ViewModifier {
     @Environment(\.isFocused) private var focused
     func body(content: Content) -> some View {
         content.overlay {
-            if focused { RoundedRectangle(cornerRadius: 6).stroke(ByoColor.accent, lineWidth: 2).padding(-2) }
+            if focused {
+                #if os(macOS)
+                RoundedRectangle(cornerRadius: 6).strokeBorder(ByoColor.accent, lineWidth: 2)
+                #else
+                RoundedRectangle(cornerRadius: 6).stroke(ByoColor.accent, lineWidth: 2).padding(-2)
+                #endif
+            }
         }
     }
 }

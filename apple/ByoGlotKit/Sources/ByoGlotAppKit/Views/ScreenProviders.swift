@@ -12,6 +12,34 @@ public struct ScreenProviders: View {
     @State private var selected: ProviderRoute?
     public init(model: AppModel) { self.model = model }
     public var body: some View {
+        Group {
+        #if os(macOS)
+        SettingsPage(title: "providers.title") {
+            if model.settings.connections.isEmpty {
+                Section { Text(AppStrings.text("providers.firstBody")).foregroundStyle(ByoColor.muted) }
+            } else {
+                Section(AppStrings.text("providers.saved")) {
+                    ForEach(model.settings.connections) { connection in
+                        LabeledContent {
+                            Text(model.keyStatus(connection)).foregroundStyle(ByoColor.muted)
+                        } label: {
+                            Button(connection.name) { selected = ProviderRoute(preset: connection.preset, connectionId: connection.id) }.help(connection.baseUrl)
+                        }
+                    }
+                }
+            }
+            Section(AppStrings.text("providers.add")) {
+                ForEach(ConnectionEditor.presets(), id: \.self) { preset in
+                    LabeledContent {
+                        Text(preset == .custom ? AppStrings.text("providers.customSub") : URL(string: Contracts.presets[preset]!.baseUrl)?.host ?? "").foregroundStyle(ByoColor.muted)
+                    } label: {
+                        Button(providerTitle(preset)) { selected = ProviderRoute(preset: preset) }
+                    }
+                }
+            }
+            Section { Text(AppStrings.text("providers.storedHere")).foregroundStyle(ByoColor.muted) }
+        }.navigationDestination(item: $selected) { route in ProviderKeyScreen(model: model, route: route) }
+        #else
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 if model.settings.connections.isEmpty {
@@ -49,6 +77,8 @@ public struct ScreenProviders: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .navigationDestination(item: $selected) { route in ProviderKeyScreen(model: model, route: route) }
+        #endif
+        }
             .task { await model.refresh() }
     }
 }
@@ -89,6 +119,31 @@ private struct ProviderKeyScreen: View {
         return error.kind == .unauthorized || error.kind == .providerAuth || error.status == 401 || error.status == 403
     }
     var body: some View {
+        Group {
+            #if os(macOS)
+            Form {
+                Section {
+                    if route.preset == .custom && !stored {
+                        ByoTextField("providers.name", text: $name)
+                        ByoTextField("custom.baseUrl", text: $baseURL, mono: true, invalid: invalidURL)
+                        Text(AppStrings.text(invalidURL ? model.editor.urlPolicy.invalidURLKey : model.editor.urlPolicy.providerURLHelpKey))
+                            .foregroundStyle(invalidURL ? ByoColor.error : ByoColor.muted).textSelection(.enabled)
+                    }
+                    if stored { savedContent }
+                    else {
+                        keyField
+                        if let failure {
+                            Banner(title: authError ? AppStrings.text("key.bad") : failureTitle, message: AppStrings.error(failure), actionTitle: "err.retry", action: check)
+                        }
+                        ByoButton(checking ? "key.checking" : "key.check", busy: checking, action: check)
+                            .disabled(!canCheck).keyboardShortcut(.defaultAction)
+                    }
+                }
+                Section { Text(AppStrings.text("key.storeMac")).foregroundStyle(ByoColor.muted) }
+                if connection != nil { Section { deleteSection } }
+            }.formStyle(.grouped)
+                .modifier(MacSettingsNavigation(busy: checking || deleting, cancelAction: !deleteConfirm))
+            #else
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if route.preset == .custom && !stored {
@@ -128,6 +183,8 @@ private struct ProviderKeyScreen: View {
                 if connection != nil { deleteSection }
             }.padding(16)
         }.background(ByoColor.background).foregroundStyle(ByoColor.text)
+            #endif
+        }
             .navigationTitle(connection?.name ?? providerTitle(route.preset))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -142,6 +199,9 @@ private struct ProviderKeyScreen: View {
                     VStack(alignment: .leading, spacing: 16) {
                         Text(AppStrings.format("consent.body", ["origin": consentOrigin ?? ""]))
                         ByoButton("consent.allow", kind: .primary) { consentOrigin = nil; save(consent: true) }
+                            #if os(macOS)
+                            .keyboardShortcut(.defaultAction)
+                            #endif
                         ByoButton("common.cancel") { consentOrigin = nil }
                     }
                 }
@@ -151,6 +211,20 @@ private struct ProviderKeyScreen: View {
         !checking && (!key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || hasKey || !ProviderEffort.needsKey(preset: route.preset, baseUrl: baseURL)) && (route.preset != .custom || !baseURL.isEmpty)
     }
     private var keyField: some View {
+        #if os(macOS)
+        LabeledContent(AppStrings.text(ProviderEffort.needsKey(preset: route.preset, baseUrl: baseURL) ? "key.label" : "providers.optionalKey")) {
+            HStack {
+                Group {
+                    if showKey { TextField(AppStrings.text("key.label"), text: $key) }
+                    else { SecureField(AppStrings.text("key.label"), text: $key) }
+                }.labelsHidden().font(.system(.body, design: .monospaced)).focused($keyFocused)
+                    .onSubmit { if canCheck { check() } }
+                Button { showKey.toggle() } label: { Image(systemName: showKey ? "eye.slash" : "eye") }
+                    .accessibilityLabel(AppStrings.text(showKey ? "key.hide" : "key.show"))
+                ByoPasteButton(iconOnly: true, label: "key.paste") { key = $0 }
+            }.disabled(checking)
+        }
+        #else
         VStack(alignment: .leading, spacing: 6) {
             Text(AppStrings.text(ProviderEffort.needsKey(preset: route.preset, baseUrl: baseURL) ? "key.label" : "providers.optionalKey")).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
             HStack(spacing: 0) {
@@ -170,6 +244,7 @@ private struct ProviderKeyScreen: View {
             }.frame(minHeight: 48).overlay { RoundedRectangle(cornerRadius: 6).stroke(authError ? ByoColor.error : keyFocused ? ByoColor.accent : ByoColor.strongBorder, lineWidth: keyFocused ? 2 : 1) }
                 .disabled(checking)
         }
+        #endif
     }
     @ViewBuilder private var savedContent: some View {
         if let connection {
@@ -196,6 +271,13 @@ private struct ProviderKeyScreen: View {
                     .modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
                 if list.isEmpty { Text(AppStrings.text("providers.noModels")) }
                 else {
+                    #if os(macOS)
+                    MacModelPicker(model: model, selected: connection.pageModel, connectionID: connection.id) { ref in
+                        guard connection.pageModel?.id != ref?.id || connection.pageModel?.providerID != ref?.providerID else { return }
+                        guard let info = list.first(where: { $0.id == ref?.id && $0.providerID == ref?.providerID }) else { return }
+                        Task { await model.setDefaultModel(connectionId: connection.id, model: info) }
+                    }
+                    #else
                     SectionLabel("providers.defaultModel")
                     ByoGroup {
                         ForEach(list, id: \.id) { info in
@@ -205,6 +287,7 @@ private struct ProviderKeyScreen: View {
                             }
                         }
                     }
+                    #endif
                 }
             }
             if let error = model.catalogueErrors[connection.id] {
@@ -223,13 +306,22 @@ private struct ProviderKeyScreen: View {
             if deleteConfirm {
                 Text(AppStrings.format("providers.deleteQuestion", ["provider": connection?.name ?? name]))
                 ViewThatFits {
-                    HStack { deleteButton; ByoButton("common.cancel") { deleteConfirm = false } }
-                    VStack { deleteButton; ByoButton("common.cancel") { deleteConfirm = false } }
+                    HStack { deleteButton; cancelDelete }
+                    VStack { deleteButton; cancelDelete }
                 }
             } else { ByoButton("key.delete", kind: .danger) { deleteConfirm = true } }
-        }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
+        }
+            #if !os(macOS)
+            .padding(12).frame(maxWidth: .infinity, alignment: .leading)
             .overlay { RoundedRectangle(cornerRadius: 6).stroke(ByoColor.strongBorder) }
+            #endif
             .accessibilityElement(children: .contain)
+    }
+    private var cancelDelete: some View {
+        ByoButton("common.cancel") { deleteConfirm = false }
+            #if os(macOS)
+            .keyboardShortcut(.cancelAction).disabled(deleting)
+            #endif
     }
     private var deleteButton: some View {
         ByoButton("common.delete", kind: .danger, busy: deleting, action: deleteSavedConnection)

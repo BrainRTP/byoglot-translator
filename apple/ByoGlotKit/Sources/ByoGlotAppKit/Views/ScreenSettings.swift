@@ -89,6 +89,22 @@ public struct ScreenLanguageSettings: View {
     @SceneStorage("settings.language.sheet") private var sheet = ""
     public init(model: AppModel) { self.model = model }
     public var body: some View {
+        #if os(macOS)
+        SettingsPage(title: "settings.language") {
+            Section {
+                MacLanguagePicker(label: "lang.dstTitle", selection: Binding(get: { model.targetLang }, set: { code in Task { await model.chooseTarget(code) } }))
+                Picker(AppStrings.text("settings.uiLang"), selection: Binding(get: { model.interfaceLanguage }, set: model.setInterfaceLanguage)) {
+                    ForEach(["system", "en", "ru"], id: \.self) { Text($0 == "system" ? AppStrings.text("settings.system") : AppStrings.language($0)).tag($0) }
+                }
+                Picker(AppStrings.text("settings.theme"), selection: Binding(get: { model.settings.theme.rawValue }, set: { value in Task { await model.updateSettings { $0.theme = ThemeChoice(rawValue: value) ?? .system } } })) {
+                    ForEach(["system", "light", "dark"], id: \.self) { Text(AppStrings.text("theme." + $0)).tag($0) }
+                }
+            }
+            Section(AppStrings.text("settings.input")) {
+                SwitchRow(title: "settings.liveTranslate", value: Binding(get: { model.settings.autoTranslate }, set: { value in Task { await model.updateSettings { $0.autoTranslate = value } } }), help: "settings.liveHelp")
+            }
+        }
+        #else
         SettingsPage(title: "settings.language") {
             ByoGroup {
                 ListRow(AppStrings.text("lang.dstTitle"), value: AppStrings.language(model.targetLang)) { sheet = "target" }
@@ -109,6 +125,7 @@ public struct ScreenLanguageSettings: View {
                 }
             }
         }
+        #endif
     }
 }
 
@@ -169,7 +186,15 @@ public struct ScreenLanguagePrompt: View {
     public var body: some View {
         SettingsPage(title: "settings.prompt") {
             SwitchRow(title: "prompt.enabled", value: Binding(get: { model.settings.globals.languagePromptEnabled }, set: { enabled in Task { await model.updateSettings { $0.globals.languagePromptEnabled = enabled } } }))
+            #if os(macOS)
+            Picker(AppStrings.text("prompt.profile"), selection: Binding(get: { model.settings.globals.languageProfile }, set: { profile in
+                if dirty { pendingProfile = profile; discarding = true } else { chooseProfile(profile) }
+            })) {
+                ForEach(["auto", Contracts.genericProfileId] + Contracts.builtinProfiles.keys.filter { $0 != Contracts.genericProfileId }.sorted(), id: \.self) { Text(AppStrings.profile($0)).tag($0) }
+            }
+            #else
             ByoGroup { ListRow(AppStrings.text("prompt.profile"), value: AppStrings.profile(model.settings.globals.languageProfile)) { profiles = true } }
+            #endif
             if discarding {
                 InlineConfirm(text: AppStrings.text("prompt.discardConfirm"), danger: true, confirm: {
                     draft = saved; discarding = false
@@ -195,7 +220,9 @@ public struct ScreenLanguagePrompt: View {
                 InlineConfirm(text: AppStrings.text("prompt.resetConfirm"), confirm: { Task { if await model.updateSettings({ [id] in $0.profileOverrides[id] = nil }) { draft = base; resetting = false } } }, cancel: { resetting = false })
             } else { ByoButton("prompt.reset", kind: .text) { resetting = true }.disabled(saved == base && !dirty) }
         }
-        #if os(iOS)
+        #if os(macOS)
+        .modifier(MacSettingsNavigation(cancelAction: !discarding && !resetting, back: { if dirty { pendingProfile = nil; discarding = true } else { dismiss() } }))
+        #else
         .navigationBarBackButtonHidden(dirty)
         .toolbar {
             if dirty {
@@ -220,6 +247,9 @@ public struct ScreenLanguagePrompt: View {
     }
     @ViewBuilder private var saveButtons: some View {
         ByoButton("common.save") { Task { if await model.saveProfile(id: id, text: draft) { draft = saved } } }.disabled(!dirty || draft.utf16.count > Contracts.limits.maxProfileText || !model.settings.globals.languagePromptEnabled)
+            #if os(macOS)
+            .keyboardShortcut(.defaultAction)
+            #endif
         ByoButton("prompt.discard") { draft = saved }.disabled(!dirty)
     }
     private func chooseProfile(_ value: String) { Task {

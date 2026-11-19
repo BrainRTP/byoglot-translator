@@ -176,7 +176,15 @@ private struct ProviderKeyScreen: View {
             }
             Label(model.keyStatus(connection), systemImage: keyMissing ? "exclamationmark.circle" : "checkmark.circle.fill")
                 .foregroundStyle(keyMissing ? ByoColor.error : ByoColor.success)
-            if hasKey { Text("••••••••").modifier(ByoTypography(14, mono: true)).accessibilityLabel(AppStrings.text("key.label")) }
+            if hasKey {
+                Text("••••••••").modifier(ByoTypography(14, mono: true))
+                    #if os(macOS)
+                    // A label override on selectable text can recurse through AppKit.
+                    .accessibilityRepresentation { Text(AppStrings.text("key.label")) }
+                    #else
+                    .accessibilityLabel(AppStrings.text("key.label"))
+                    #endif
+            }
             if let list = model.models[connection.id] {
                 Text(AppStrings.format(list.count == 1 ? "key.okModel" : "key.okModels", ["provider": connection.name, "n": String(list.count)]))
                     .modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)

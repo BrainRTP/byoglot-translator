@@ -262,10 +262,9 @@ struct MacModelPicker: View {
                     }
                 }
             }.disabled(model.settings.connections.isEmpty).help(selected?.id ?? AppStrings.text("main.chooseModel"))
-        }
+        }.task { if connectionID == nil && enabled { for connection in model.settings.connections { await model.warmModels(connectionId: connection.id) } } }
         if connectionID == nil {
             ForEach(model.settings.connections) { connection in ModelCatalogueError(model: model, connection: connection) }
-                .task { if enabled { for connection in model.settings.connections { await model.warmModels(connectionId: connection.id) } } }
         }
     }
 }

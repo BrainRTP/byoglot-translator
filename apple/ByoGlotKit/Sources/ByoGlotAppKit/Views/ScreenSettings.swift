@@ -180,7 +180,12 @@ public struct ScreenLanguagePrompt: View {
             if model.settings.globals.languageProfile == "auto" && Contracts.builtinProfiles[model.targetLang] == nil { Note(text: AppStrings.text("prompt.noProfile")) }
             Chip(title: dirty ? "prompt.unsaved" : saved == base ? "template.builtin" : "prompt.modified")
             DraftEditor(label: AppStrings.format("prompt.for", ["language": AppStrings.profile(id)]), text: $draft).disabled(!model.settings.globals.languagePromptEnabled)
-            if draft.utf16.count > Contracts.limits.maxProfileText { Text(AppStrings.format("prompt.limit", ["n": String(Contracts.limits.maxProfileText)])).foregroundStyle(ByoColor.error) }
+            if draft.utf16.count > Contracts.limits.maxProfileText {
+                Text(AppStrings.format("prompt.limit", ["n": String(Contracts.limits.maxProfileText)])).foregroundStyle(ByoColor.error)
+                    #if os(macOS)
+                    .textSelection(.enabled)
+                    #endif
+            }
             Note(text: AppStrings.text("prompt.order"))
             ViewThatFits {
                 HStack { saveButtons }

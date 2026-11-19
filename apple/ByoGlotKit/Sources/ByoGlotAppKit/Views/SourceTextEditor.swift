@@ -18,7 +18,7 @@ struct SourceTextEditor: UIViewRepresentable {
         view.backgroundColor = .clear
         view.keyboardDismissMode = .interactive
         view.alwaysBounceVertical = true
-        view.textContainerInset = UIEdgeInsets(top: 12, left: 9, bottom: 8, right: 9)
+        view.textContainerInset = UIEdgeInsets(top: ByoSpace.inset, left: 9, bottom: ByoSpace.small, right: 9)
         view.adjustsFontForContentSizeCategory = true
         view.accessibilityLabel = AppStrings.text("main.source")
         view.isAccessibilityElement = true
@@ -77,8 +77,13 @@ struct SourceTextEditor: View {
     let paste: (String) -> Void
     let submit: () -> Void
     let focus: (Bool) -> Void
+    @FocusState private var focused: Bool
     var body: some View {
         TextEditor(text: $text).scrollContentBackground(.hidden).modifier(ByoTypography(17))
+            // Native line padding supplies the other 5 pt of the 14 pt inset.
+            .padding(.horizontal, 9).padding(.vertical, 6)
+            .focused($focused).focusEffectDisabled()
+            .onChange(of: focused) { _, value in focus(value) }
             .onChange(of: text) { _, value in edit(value, false) }.onSubmit(submit)
             .accessibilityLabel(AppStrings.text("main.source"))
     }

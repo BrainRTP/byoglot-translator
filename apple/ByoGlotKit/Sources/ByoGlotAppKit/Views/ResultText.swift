@@ -17,7 +17,7 @@ public struct ResultText: View {
         ResultTextPresentation(text: text, playback: reduceMotion ? nil : playback)
             .id(reduceMotion ? nil : playback?.id)
             .overlay(alignment: .bottomTrailing) {
-                if running { StreamingCaret().offset(x: 4) }
+                if running { StreamingCaret().offset(x: ByoSpace.tiny) }
             }
     }
 }

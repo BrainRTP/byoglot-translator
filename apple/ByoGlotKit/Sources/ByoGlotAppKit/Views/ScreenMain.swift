@@ -23,7 +23,16 @@ public struct ScreenMain: View {
         }
         .background(ByoColor.background).foregroundStyle(ByoColor.text)
         .navigationTitle(AppStrings.text("main.title"))
-        .toolbar { ToolbarItem(placement: .primaryAction) { ByoIconButton(title: "settings.title", symbol: "slider.horizontal.3", action: openSettings) } }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                #if os(macOS)
+                Button(action: openSettings) { Label(AppStrings.text("settings.title"), systemImage: "slider.horizontal.3") }
+                    .labelStyle(.iconOnly).controlSize(.regular).help(AppStrings.text("settings.title"))
+                #else
+                ByoIconButton(title: "settings.title", symbol: "slider.horizontal.3", action: openSettings)
+                #endif
+            }
+        }
         .sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } }), onDismiss: {
             let action = afterSheet
             afterSheet = nil
@@ -40,26 +49,51 @@ public struct ScreenMain: View {
     }
     private var mainContent: some View {
         VStack(spacing: 0) {
+            #if os(macOS)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: ByoSpace.small) { templateButton; changedChip; Spacer(minLength: 0) }
+                modelButton.frame(maxWidth: .infinity, alignment: .leading)
+            }.padding(.horizontal, ByoSpace.screen).padding(.bottom, ByoSpace.tiny)
+            #else
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { templateButton; changedChip; Spacer(minLength: 0); modelButton }
+                HStack(spacing: ByoSpace.small) { templateButton; changedChip; Spacer(minLength: 0); modelButton }
                 VStack(alignment: .leading, spacing: 0) { HStack { templateButton; changedChip }; modelButton }
-            }.padding(.horizontal, 16).padding(.bottom, 4)
+            }.padding(.horizontal, ByoSpace.screen).padding(.bottom, ByoSpace.tiny)
+            #endif
             TranslatorBlock(model: model, text: $text, openProviders: openProviders, openModels: { sheet = "model" }, openLanguage: { sheet = $0 ? "source" : "target" })
                 .frame(minHeight: typeSize.isAccessibilitySize ? 840 : nil)
         }
+        #if os(macOS)
+        .frame(maxWidth: 720).frame(maxWidth: .infinity)
+        #endif
     }
     private var templateButton: some View {
         Button { sheet = "params" } label: {
-            HStack(spacing: 6) { Text(templateLabel(model.template)).fontWeight(.semibold); Image(systemName: "chevron.down").font(.caption).accessibilityHidden(true) }
+            HStack(spacing: 6) {
+                Text(templateLabel(model.template)).fontWeight(.semibold)
+                    #if os(macOS)
+                    .lineLimit(1).truncationMode(.tail)
+                    #endif
+                Image(systemName: "chevron.down").font(.caption).accessibilityHidden(true)
+            }
                 .modifier(ByoTypography(15)).frame(minHeight: 44)
         }.buttonStyle(.plain).accessibilityLabel(AppStrings.text("main.template") + ": " + templateLabel(model.template)).modifier(ByoFocusRing())
+            #if os(macOS)
+            .help(templateLabel(model.template))
+            #endif
     }
     @ViewBuilder private var changedChip: some View { if model.changed { Chip(title: "main.changed") } }
     private var modelButton: some View {
         Button { sheet = "model" } label: {
             Text(model.model.map { "\($0.id) · \(AppStrings.effort($0.variant))" } ?? AppStrings.text("main.chooseModel"))
                 .modifier(ByoTypography(13, mono: true)).foregroundStyle(ByoColor.muted).frame(minHeight: 44).contentShape(Rectangle())
+                #if os(macOS)
+                .lineLimit(1).truncationMode(.tail)
+                #endif
         }.buttonStyle(.plain).accessibilityLabel(AppStrings.text("model.title")).modifier(ByoFocusRing())
+            #if os(macOS)
+            .help(model.model.map { "\($0.id) · \(AppStrings.effort($0.variant))" } ?? AppStrings.text("main.chooseModel"))
+            #endif
     }
     private func leaveSheet(_ action: @escaping () -> Void) { afterSheet = action; sheet = "" }
 
@@ -83,7 +117,7 @@ public struct LangBar: View {
                 HStack(spacing: 2) { sourceMenu; swapButton; targetMenu }
             }
         }.padding(2).frame(minHeight: 48)
-            .overlay { RoundedRectangle(cornerRadius: 10).stroke(ByoColor.border).allowsHitTesting(false) }
+            .overlay { RoundedRectangle(cornerRadius: ByoRadius.panel).stroke(ByoColor.border).allowsHitTesting(false) }
             .accessibilityElement(children: .contain)
     }
     private var sourceMenu: some View {
@@ -98,8 +132,8 @@ public struct LangBar: View {
             .accessibilityLabel(AppStrings.text("lang.dstTitle") + ": " + AppStrings.language(model.targetLang))
     }
     private func languageLabel(_ label: String) -> some View {
-        HStack(spacing: 4) { Text(label).lineLimit(typeSize.isAccessibilitySize ? 2 : 1); Image(systemName: "chevron.down").font(.caption2).accessibilityHidden(true) }
-            .modifier(ByoTypography(15)).frame(maxWidth: .infinity, minHeight: 44).padding(.horizontal, 4).contentShape(Rectangle())
+        HStack(spacing: ByoSpace.tiny) { Text(label).lineLimit(typeSize.isAccessibilitySize ? 2 : 1); Image(systemName: "chevron.down").font(.caption2).accessibilityHidden(true) }
+            .modifier(ByoTypography(15)).frame(maxWidth: .infinity, minHeight: 44).padding(.horizontal, ByoSpace.tiny).contentShape(Rectangle())
     }
 }
 
@@ -119,7 +153,7 @@ public struct TranslatorBlock: View {
     public var body: some View {
         Group {
             if typeSize.isAccessibilitySize {
-                VStack(spacing: 8) {
+                VStack(spacing: ByoSpace.small) {
                     languages
                     source.frame(height: 340)
                     output.frame(minHeight: 420)
@@ -127,17 +161,24 @@ public struct TranslatorBlock: View {
             } else {
                 GeometryReader { geometry in
                     let available = max(260, geometry.size.height - 68)
+                    #if os(macOS)
+                    let fraction = 0.5
+                    #else
                     let fraction = editing ? 0.4 : 0.5
+                    #endif
                     ScrollView {
-                        VStack(spacing: 8) {
+                        VStack(spacing: ByoSpace.small) {
                             languages
                             source.frame(height: max(120, available * fraction))
                             output.frame(height: max(180, available * (1 - fraction)))
                         }.frame(minHeight: geometry.size.height, alignment: .top)
                     }.scrollBounceBehavior(.basedOnSize).scrollDismissesKeyboard(.immediately)
+                        #if os(macOS)
+                        .scrollClipDisabled()
+                        #endif
                 }
             }
-        }.padding(.horizontal, 16).padding(.bottom, 12)
+        }.padding(.horizontal, ByoSpace.screen).padding(.bottom, ByoSpace.inset)
             .onChange(of: model.inputText) { _, value in if value != text { text = value } }
             .onChange(of: model.resultAnimation) { _, value in playback = reduceMotion ? nil : value }
             .onChange(of: reduceMotion) { _, value in if value { playback = nil } }
@@ -157,24 +198,44 @@ public struct TranslatorBlock: View {
             ZStack(alignment: .topLeading) {
                 if text.isEmpty {
                     Text(AppStrings.text("main.placeholder")).modifier(ByoTypography(17)).foregroundStyle(ByoColor.muted)
-                        .padding(.horizontal, 14).padding(.vertical, 12).allowsHitTesting(false).accessibilityHidden(true)
+                        .padding(.horizontal, 14)
+                        #if os(macOS)
+                        .padding(.vertical, 6)
+                        #else
+                        .padding(.vertical, ByoSpace.inset)
+                        #endif
+                        .allowsHitTesting(false).accessibilityHidden(true)
                 }
                 SourceTextEditor(text: $text, autoTranslate: model.settings.autoTranslate, edit: { model.edit($0, composing: $1) }, paste: { value in text = value; model.edit(value, pasted: true) }, submit: model.keyboardTranslate, focus: { editing = $0 })
             }
             Group {
                 if typeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: 4) { counter; inputAction }
+                    VStack(alignment: .leading, spacing: ByoSpace.tiny) { counter; inputAction }
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
+                    #if os(macOS)
+                    HStack(spacing: ByoSpace.inset) { counter; Spacer(); inputAction }
+                    #else
                     HStack { counter; Spacer(); inputAction }
+                    #endif
                 }
-            }.padding(.leading, 14).padding(.trailing, 4).padding(.bottom, 4)
+            }.padding(.leading, 14).padding(.trailing, ByoSpace.tiny).padding(.bottom, ByoSpace.tiny)
             if model.overLimit {
                 Text(AppStrings.text("main.tooLongBody")).modifier(ByoTypography(13)).foregroundStyle(ByoColor.error)
-                    .fixedSize(horizontal: false, vertical: true).padding(.horizontal, 14).padding(.bottom, 8)
+                    .fixedSize(horizontal: false, vertical: true).padding(.horizontal, 14).padding(.bottom, ByoSpace.small)
+                    #if os(macOS)
+                    .textSelection(.enabled)
+                    #endif
             }
-        }.background(ByoColor.background, in: RoundedRectangle(cornerRadius: 10))
-            .overlay { RoundedRectangle(cornerRadius: 10).stroke(editing ? ByoColor.accent : ByoColor.border, lineWidth: editing ? 2 : 1).allowsHitTesting(false) }
+        }.background(ByoColor.background, in: RoundedRectangle(cornerRadius: ByoRadius.panel))
+            .overlay {
+                #if os(macOS)
+                RoundedRectangle(cornerRadius: ByoRadius.panel).stroke(editing ? ByoColor.accent : ByoColor.border).allowsHitTesting(false)
+                if editing { RoundedRectangle(cornerRadius: ByoRadius.panel).stroke(ByoColor.accent, lineWidth: 2).padding(-2).allowsHitTesting(false) }
+                #else
+                RoundedRectangle(cornerRadius: ByoRadius.panel).stroke(editing ? ByoColor.accent : ByoColor.border, lineWidth: editing ? 2 : 1).allowsHitTesting(false)
+                #endif
+            }
     }
     private var counter: some View {
         Text(AppStrings.format("main.counter", ["n": String(AppModel.inputCount(text))]))
@@ -190,7 +251,7 @@ public struct TranslatorBlock: View {
     }
     private var output: some View {
         VStack(spacing: 0) {
-            HStack {
+            HStack(spacing: outputRowSpacing) {
                 Text(AppStrings.language(model.targetLang)).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
                 Spacer()
                 if model.running { ProgressView().controlSize(.small).accessibilityLabel(AppStrings.text("main.running")) }
@@ -199,23 +260,37 @@ public struct TranslatorBlock: View {
                 if typeSize.isAccessibilitySize { resultContent }
                 else { ScrollView { resultContent }.scrollDismissesKeyboard(.immediately) }
             }.accessibilityLabel(AppStrings.text("main.title")).accessibilityElement(children: .contain)
-            HStack {
+            HStack(spacing: outputActionSpacing) {
                 Spacer(minLength: 0)
                 if model.running { ByoButton("main.stop", icon: "stop", action: model.stop) }
                 else {
                     ByoIconButton(title: "main.copy", symbol: "doc.on.doc", action: copy).disabled(model.result.isEmpty)
+                    #if os(macOS)
+                    ShareLink(item: model.result) { ByoIconLabel(symbol: "square.and.arrow.up") }
+                        .buttonStyle(.plain).foregroundStyle(ByoColor.text)
+                        .accessibilityLabel(AppStrings.text("main.share")).help(AppStrings.text("main.share"))
+                        .disabled(model.result.isEmpty).modifier(ByoFocusRing())
+                    #else
                     ShareLink(item: model.result) { Image(systemName: "square.and.arrow.up").font(.system(size: 20)).frame(minWidth: 44, minHeight: 44) }
                         .foregroundStyle(model.result.isEmpty ? ByoColor.strongBorder : ByoColor.text)
                         .accessibilityLabel(AppStrings.text("main.share")).disabled(model.result.isEmpty).modifier(ByoFocusRing())
+                    #endif
                     ByoIconButton(title: "main.retranslate", symbol: "arrow.clockwise", action: model.translateAgain).disabled(!model.canTranslate)
                         .keyboardShortcut(.return, modifiers: .command)
                 }
-            }.padding(.horizontal, 4).padding(.bottom, 4)
-        }.background(ByoColor.surface, in: RoundedRectangle(cornerRadius: 10))
-            .overlay { RoundedRectangle(cornerRadius: 10).stroke(ByoColor.border) }
+            }.padding(.horizontal, ByoSpace.tiny).padding(.bottom, ByoSpace.tiny)
+        }.background(ByoColor.surface, in: RoundedRectangle(cornerRadius: ByoRadius.panel))
+            .overlay { RoundedRectangle(cornerRadius: ByoRadius.panel).stroke(ByoColor.border) }
     }
+    #if os(macOS)
+    private var outputRowSpacing: CGFloat? { ByoSpace.inset }
+    private var outputActionSpacing: CGFloat? { ByoSpace.small }
+    #else
+    private var outputRowSpacing: CGFloat? { nil }
+    private var outputActionSpacing: CGFloat? { nil }
+    #endif
     private var resultContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: ByoSpace.inset) {
             if model.result.isEmpty && model.error == nil && !model.running {
                 Text(AppStrings.text("main.resultPlaceholder")).foregroundStyle(ByoColor.muted)
             } else if !model.result.isEmpty || model.running {

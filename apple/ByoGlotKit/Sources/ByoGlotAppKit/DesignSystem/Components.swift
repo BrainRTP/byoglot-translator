@@ -45,11 +45,27 @@ struct ByoIconButton: View {
     let symbol: String
     let action: () -> Void
     var body: some View {
+        #if os(macOS)
+        Button(action: action) { ByoIconLabel(symbol: symbol) }
+            .buttonStyle(.plain).foregroundStyle(ByoColor.text)
+            .accessibilityLabel(AppStrings.text(title)).help(AppStrings.text(title)).modifier(ByoFocusRing())
+        #else
         Button(action: action) { Image(systemName: symbol).font(.system(size: 20)).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
             .buttonStyle(.plain).foregroundStyle(ByoColor.text)
             .accessibilityLabel(AppStrings.text(title)).modifier(ByoFocusRing())
+        #endif
     }
 }
+
+#if os(macOS)
+struct ByoIconLabel: View {
+    let symbol: String
+    var body: some View {
+        Image(systemName: symbol).font(.system(size: 20)).frame(width: 44, height: 44)
+            .contentShape(RoundedRectangle(cornerRadius: ByoRadius.control))
+    }
+}
+#endif
 
 public struct ByoTextField: View {
     let label: String

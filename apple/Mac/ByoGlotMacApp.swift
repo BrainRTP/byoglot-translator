@@ -136,8 +136,10 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
             window.contentMinSize = NSSize(width: 560, height: 600)
             window.isReleasedWhenClosed = false
             window.isRestorable = false
+            window.disableSnapshotRestoration()
             window.contentView = NSHostingView(rootView: MacTranslatorContent(app: self))
-            window.center()
+            if !window.setFrameUsingName("ByoGlotTranslator") { window.center() }
+            window.setFrameAutosaveName("ByoGlotTranslator")
             translatorWindow = window
         }
         translatorWindow?.makeKeyAndOrderFront(nil)

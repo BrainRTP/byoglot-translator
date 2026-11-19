@@ -7,14 +7,13 @@ final class QuickPanel: NSPanel {
     var onDismiss: (() -> Void)?
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
-    override func cancelOperation(_ sender: Any?) { onDismiss?() }
+    override func cancelOperation(_ sender: Any?) { if isKeyWindow { onDismiss?() } }
 }
 
 @MainActor
 final class QuickPanelController: NSObject, NSWindowDelegate {
-    private let panel = QuickPanel(contentRect: NSRect(x: 0, y: 0, width: 380, height: 240), styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView, .closable, .resizable], backing: .buffered, defer: true)
+    private let panel = QuickPanel(contentRect: NSRect(x: 0, y: 0, width: 380, height: 360), styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView, .closable, .resizable], backing: .buffered, defer: true)
     private var localMonitor: Any?
-    private var globalMonitor: Any?
     private weak var coordinator: QuickTranslateCoordinator?
 
     override init() {
@@ -26,9 +25,9 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
         panel.becomesKeyOnlyIfNeeded = false
         panel.isReleasedWhenClosed = false
         panel.isRestorable = false
+        panel.disableSnapshotRestoration()
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
-        panel.minSize = NSSize(width: 320, height: 220)
         panel.contentView = nil
         panel.delegate = self
         panel.onDismiss = { [weak self] in self?.coordinator?.dismiss() }
@@ -38,7 +37,10 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
         self.coordinator = coordinator
         panel.title = AppStrings.text("main.title")
         if panel.contentView == nil {
-            panel.contentView = NSHostingView(rootView: QuickPanelContent(coordinator: coordinator))
+            let host = NSHostingView(rootView: QuickPanelContent(coordinator: coordinator))
+            host.sizingOptions = [.minSize, .maxSize]
+            host.safeAreaRegions = .container
+            panel.contentView = host
         }
         if reposition {
             let mouse = NSEvent.mouseLocation
@@ -52,14 +54,11 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
                 let handled = MainActor.assumeIsolated {
                     guard let self else { return false }
                     if event.type == .keyDown {
-                        if event.window === self.panel, event.keyCode == 53 { self.panel.cancelOperation(nil); return true }
+                        if self.panel.isKeyWindow, event.window === self.panel, event.keyCode == 53 { self.panel.cancelOperation(nil); return true }
                     } else if event.window !== self.panel { self.dismissOutside() }
                     return false
                 }
                 return handled ? nil : event
-            }
-            globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
-                MainActor.assumeIsolated { self?.dismissOutside() }
             }
         }
         panel.orderFrontRegardless()
@@ -71,9 +70,7 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
 
     func hide() {
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
-        if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
         localMonitor = nil
-        globalMonitor = nil
         panel.orderOut(nil)
     }
 
@@ -88,58 +85,69 @@ private struct QuickPanelContent: View {
     private var scheme: ColorScheme? {
         switch coordinator.model.settings.theme { case .system: nil; case .light: .light; case .dark: .dark }
     }
+    private var hasResult: Bool { if case .done = coordinator.state { true } else { false } }
     var body: some View {
         VStack(alignment: .leading, spacing: ByoSpace.small) {
-            HStack {
+            HStack(spacing: ByoSpace.small) {
                 Menu {
                     ForEach(coordinator.templates, id: \.id) { template in
                         Button(templateLabel(template)) { coordinator.chooseTemplate(template) }
                     }
                 } label: {
-                    Text(templateLabel(coordinator.selectedTemplate))
+                    Text(templateLabel(coordinator.selectedTemplate)).lineLimit(1).truncationMode(.tail)
+                        .modifier(ByoTypography(15, weight: .semibold))
                 }
+                .menuStyle(.button).buttonStyle(.borderless).controlSize(.regular)
+                .help(templateLabel(coordinator.selectedTemplate))
                 .accessibilityLabel(AppStrings.text("main.template"))
                 .disabled(coordinator.source == nil)
-                Spacer()
-                Button { coordinator.pinned.toggle() } label: { Image(systemName: coordinator.pinned ? "pin.fill" : "pin") }
+                Spacer(minLength: ByoSpace.small)
+                Button { coordinator.pinned.toggle() } label: {
+                    Image(systemName: coordinator.pinned ? "pin.fill" : "pin")
+                        .font(.system(size: 20)).frame(width: 44, height: 44).contentShape(Rectangle())
+                }.buttonStyle(.plain)
                     .accessibilityLabel(AppStrings.text(coordinator.pinned ? "mac.unpin" : "mac.pin"))
                     .accessibilityValue(AppStrings.text(coordinator.pinned ? "mac.pinned" : "mac.unpinned"))
-            }
-            if let source = coordinator.source {
-                Text(source).lineLimit(2).foregroundStyle(ByoColor.muted).accessibilityLabel(AppStrings.text("main.source") + ": " + source)
-                Divider()
-            }
+            }.frame(height: 44)
+            Text(coordinator.source ?? " ").modifier(ByoTypography(15, relativeTo: .caption))
+                .lineLimit(1).truncationMode(.tail).foregroundStyle(ByoColor.muted)
+                .frame(height: 22, alignment: .leading)
+                .accessibilityRepresentation { Text(AppStrings.text("main.source") + ": " + (coordinator.source ?? "")) }
+                .accessibilityHidden(coordinator.source == nil)
+            ByoColor.border.frame(height: 1).accessibilityHidden(true)
             ScrollView {
                 Group {
                     switch coordinator.state {
                     case .hidden: EmptyView()
                     case .message(let text):
                         VStack(alignment: .leading, spacing: ByoSpace.small) {
-                            Text(coordinator.pasteDenied ? AppStrings.text("mac.pasteDenied") : text)
+                            Text(coordinator.pasteDenied ? AppStrings.text("mac.pasteDenied") : text).modifier(ByoTypography(15))
                             if coordinator.pasteDenied {
-                                Button(AppStrings.text("mac.openPasteSettings")) {
+                                ByoButton("mac.openPasteSettings", kind: .text) {
                                     if let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Pasteboard") { NSWorkspace.shared.open(url) }
                                 }
                             }
                         }
-                    case .translating: ProgressView(AppStrings.text("main.running"))
+                    case .translating:
+                        ProgressView(AppStrings.text("main.running")).progressViewStyle(.circular).controlSize(.small)
+                            .modifier(ByoTypography(15, relativeTo: .caption)).foregroundStyle(ByoColor.muted)
                     case .done(_, let result): ResultText(text: result.text)
                     case .failed(_, let error):
                         VStack(alignment: .leading, spacing: ByoSpace.small) {
-                            Text(AppStrings.error(error)).foregroundStyle(ByoColor.error)
-                            Button(AppStrings.text("err.retry"), action: coordinator.retry)
+                            Text(AppStrings.error(error)).modifier(ByoTypography(15)).foregroundStyle(ByoColor.error)
+                            ByoButton("err.retry", kind: .text, action: coordinator.retry)
                         }
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
-            }.frame(maxHeight: .infinity)
-            HStack {
-                if case .done = coordinator.state { Button(AppStrings.text("main.copy"), action: coordinator.copyResult) }
-                Spacer()
-                Button(AppStrings.text("mac.openInTranslator"), action: coordinator.openInTranslator).disabled(coordinator.source == nil)
+            }.frame(minHeight: 100, maxHeight: .infinity)
+            HStack(spacing: ByoSpace.small) {
+                ByoButton("main.copy", action: coordinator.copyResult).disabled(!hasResult)
+                Spacer(minLength: 0)
+                ByoButton("mac.openInTranslator", action: coordinator.openInTranslator).disabled(coordinator.source == nil)
             }
         }
-        .padding(ByoSpace.inset)
-        .padding(.top, 24)
+        .padding(ByoSpace.screen)
+        .frame(minWidth: 380, maxWidth: 640, minHeight: 300, maxHeight: 640)
         .background(ByoColor.background).foregroundStyle(ByoColor.text).tint(ByoColor.accent)
         .preferredColorScheme(scheme).environment(\.locale, AppStrings.locale)
         .textSelection(.enabled)

@@ -142,5 +142,6 @@ private struct QuickPanelContent: View {
         .padding(.top, 24)
         .background(ByoColor.background).foregroundStyle(ByoColor.text).tint(ByoColor.accent)
         .preferredColorScheme(scheme).environment(\.locale, AppStrings.locale)
+        .textSelection(.enabled)
     }
 }

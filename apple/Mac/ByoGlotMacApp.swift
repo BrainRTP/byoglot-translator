@@ -2,7 +2,9 @@ import AppKit
 import ByoGlotAppKit
 import ByoGlotCore
 import ByoGlotStore
+import Carbon
 import Network
+import Observation
 import SwiftUI
 
 @main
@@ -17,6 +19,7 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
     }
     private let network = NWPathMonitor()
     private var scenes: NSHostingSceneRepresentation<MacScenes>?
+    private var translatorWindow: NSWindow?
 
     override init() {
         let settings = SettingsStore(directory: URL.applicationSupportDirectory)
@@ -41,6 +44,8 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
         let scenes = NSHostingSceneRepresentation { MacScenes(app: self) }
         self.scenes = scenes
         NSApp.addSceneRepresentation(scenes)
+        installMainMenu()
+        NotificationCenter.default.addObserver(self, selector: #selector(windowWillClose(_:)), name: NSWindow.willCloseNotification, object: nil)
         quick.start()
         NSApp.servicesProvider = ServiceProvider(coordinator: quick)
         network.pathUpdateHandler = { [weak model] path in
@@ -49,24 +54,98 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
         }
         network.start(queue: DispatchQueue(label: "io.github.brainrtp.byoglot.network"))
         let isDefaultLaunch = notification.userInfo?[NSApplication.launchIsDefaultUserInfoKey] as? Bool == true
+        let launchEvent = NSAppleEventManager.shared().currentAppleEvent
+        let backgroundLaunch = launchEvent?.paramDescriptor(forKeyword: AEKeyword(keyAELaunchedAsLogInItem)) != nil || launchEvent?.paramDescriptor(forKeyword: AEKeyword(keyAELaunchedAsServiceItem)) != nil
         Task {
             await model.refresh()
-            if isDefaultLaunch && (!model.loaded || model.settings.connections.isEmpty) { showSettings(.connections) }
+            if isDefaultLaunch && !backgroundLaunch { showPrimaryWindow() }
         }
     }
 
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showPrimaryWindow()
+        return false
+    }
+
+    private func showPrimaryWindow() {
+        if !model.loaded || model.settings.connections.isEmpty { showSettings(.connections) }
+        else { showTranslator() }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
+        NotificationCenter.default.removeObserver(self)
         quick.stop()
         model.stop()
         network.cancel()
     }
 
+    private func installMainMenu() {
+        let menu = NSMenu()
+        let appMenu = NSMenu(title: "ByoGlot")
+        appMenu.addItem(withTitle: AppStrings.text("mac.about"), action: #selector(orderFrontStandardAboutPanel(_:)), keyEquivalent: "").target = self
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: AppStrings.text("mac.settings"), action: #selector(showSettingsWindow(_:)), keyEquivalent: ",").target = self
+        appMenu.addItem(.separator())
+        let servicesMenu = NSMenu(title: AppStrings.text("mac.services"))
+        appMenu.addItem(withTitle: servicesMenu.title, action: nil, keyEquivalent: "").submenu = servicesMenu
+        NSApp.servicesMenu = servicesMenu
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: AppStrings.text("mac.hide"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: AppStrings.text("mac.hideOthers"), action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h").keyEquivalentModifierMask = [.command, .option]
+        appMenu.addItem(withTitle: AppStrings.text("mac.showAll"), action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: AppStrings.text("mac.quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "ByoGlot", action: nil, keyEquivalent: "").submenu = appMenu
+        let editMenu = NSMenu(title: AppStrings.text("mac.edit"))
+        editMenu.addItem(withTitle: AppStrings.text("mac.undo"), action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: AppStrings.text("mac.redo"), action: Selector(("redo:")), keyEquivalent: "z").keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: AppStrings.text("mac.cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: AppStrings.text("main.copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: AppStrings.text("main.paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: AppStrings.text("mac.selectAll"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        menu.addItem(withTitle: editMenu.title, action: nil, keyEquivalent: "").submenu = editMenu
+        let windowMenu = NSMenu(title: AppStrings.text("mac.window"))
+        windowMenu.addItem(withTitle: AppStrings.text("common.close"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        windowMenu.addItem(withTitle: AppStrings.text("mac.minimize"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowMenu.addItem(withTitle: AppStrings.text("mac.zoom"), action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: windowMenu.title, action: nil, keyEquivalent: "").submenu = windowMenu
+        NSApp.windowsMenu = windowMenu
+        NSApp.mainMenu = menu
+        withObservationTracking {
+            _ = AppStrings.interfaceLanguage
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.installMainMenu() }
+        }
+    }
+
+    @objc private func orderFrontStandardAboutPanel(_ sender: Any?) { showSettings(.about) }
+    @objc private func showSettingsWindow(_ sender: Any?) { showSettings() }
+
+    @objc private func windowWillClose(_ notification: Notification) {
+        guard let closing = notification.object as? NSWindow, closing.canBecomeMain else { return }
+        let anotherWindow = NSApp.windows.contains { $0 !== closing && $0.canBecomeMain && ($0.isVisible || $0.isMiniaturized) }
+        if !anotherWindow { NSApp.setActivationPolicy(.accessory) }
+    }
+
     func showTranslator() {
-        scenes?.environment.openWindow(id: "translator")
+        NSApp.setActivationPolicy(.regular)
+        if translatorWindow == nil {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 720), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+            window.title = AppStrings.text("main.title")
+            window.contentMinSize = NSSize(width: 560, height: 600)
+            window.isReleasedWhenClosed = false
+            window.isRestorable = false
+            window.contentView = NSHostingView(rootView: MacTranslatorContent(app: self))
+            window.center()
+            translatorWindow = window
+        }
+        translatorWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate()
     }
 
     func showSettings(_ tab: MacSettingsTab? = nil) {
+        NSApp.setActivationPolicy(.regular)
         if let tab { UserDefaults.standard.set(tab.rawValue, forKey: "mac.settingsTab") }
         scenes?.environment.openSettings()
         NSApp.activate()
@@ -80,22 +159,23 @@ private struct MacScenes: Scene {
             MenuContent(quick: app.quick, openTranslator: app.showTranslator, openSettings: { app.showSettings() })
                 .environment(\.locale, AppStrings.locale)
         }
-        Window(AppStrings.text("main.title"), id: "translator") {
-            MacContent(model: app.model) {
-                NavigationStack {
-                    ScreenMain(model: app.model, openProviders: { app.showSettings(.connections) }, openSettings: { app.showSettings() }, openTemplates: { app.showSettings(.templates) })
-                        .id(app.quick.editorRevision)
-                }
-            }.frame(minWidth: 560, minHeight: 600)
-        }
-        .defaultSize(width: 760, height: 720)
-        .defaultLaunchBehavior(.suppressed)
-        .restorationBehavior(.disabled)
         Settings {
             MacContent(model: app.model) { MacSettingsView(model: app.model, quick: app.quick) }
                 .frame(minWidth: 620, minHeight: 520)
         }
         .defaultSize(width: 700, height: 620)
+    }
+}
+
+private struct MacTranslatorContent: View {
+    let app: ByoGlotMacApp
+    var body: some View {
+        MacContent(model: app.model) {
+            NavigationStack {
+                ScreenMain(model: app.model, openProviders: { app.showSettings(.connections) }, openSettings: { app.showSettings() }, openTemplates: { app.showSettings(.templates) })
+                    .id(app.quick.editorRevision)
+            }
+        }.frame(minWidth: 560, minHeight: 600)
     }
 }
 
@@ -113,6 +193,7 @@ private struct MacContent<Content: View>: View {
             else { content }
         }
         .tint(ByoColor.accent)
+        .textSelection(.enabled)
         .preferredColorScheme(scheme)
         .environment(\.locale, AppStrings.locale)
     }

@@ -45,10 +45,11 @@ struct FixedDetector: SourceLanguageDetecting {
 }
 
 struct LockedSecrets: SecretStore {
-    func set(_ secret: String, connectionId: String, origin: String) throws(SecretError) { throw .keychain(errSecInteractionNotAllowed) }
-    func secret(connectionId: String, origin: String) throws(SecretError) -> String? { throw .keychain(errSecInteractionNotAllowed) }
-    func has(connectionId: String) throws(SecretError) -> Bool { throw .keychain(errSecInteractionNotAllowed) }
-    func delete(connectionId: String) throws(SecretError) { throw .keychain(errSecInteractionNotAllowed) }
+    var error: SecretError = .keychain(errSecInteractionNotAllowed)
+    func set(_ secret: String, connectionId: String, origin: String) throws(SecretError) { throw error }
+    func secret(connectionId: String, origin: String) throws(SecretError) -> String? { throw error }
+    func has(connectionId: String) throws(SecretError) -> Bool { throw error }
+    func delete(connectionId: String) throws(SecretError) { throw error }
 }
 
 final class AppFixture: Sendable {

@@ -190,9 +190,20 @@ public actor ConnectionEditor {
         } catch { return nil }
     }
 
+    #if os(macOS)
+    public func keyState(connectionId: String) async throws(RunnerError) -> Bool {
+        guard let state = try? await settings.read(), let connection = state.connections.first(where: { $0.id == connectionId }), let origin = originOf(connection.baseUrl) else { return false }
+        do { return try !(secrets.secret(connectionId: connectionId, origin: origin)?.isEmpty ?? true) }
+        catch {
+            if case .originMismatch = error { return false }
+            throw secretRunnerError(error)
+        }
+    }
+    #else
     public func keyState(connectionId: String) async -> Bool {
         guard let state = try? await settings.read(), let connection = state.connections.first(where: { $0.id == connectionId }), let origin = originOf(connection.baseUrl) else { return false }
         guard let secret = try? secrets.secret(connectionId: connectionId, origin: origin) else { return false }
         return !secret.isEmpty
     }
+    #endif
 }

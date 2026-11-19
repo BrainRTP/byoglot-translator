@@ -16,6 +16,10 @@ public struct MainErrorPresentation {
         var actionTitle = "err.retry"
         var warning = false
         switch error {
+        #if os(macOS)
+        case .keychain:
+            title = AppStrings.text("mac.keychainTitle")
+        #endif
         case .interrupted:
             title = AppStrings.text("main.interrupted")
         case .noConnection, .keyMissing:

@@ -46,4 +46,4 @@ Import uses `fileImporter` with JSON files. The app registers no document types 
 
 ## Running the Mac app locally
 
-Generate the project with `xcodegen generate`, open `ByoGlot.xcodeproj`, and select the `ByoGlotMac` scheme. In the target's Signing & Capabilities settings, enable automatic signing and choose your development team before running. A signed build with a development team is required for the Keychain; an unsigned build cannot save provider keys. Signing follows the iOS target: the repository does not set a development team.
+Generate the project with `xcodegen generate`, open `ByoGlot.xcodeproj`, select the `ByoGlotMac` scheme, and enable automatic signing with your development team in Signing & Capabilities. Saving provider keys requires a signed build with an embedded provisioning profile; without it, saving can fail with Keychain error -34018. After selecting your team, build from `apple/` with `xcodebuild -project ByoGlot.xcodeproj -scheme ByoGlotMac -configuration Debug -allowProvisioningUpdates PROVISIONING_PROFILE_REQUIRED=YES build`; the repository does not set a development team.

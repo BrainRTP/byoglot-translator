@@ -32,6 +32,9 @@ public final class AppModel {
     public private(set) var activity = AppActivity.active
     public private(set) var models: [String: [ModelInfo]] = [:]
     public private(set) var keyStates: [String: Bool] = [:]
+    #if os(macOS)
+    public private(set) var keyErrors: [String: RunnerError] = [:]
+    #endif
     public private(set) var catalogueErrors: [String: RunnerError] = [:]
     public private(set) var recentLanguages: [String] = []
     public private(set) var cacheStatistics = TranslationCacheStatistics()
@@ -134,10 +137,27 @@ public final class AppModel {
                 if settings.autoTranslate && !complete && !running { schedule() }
             }
             for connection in settings.connections {
+                #if os(macOS)
+                do {
+                    keyStates[connection.id] = try await editor.keyState(connectionId: connection.id)
+                    keyErrors[connection.id] = nil
+                } catch {
+                    keyStates[connection.id] = false
+                    keyErrors[connection.id] = error
+                }
+                #else
                 keyStates[connection.id] = await editor.keyState(connectionId: connection.id)
+                #endif
                 models[connection.id] = await editor.cachedModels(connectionId: connection.id)
             }
         } catch { storageError = .appGroupUnavailable }
+    }
+
+    func keyStatus(_ connection: Connection) -> String {
+        #if os(macOS)
+        if let error = keyErrors[connection.id] { return AppStrings.error(error) }
+        #endif
+        return AppStrings.text(keyStates[connection.id] == true ? "key.ok" : ProviderEffort.needsKey(preset: connection.preset, baseUrl: connection.baseUrl) ? "providers.keyMissing" : "providers.keyNotRequired")
     }
 
     @discardableResult
@@ -567,6 +587,9 @@ public final class AppModel {
         try await editor.remove(id: id)
         models[id] = nil
         keyStates[id] = nil
+        #if os(macOS)
+        keyErrors[id] = nil
+        #endif
         await refresh()
         await refreshCacheStatistics()
     }

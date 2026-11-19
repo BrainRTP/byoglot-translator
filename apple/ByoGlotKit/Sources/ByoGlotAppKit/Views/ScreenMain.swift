@@ -223,6 +223,9 @@ public struct TranslatorBlock: View {
             if model.overLimit {
                 Text(AppStrings.text("main.tooLongBody")).modifier(ByoTypography(13)).foregroundStyle(ByoColor.error)
                     .fixedSize(horizontal: false, vertical: true).padding(.horizontal, 14).padding(.bottom, ByoSpace.small)
+                    #if os(macOS)
+                    .textSelection(.enabled)
+                    #endif
             }
         }.background(ByoColor.background, in: RoundedRectangle(cornerRadius: ByoRadius.panel))
             .overlay {

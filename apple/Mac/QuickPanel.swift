@@ -14,6 +14,7 @@ final class QuickPanel: NSPanel {
 final class QuickPanelController: NSObject, NSWindowDelegate {
     private let panel = QuickPanel(contentRect: NSRect(x: 0, y: 0, width: 380, height: 360), styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView, .closable, .resizable], backing: .buffered, defer: true)
     private var localMonitor: Any?
+    private var globalMonitor: Any?
     private weak var coordinator: QuickTranslateCoordinator?
 
     override init() {
@@ -60,6 +61,9 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
                 }
                 return handled ? nil : event
             }
+            globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
+                MainActor.assumeIsolated { self?.dismissOutside() }
+            }
         }
         panel.orderFrontRegardless()
     }
@@ -70,7 +74,9 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
 
     func hide() {
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
+        if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
         localMonitor = nil
+        globalMonitor = nil
         panel.orderOut(nil)
     }
 
@@ -102,17 +108,15 @@ private struct QuickPanelContent: View {
                 .accessibilityLabel(AppStrings.text("main.template"))
                 .disabled(coordinator.source == nil)
                 Spacer(minLength: ByoSpace.small)
-                Button { coordinator.pinned.toggle() } label: {
-                    Image(systemName: coordinator.pinned ? "pin.fill" : "pin")
-                        .font(.system(size: 20)).frame(width: 44, height: 44).contentShape(Rectangle())
-                }.buttonStyle(.plain)
-                    .accessibilityLabel(AppStrings.text(coordinator.pinned ? "mac.unpin" : "mac.pin"))
+                ByoIconButton(title: coordinator.pinned ? "mac.unpin" : "mac.pin", symbol: coordinator.pinned ? "pin.fill" : "pin") { coordinator.pinned.toggle() }
                     .accessibilityValue(AppStrings.text(coordinator.pinned ? "mac.pinned" : "mac.unpinned"))
             }.frame(height: 44)
             Text(coordinator.source ?? " ").modifier(ByoTypography(15, relativeTo: .caption))
                 .lineLimit(1).truncationMode(.tail).foregroundStyle(ByoColor.muted)
                 .frame(height: 22, alignment: .leading)
+                .textSelection(.enabled)
                 .accessibilityRepresentation { Text(AppStrings.text("main.source") + ": " + (coordinator.source ?? "")) }
+                .help(coordinator.source ?? "")
                 .accessibilityHidden(coordinator.source == nil)
             ByoColor.border.frame(height: 1).accessibilityHidden(true)
             ScrollView {
@@ -122,6 +126,7 @@ private struct QuickPanelContent: View {
                     case .message(let text):
                         VStack(alignment: .leading, spacing: ByoSpace.small) {
                             Text(coordinator.pasteDenied ? AppStrings.text("mac.pasteDenied") : text).modifier(ByoTypography(15))
+                                .textSelection(.enabled)
                             if coordinator.pasteDenied {
                                 ByoButton("mac.openPasteSettings", kind: .text) {
                                     if let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Pasteboard") { NSWorkspace.shared.open(url) }
@@ -135,21 +140,21 @@ private struct QuickPanelContent: View {
                     case .failed(_, let error):
                         VStack(alignment: .leading, spacing: ByoSpace.small) {
                             Text(AppStrings.error(error)).modifier(ByoTypography(15)).foregroundStyle(ByoColor.error)
+                                .textSelection(.enabled)
                             ByoButton("err.retry", kind: .text, action: coordinator.retry)
                         }
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }.frame(minHeight: 100, maxHeight: .infinity)
             HStack(spacing: ByoSpace.small) {
-                ByoButton("main.copy", action: coordinator.copyResult).disabled(!hasResult)
+                ByoButton("main.copy", action: coordinator.copyResult).fixedSize(horizontal: true, vertical: false).disabled(!hasResult)
                 Spacer(minLength: 0)
-                ByoButton("mac.openInTranslator", action: coordinator.openInTranslator).disabled(coordinator.source == nil)
+                ByoButton("mac.openInTranslator", action: coordinator.openInTranslator).lineLimit(1).minimumScaleFactor(0.8).disabled(coordinator.source == nil)
             }
         }
         .padding(ByoSpace.screen)
         .frame(minWidth: 380, maxWidth: 640, minHeight: 300, maxHeight: 640)
         .background(ByoColor.background).foregroundStyle(ByoColor.text).tint(ByoColor.accent)
         .preferredColorScheme(scheme).environment(\.locale, AppStrings.locale)
-        .textSelection(.enabled)
     }
 }

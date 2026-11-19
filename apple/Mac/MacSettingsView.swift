@@ -47,7 +47,7 @@ private struct MacGeneralSettings: View {
             Section {
                 LabeledContent(AppStrings.text("mac.shortcut")) { ShortcutRecorder(coordinator: quick) }
                 Text(AppStrings.text("mac.shortcutHelp")).foregroundStyle(.secondary)
-                if let error = quick.shortcutError { Text(error).foregroundStyle(ByoColor.error) }
+                if let error = quick.shortcutError { Text(error).foregroundStyle(ByoColor.error).textSelection(.enabled) }
                 Toggle(AppStrings.text("mac.doubleCopy"), isOn: Binding(get: { quick.doubleCopyEnabled }, set: quick.setDoubleCopy))
             }
             Section(AppStrings.text("mac.services")) {

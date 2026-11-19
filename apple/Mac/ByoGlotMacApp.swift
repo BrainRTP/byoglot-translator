@@ -195,7 +195,6 @@ private struct MacContent<Content: View>: View {
             else { content }
         }
         .tint(ByoColor.accent)
-        .textSelection(.enabled)
         .preferredColorScheme(scheme)
         .environment(\.locale, AppStrings.locale)
     }

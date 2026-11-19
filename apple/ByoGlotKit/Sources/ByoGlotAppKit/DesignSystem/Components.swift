@@ -40,11 +40,14 @@ public struct ByoButton: View {
     }
 }
 
-struct ByoIconButton: View {
+public struct ByoIconButton: View {
     let title: String
     let symbol: String
     let action: () -> Void
-    var body: some View {
+    public init(title: String, symbol: String, action: @escaping () -> Void) {
+        self.title = title; self.symbol = symbol; self.action = action
+    }
+    public var body: some View {
         #if os(macOS)
         Button(action: action) { ByoIconLabel(symbol: symbol) }
             .buttonStyle(.plain).foregroundStyle(ByoColor.text)
@@ -139,6 +142,9 @@ public struct Banner: View {
             Label(title, systemImage: warning ? "exclamationmark.triangle" : "exclamationmark.circle")
                 .modifier(ByoTypography(15, weight: .semibold)).foregroundStyle(warning ? ByoColor.warning : ByoColor.error)
             Text(message).modifier(ByoTypography(15)).fixedSize(horizontal: false, vertical: true)
+                #if os(macOS)
+                .textSelection(.enabled)
+                #endif
             ByoButton(actionTitle, action: action)
         }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
             .background(warning ? ByoColor.warningSurface : ByoColor.errorSurface, in: RoundedRectangle(cornerRadius: 6))

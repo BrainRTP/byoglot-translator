@@ -22,8 +22,7 @@ public struct ScreenProviders: View {
                         Text(AppStrings.text("providers.saved")).modifier(ByoTypography(13)).foregroundStyle(ByoColor.muted)
                         VStack(spacing: 0) {
                             ForEach(model.settings.connections) { connection in
-                                let needsKey = ProviderEffort.needsKey(preset: connection.preset, baseUrl: connection.baseUrl)
-                                ListRow(connection.name, subtitle: connection.baseUrl, value: AppStrings.text(model.keyStates[connection.id] == true ? "key.ok" : needsKey ? "providers.keyMissing" : "providers.keyNotRequired")) {
+                                ListRow(connection.name, subtitle: connection.baseUrl, value: model.keyStatus(connection)) {
                                     selected = ProviderRoute(preset: connection.preset, connectionId: connection.id)
                                 }
                                 Rectangle().fill(ByoColor.border).frame(height: 1)
@@ -175,7 +174,7 @@ private struct ProviderKeyScreen: View {
             if let failure {
                 Banner(title: failureTitle, message: AppStrings.error(failure), actionTitle: "err.retry", action: check)
             }
-            Label(AppStrings.text(hasKey ? "key.ok" : keyMissing ? "providers.keyMissing" : "providers.keyNotRequired"), systemImage: keyMissing ? "exclamationmark.circle" : "checkmark.circle.fill")
+            Label(model.keyStatus(connection), systemImage: keyMissing ? "exclamationmark.circle" : "checkmark.circle.fill")
                 .foregroundStyle(keyMissing ? ByoColor.error : ByoColor.success)
             if hasKey { Text("••••••••").modifier(ByoTypography(14, mono: true)).accessibilityLabel(AppStrings.text("key.label")) }
             if let list = model.models[connection.id] {

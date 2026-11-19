@@ -1,4 +1,4 @@
-import ByoGlotAppKit
+@testable import ByoGlotAppKit
 import ByoGlotCore
 import ByoGlotStore
 import Foundation
@@ -7,6 +7,24 @@ import Testing
 
 struct ConnectionEditorTests {
     #if os(macOS)
+    @MainActor @Test(arguments: [SecretError.keychain(errSecMissingEntitlement), .originMismatch])
+    func keyReadFailureIsNotReportedAsMissing(_ error: SecretError) async throws {
+        let f = AppFixture()
+        try await f.connect()
+        let editor = ConnectionEditor(settings: f.settings, secrets: LockedSecrets(error: error), transport: f.transport, urlPolicy: .allowLocalHTTP)
+        let model = AppModel(settings: f.settings, editor: editor, runner: f.runner)
+        await model.refresh()
+        let connection = try #require(model.settings.connections.first)
+        #expect(model.keyStates[connection.id] == false)
+        if case .keychain(let code) = error {
+            #expect(model.keyErrors[connection.id] == .keychain(code))
+            #expect(model.keyStatus(connection) == AppStrings.error(.keychain(code)))
+        } else {
+            #expect(model.keyErrors[connection.id] == nil)
+            #expect(model.keyStatus(connection) == AppStrings.text("providers.keyMissing"))
+        }
+    }
+
     @Test func keychainSaveFailureIsReportedAsStorageFailure() async throws {
         let f = AppFixture()
         let editor = ConnectionEditor(settings: f.settings, secrets: LockedSecrets(error: .keychain(errSecMissingEntitlement)), transport: f.transport, urlPolicy: .allowLocalHTTP)
@@ -47,7 +65,7 @@ struct ConnectionEditorTests {
         #expect(state.consentedOrigins == ["https://provider.example"])
         #expect(connection.selectionModel?.id == "model")
         #expect(try f.secrets.secret(connectionId: connection.id, origin: "https://provider.example") == "fixture-key")
-        #expect(await f.editor.keyState(connectionId: connection.id))
+        #expect(try await f.editor.keyState(connectionId: connection.id))
         #expect(await f.transport.requests.count == 1)
         #expect(try await f.editor.models(connectionId: connection.id).map(\.id) == ["model"])
         try await f.editor.remove(id: connection.id)
@@ -124,7 +142,7 @@ struct ConnectionEditorTests {
         #expect(state.theme == .dark)
         #expect(!state.autoTranslate)
         #expect(state.mainModel == ref && state.externalModel == ref && state.fallbackModel == ref)
-        for connection in state.connections { #expect(await !f.editor.keyState(connectionId: connection.id)) }
+        for connection in state.connections { #expect(try await !f.editor.keyState(connectionId: connection.id)) }
         let output = try JSONEncoder().encode(SettingsLogic.export(state, now: Date(timeIntervalSince1970: 0)))
         let object = try #require(JSONSerialization.jsonObject(with: output) as? [String: Any])
         for key in ["theme", "autoTranslate", "mainModel", "externalModel", "fallbackModel"] { #expect(object[key] == nil) }

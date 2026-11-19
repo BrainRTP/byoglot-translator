@@ -4,6 +4,7 @@ import ByoGlotCore
 import ByoGlotStore
 import Carbon
 import Network
+import Observation
 import SwiftUI
 
 @main
@@ -81,16 +82,45 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
     private func installMainMenu() {
         let menu = NSMenu()
         let appMenu = NSMenu(title: "ByoGlot")
+        appMenu.addItem(withTitle: AppStrings.text("mac.about"), action: #selector(orderFrontStandardAboutPanel(_:)), keyEquivalent: "").target = self
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: AppStrings.text("mac.settings"), action: #selector(showSettingsWindow(_:)), keyEquivalent: ",").target = self
+        appMenu.addItem(.separator())
+        let servicesMenu = NSMenu(title: AppStrings.text("mac.services"))
+        appMenu.addItem(withTitle: servicesMenu.title, action: nil, keyEquivalent: "").submenu = servicesMenu
+        NSApp.servicesMenu = servicesMenu
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: AppStrings.text("mac.hide"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: AppStrings.text("mac.hideOthers"), action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h").keyEquivalentModifierMask = [.command, .option]
+        appMenu.addItem(withTitle: AppStrings.text("mac.showAll"), action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: AppStrings.text("mac.quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(withTitle: "ByoGlot", action: nil, keyEquivalent: "").submenu = appMenu
         let editMenu = NSMenu(title: AppStrings.text("mac.edit"))
+        editMenu.addItem(withTitle: AppStrings.text("mac.undo"), action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: AppStrings.text("mac.redo"), action: Selector(("redo:")), keyEquivalent: "z").keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(.separator())
         editMenu.addItem(withTitle: AppStrings.text("mac.cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         editMenu.addItem(withTitle: AppStrings.text("main.copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         editMenu.addItem(withTitle: AppStrings.text("main.paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         editMenu.addItem(withTitle: AppStrings.text("mac.selectAll"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         menu.addItem(withTitle: editMenu.title, action: nil, keyEquivalent: "").submenu = editMenu
+        let windowMenu = NSMenu(title: AppStrings.text("mac.window"))
+        windowMenu.addItem(withTitle: AppStrings.text("common.close"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        windowMenu.addItem(withTitle: AppStrings.text("mac.minimize"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowMenu.addItem(withTitle: AppStrings.text("mac.zoom"), action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: windowMenu.title, action: nil, keyEquivalent: "").submenu = windowMenu
+        NSApp.windowsMenu = windowMenu
         NSApp.mainMenu = menu
+        withObservationTracking {
+            _ = AppStrings.interfaceLanguage
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.installMainMenu() }
+        }
     }
+
+    @objc private func orderFrontStandardAboutPanel(_ sender: Any?) { showSettings(.about) }
+    @objc private func showSettingsWindow(_ sender: Any?) { showSettings() }
 
     @objc private func windowWillClose(_ notification: Notification) {
         guard let closing = notification.object as? NSWindow, closing.canBecomeMain else { return }

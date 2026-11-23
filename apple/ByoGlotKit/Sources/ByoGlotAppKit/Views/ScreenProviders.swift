@@ -235,11 +235,16 @@ private struct ProviderKeyScreen: View {
             if let failure {
                 Banner(title: failureTitle, message: AppStrings.error(failure), actionTitle: "err.retry", action: check)
             }
+            #if os(macOS)
+            Label { Text(model.keyStatus(connection)) } icon: {
+                Image(keyMissing ? "fa-triangle-exclamation" : "fa-circle-check").resizable().scaledToFit().frame(width: 14, height: 14)
+            }
+                .foregroundStyle(keyMissing ? ByoColor.error : ByoColor.success)
+                .textSelection(.enabled)
+            #else
             Label(model.keyStatus(connection), systemImage: keyMissing ? "exclamationmark.circle" : "checkmark.circle.fill")
                 .foregroundStyle(keyMissing ? ByoColor.error : ByoColor.success)
-                #if os(macOS)
-                .textSelection(.enabled)
-                #endif
+            #endif
             if hasKey {
                 Text("••••••••").modifier(ByoTypography(14, mono: true))
                     #if os(macOS)

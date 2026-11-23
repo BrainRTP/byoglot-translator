@@ -32,8 +32,8 @@ public struct ScreenMain: View {
                 Button(action: openSettings) {
                     Label(AppStrings.text("settings.title"), image: "fa-sliders")
                         .labelStyle(.iconOnly).frame(width: 36, height: 36)
-                        .background(ByoColor.muted.opacity(settingsHovered ? 0.3 : 0.18), in: Circle())
-                        .contentShape(Circle())
+                        .background(ByoColor.muted.opacity(settingsHovered ? 0.18 : 0.1), in: RoundedRectangle(cornerRadius: ByoRadius.group))
+                        .contentShape(RoundedRectangle(cornerRadius: ByoRadius.group))
                 }.buttonStyle(.plain).foregroundStyle(ByoColor.text)
                     .onHover { settingsHovered = $0 }.help(AppStrings.text("settings.title"))
                 #else
@@ -334,18 +334,20 @@ public struct TranslatorBlock: View {
                 else {
                     #if os(macOS)
                     ByoIconButton(title: "main.copy", image: Image("fa-copy"), action: copy).disabled(model.result.isEmpty)
-                    ShareLink(item: model.result) { ByoIconLabel(symbol: "square.and.arrow.up") }
+                    ShareLink(item: model.result) { ByoIconLabel(image: Image("fa-arrow-up-from-bracket")) }
                         .buttonStyle(.plain).foregroundStyle(ByoColor.text)
                         .accessibilityLabel(AppStrings.text("main.share")).help(AppStrings.text("main.share"))
                         .disabled(model.result.isEmpty).modifier(ByoFocusRing())
+                    ByoIconButton(title: "main.retranslate", image: Image("fa-rotate-right"), action: model.translateAgain).disabled(!model.canTranslate)
+                        .keyboardShortcut(.return, modifiers: .command)
                     #else
                     ByoIconButton(title: "main.copy", symbol: "doc.on.doc", action: copy).disabled(model.result.isEmpty)
                     ShareLink(item: model.result) { Image(systemName: "square.and.arrow.up").font(.system(size: 20)).frame(minWidth: 44, minHeight: 44) }
                         .foregroundStyle(model.result.isEmpty ? ByoColor.strongBorder : ByoColor.text)
                         .accessibilityLabel(AppStrings.text("main.share")).disabled(model.result.isEmpty).modifier(ByoFocusRing())
-                    #endif
                     ByoIconButton(title: "main.retranslate", symbol: "arrow.clockwise", action: model.translateAgain).disabled(!model.canTranslate)
                         .keyboardShortcut(.return, modifiers: .command)
+                    #endif
                 }
             }.padding(.horizontal, ByoSpace.tiny).padding(.bottom, ByoSpace.tiny)
         }.background(ByoColor.surface, in: RoundedRectangle(cornerRadius: ByoRadius.panel))

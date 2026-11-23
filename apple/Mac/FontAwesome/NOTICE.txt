@@ -1,7 +1,7 @@
 Font Awesome Free 7.3.1 by Fonticons, Inc.
 https://fontawesome.com
 
-Classic Solid icons: copy, arrow-up-right-from-square, sliders, arrow-right-arrow-left, x, stop, thumbtack, thumbtack-slash, eye, eye-slash, server, circle-info.
+Classic Solid icons: copy, arrow-up-right-from-square, sliders, arrow-right-arrow-left, x, stop, thumbtack, thumbtack-slash, eye, eye-slash, server, circle-info, arrow-up-from-bracket, rotate-right, circle-check, triangle-exclamation.
 Classic Regular icons: paste, pen-to-square.
 Source: https://github.com/FortAwesome/Font-Awesome/tree/7.3.1/svgs/solid
 Source: https://github.com/FortAwesome/Font-Awesome/tree/7.3.1/svgs/regular
@@ -12,3 +12,4 @@ https://fontawesome.com/license/free
 The original SVG files and upstream LICENSE.txt are included in this directory. SVG files were converted to PDF for the macOS asset catalog; geometry is unchanged and color is applied at render time. No Font Awesome fonts or code are included.
 
 To regenerate each PDF, run rsvg-convert --format pdf --dpi-x 72 --dpi-y 72 --width 20 --height 20 --keep-aspect-ratio --output <asset.pdf> <source.svg>.
+For settings tab icons (sliders, server, regular-pen-to-square, circle-info), use --width 16 --height 16 --page-width 20 --page-height 20 --left 2 --top 2 to preserve space around the original geometry.

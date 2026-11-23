@@ -183,7 +183,14 @@ public struct Banner: View {
     }
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(title, systemImage: warning ? "exclamationmark.triangle" : "exclamationmark.circle")
+            Label { Text(title) } icon: {
+                #if os(macOS)
+                if warning { Image("fa-triangle-exclamation").resizable().scaledToFit().frame(width: 16, height: 16) }
+                else { Image(systemName: "exclamationmark.circle") }
+                #else
+                Image(systemName: warning ? "exclamationmark.triangle" : "exclamationmark.circle")
+                #endif
+            }
                 .modifier(ByoTypography(15, weight: .semibold)).foregroundStyle(warning ? ByoColor.warning : ByoColor.error)
             Text(message).modifier(ByoTypography(15)).fixedSize(horizontal: false, vertical: true)
                 #if os(macOS)

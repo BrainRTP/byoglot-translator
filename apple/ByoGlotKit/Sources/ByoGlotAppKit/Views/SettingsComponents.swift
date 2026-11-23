@@ -216,15 +216,15 @@ public struct MacSettingsNavigation: ViewModifier {
     let cancelAction: Bool
     public init(busy: Bool = false, cancelAction: Bool = true, back: (() -> Void)? = nil) { self.busy = busy; self.cancelAction = cancelAction; self.back = back }
     public func body(content: Content) -> some View {
-        content.navigationBarBackButtonHidden()
-            .safeAreaInset(edge: .top, spacing: 0) {
-                HStack {
-                    Button { if let back { back() } else { dismiss() } } label: {
-                        Label(AppStrings.text("mac.back"), systemImage: "chevron.left")
-                    }.keyboardShortcut(cancelAction ? .cancelAction : nil).disabled(busy)
-                    Spacer()
-                }.padding(.horizontal, 20).padding(.top, 12)
-            }
+        VStack(spacing: 0) {
+            HStack {
+                Button { if let back { back() } else { dismiss() } } label: {
+                    Label(AppStrings.text("mac.back"), systemImage: "chevron.left")
+                }.keyboardShortcut(cancelAction ? .cancelAction : nil).disabled(busy)
+                Spacer()
+            }.padding(.horizontal, 20).padding(.top, ByoSpace.inset)
+            content
+        }.background(.background).navigationBarBackButtonHidden()
     }
 }
 

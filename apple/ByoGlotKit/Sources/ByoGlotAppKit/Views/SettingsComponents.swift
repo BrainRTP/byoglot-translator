@@ -254,7 +254,7 @@ struct MacModelMenuItems: View {
         ForEach(connections) { connection in
             Section(connection.name) {
                 ForEach((model.models[connection.id] ?? []).filter { query.isEmpty || $0.id.localizedCaseInsensitiveContains(query) }, id: \.id) { info in
-                    Button(info.id) { choose(ModelRef(providerID: info.providerID, id: info.id, variant: "none", connectionId: connection.id)) }
+                    Button(info.id) { choose(ModelRef(providerID: info.providerID, id: info.id, variant: selected?.variant ?? "none", connectionId: connection.id)) }
                         .disabled(selected?.connectionId == connection.id && selected?.providerID == info.providerID && selected?.id == info.id)
                 }
             }

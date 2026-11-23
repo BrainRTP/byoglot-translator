@@ -53,7 +53,7 @@ targets:
     deploymentTarget: '27.0'
     sources:
       - path: Mac
-        excludes: [Info.plist, Mac.entitlements]
+        excludes: [Info.plist, Mac.entitlements, 'FontAwesome/*.svg']
     dependencies:
       - package: ByoGlotKit
         product: ByoGlotMacKit

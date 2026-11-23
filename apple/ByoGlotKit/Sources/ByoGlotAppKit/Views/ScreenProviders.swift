@@ -206,7 +206,7 @@ private struct ProviderKeyScreen: View {
                 }.labelsHidden().textFieldStyle(.roundedBorder).font(.system(.body, design: .monospaced)).focused($keyFocused)
                     .onSubmit { if canCheck { check() } }
                 Button { showKey.toggle() } label: {
-                    Image(showKey ? "fa-eye-slash" : "fa-eye").resizable().scaledToFit().frame(width: 14, height: 14)
+                    Image(showKey ? "fa-eye-slash" : "fa-eye").resizable().scaledToFit().frame(width: 14, height: 14).accessibilityHidden(true)
                 }
                     .accessibilityLabel(AppStrings.text(showKey ? "key.hide" : "key.show"))
                 ByoPasteButton(iconOnly: true, label: "key.paste") { key = $0 }
@@ -237,7 +237,7 @@ private struct ProviderKeyScreen: View {
             }
             #if os(macOS)
             Label { Text(model.keyStatus(connection)) } icon: {
-                Image(keyMissing ? "fa-triangle-exclamation" : "fa-circle-check").resizable().scaledToFit().frame(width: 14, height: 14)
+                Image(keyMissing ? "fa-triangle-exclamation" : "fa-circle-check").resizable().scaledToFit().frame(width: 14, height: 14).accessibilityHidden(true)
             }
                 .foregroundStyle(keyMissing ? ByoColor.error : ByoColor.success)
                 .textSelection(.enabled)

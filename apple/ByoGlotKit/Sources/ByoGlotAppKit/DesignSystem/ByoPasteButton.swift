@@ -30,7 +30,7 @@ private struct MacPasteLabelStyle: LabelStyle {
     let iconOnly: Bool
     func makeBody(configuration: Configuration) -> some View {
         HStack {
-            Image("fa-regular-paste").resizable().scaledToFit().frame(width: 16, height: 16)
+            Image("fa-regular-paste").resizable().scaledToFit().frame(width: 16, height: 16).accessibilityHidden(true)
             if !iconOnly { configuration.title }
         }
     }

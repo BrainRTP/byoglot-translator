@@ -329,6 +329,9 @@ public final class AppModel {
     public func setNetworkAvailable(_ available: Bool) {
         let restored = !online && available
         online = available
+        #if os(macOS)
+        if restored { requestedModelCatalogues.removeAll() }
+        #endif
         if !available && running {
             if let latestChunk { apply(latestChunk) }
             cancelTasks()
@@ -569,9 +572,10 @@ public final class AppModel {
 
     #if os(macOS)
     func warmMissingModels(connectionId: String) async {
-        guard models[connectionId] == nil, catalogueErrors[connectionId] == nil,
+        guard models[connectionId] == nil,
               requestedModelCatalogues.insert(connectionId).inserted else { return }
         await warmModels(connectionId: connectionId)
+        if catalogueErrors[connectionId] != nil { requestedModelCatalogues.remove(connectionId) }
     }
     #endif
 

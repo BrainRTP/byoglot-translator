@@ -35,6 +35,7 @@ public struct ScreenMain: View {
                         .background(ByoColor.muted.opacity(settingsHovered ? 0.18 : 0.1), in: RoundedRectangle(cornerRadius: ByoRadius.group))
                         .contentShape(RoundedRectangle(cornerRadius: ByoRadius.group))
                 }.buttonStyle(.plain).foregroundStyle(ByoColor.text)
+                    .modifier(ByoFocusRing())
                     .onHover { settingsHovered = $0 }.help(AppStrings.text("settings.title"))
                 #else
                 ByoIconButton(title: "settings.title", symbol: "slider.horizontal.3", action: openSettings)

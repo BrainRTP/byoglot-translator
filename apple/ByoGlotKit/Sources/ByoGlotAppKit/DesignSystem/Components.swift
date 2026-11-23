@@ -94,10 +94,9 @@ public struct ByoIconButton: View {
 struct ByoIconLabel: View {
     let image: Image
     @State private var hovered = false
-    init(symbol: String) { image = Image(systemName: symbol) }
     init(image: Image) { self.image = image }
     var body: some View {
-        image.font(.system(size: 20)).frame(width: 44, height: 44)
+        image.accessibilityHidden(true).font(.system(size: 20)).frame(width: 44, height: 44)
             .contentShape(RoundedRectangle(cornerRadius: ByoRadius.control))
             .background(hovered ? ByoColor.accentTint : .clear, in: RoundedRectangle(cornerRadius: ByoRadius.control))
             .onHover { hovered = $0 }
@@ -185,7 +184,7 @@ public struct Banner: View {
         VStack(alignment: .leading, spacing: 8) {
             Label { Text(title) } icon: {
                 #if os(macOS)
-                if warning { Image("fa-triangle-exclamation").resizable().scaledToFit().frame(width: 16, height: 16) }
+                if warning { Image("fa-triangle-exclamation").resizable().scaledToFit().frame(width: 16, height: 16).accessibilityHidden(true) }
                 else { Image(systemName: "exclamationmark.circle") }
                 #else
                 Image(systemName: warning ? "exclamationmark.triangle" : "exclamationmark.circle")

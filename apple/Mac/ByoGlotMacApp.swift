@@ -56,6 +56,10 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
         let isDefaultLaunch = notification.userInfo?[NSApplication.launchIsDefaultUserInfoKey] as? Bool == true
         let launchEvent = NSAppleEventManager.shared().currentAppleEvent
         let backgroundLaunch = launchEvent?.paramDescriptor(forKeyword: AEKeyword(keyAELaunchedAsLogInItem)) != nil || launchEvent?.paramDescriptor(forKeyword: AEKeyword(keyAELaunchedAsServiceItem)) != nil
+        if isDefaultLaunch && !backgroundLaunch {
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate()
+        }
         Task {
             await model.refresh()
             if isDefaultLaunch && !backgroundLaunch { showPrimaryWindow() }
@@ -144,14 +148,14 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
         }
         translatorWindow?.deminiaturize(nil)
         translatorWindow?.makeKeyAndOrderFront(nil)
-        DispatchQueue.main.async { NSApp.activate(ignoringOtherApps: true) }
+        NSApp.activate()
     }
 
     func showSettings(_ tab: MacSettingsTab? = nil) {
         NSApp.setActivationPolicy(.regular)
         if let tab { UserDefaults.standard.set(tab.rawValue, forKey: "mac.settingsTab") }
         scenes?.environment.openSettings()
-        DispatchQueue.main.async { NSApp.activate(ignoringOtherApps: true) }
+        NSApp.activate()
     }
 }
 

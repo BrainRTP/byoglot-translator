@@ -2228,6 +2228,23 @@
         }
       }
     },
+    "consent.allowShort": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Разрешить"
+          }
+        }
+      }
+    },
     "consent.allow": {
       "extractionState": "manual",
       "localizations": {

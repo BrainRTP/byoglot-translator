@@ -142,15 +142,16 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
             window.setFrameAutosaveName("ByoGlotTranslator")
             translatorWindow = window
         }
+        translatorWindow?.deminiaturize(nil)
         translatorWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate()
+        DispatchQueue.main.async { NSApp.activate(ignoringOtherApps: true) }
     }
 
     func showSettings(_ tab: MacSettingsTab? = nil) {
         NSApp.setActivationPolicy(.regular)
         if let tab { UserDefaults.standard.set(tab.rawValue, forKey: "mac.settingsTab") }
         scenes?.environment.openSettings()
-        NSApp.activate()
+        DispatchQueue.main.async { NSApp.activate(ignoringOtherApps: true) }
     }
 }
 

@@ -35,7 +35,7 @@ struct ByoGlotApp: App {
 
 private struct RootView: View {
     @Bindable var model: AppModel
-    @SceneStorage("root.tab") private var tab = "translate"
+    @State private var showingSettings = false
     @State private var settingsPath: [SettingsDestination] = []
     @State private var network = NetworkObserver()
     @State private var privacyCover = PrivacyCover()
@@ -49,14 +49,25 @@ private struct RootView: View {
                 Banner(title: AppStrings.text("err.generic"), message: AppStrings.error(error), actionTitle: "err.retry") { Task { await model.refresh() } }.padding(16)
             } else if !model.loaded { ProgressView() }
             else {
-                TabView(selection: $tab) {
-                    Tab(AppStrings.text("main.title"), systemImage: "character.bubble", value: "translate") {
-                        NavigationStack { ScreenMain(model: model, openProviders: { showSettings(.providers) }, openSettings: { tab = "settings"; settingsPath = [] }, openTemplates: { showSettings(.templates) }) }
+                if showingSettings {
+                    NavigationStack(path: $settingsPath) {
+                        ScreenSettings(model: model)
+                            .toolbar {
+                                if settingsPath.isEmpty {
+                                    ToolbarItem(placement: .topBarLeading) {
+                                        Button { showingSettings = false } label: {
+                                            HStack(spacing: ByoSpace.tiny) {
+                                                Image(systemName: "chevron.left").accessibilityHidden(true)
+                                                Text(AppStrings.text("mac.back"))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                     }
-                    Tab(AppStrings.text("settings.title"), systemImage: "slider.horizontal.3", value: "settings") {
-                        NavigationStack(path: $settingsPath) { ScreenSettings(model: model) }
-                    }
-                }.tabViewStyle(.sidebarAdaptable)
+                } else {
+                    NavigationStack { ScreenMain(model: model, openProviders: { showSettings(.providers) }, openSettings: { showingSettings = true; settingsPath = [] }, openTemplates: { showSettings(.templates) }) }
+                }
             }
         }.preferredColorScheme(scheme).environment(\.locale, model.interfaceLanguage == "system" ? .current : Locale(identifier: model.interfaceLanguage))
             .background(PrivacySceneAttachment(cover: privacyCover).frame(width: 0, height: 0))
@@ -77,7 +88,7 @@ private struct RootView: View {
             }
     }
     private func showSettings(_ destination: SettingsDestination) {
-        tab = "settings"
+        showingSettings = true
         settingsPath = [destination]
     }
 

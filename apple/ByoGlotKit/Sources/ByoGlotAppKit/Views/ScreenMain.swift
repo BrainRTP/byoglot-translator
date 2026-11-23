@@ -94,11 +94,16 @@ public struct ScreenMain: View {
     private var modelButton: some View {
         #if os(macOS)
         Menu {
+            Menu(AppStrings.text("model.effort")) {
+                EffortSegment(model: model, ref: model.model, choose: model.chooseModel)
+            }
+            Divider()
             MacModelMenuItems(model: model, connections: model.settings.connections, selected: model.model) { model.chooseModel($0) }
             Divider()
             Button(AppStrings.text("mac.searchModels")) { sheet = "model" }
         } label: { Text(model.model.map { "\($0.id) · \(AppStrings.effort($0.variant))" } ?? AppStrings.text("main.chooseModel")).lineLimit(1) }
             .accessibilityLabel(AppStrings.text("model.title"))
+            .task { for connection in model.settings.connections { await model.warmMissingModels(connectionId: connection.id) } }
         #else
         Button { sheet = "model" } label: {
             Text(model.model.map { "\($0.id) · \(AppStrings.effort($0.variant))" } ?? AppStrings.text("main.chooseModel"))

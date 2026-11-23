@@ -1,0 +1,12 @@
+Font Awesome Free 7.3.1 by Fonticons, Inc.
+https://fontawesome.com
+
+Icons: copy, arrow-up-right-from-square (Classic Solid).
+Source: https://github.com/FortAwesome/Font-Awesome/tree/7.3.1/svgs/solid
+Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).
+https://creativecommons.org/licenses/by/4.0/
+https://fontawesome.com/license/free
+
+The original SVG files and upstream LICENSE.txt are included in this directory. SVG files were converted to PDF for the macOS asset catalog; geometry is unchanged and color is applied at render time. No Font Awesome fonts or code are included.
+
+To regenerate each PDF, run rsvg-convert --format pdf --dpi-x 72 --dpi-y 72 --width 20 --height 20 --keep-aspect-ratio --output <asset.pdf> <source.svg>.

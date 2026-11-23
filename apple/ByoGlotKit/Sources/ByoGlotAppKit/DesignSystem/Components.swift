@@ -67,18 +67,23 @@ public struct ByoButton: View {
 
 public struct ByoIconButton: View {
     let title: String
-    let symbol: String
+    let image: Image
     let action: () -> Void
     public init(title: String, symbol: String, action: @escaping () -> Void) {
-        self.title = title; self.symbol = symbol; self.action = action
+        self.title = title; self.image = Image(systemName: symbol); self.action = action
     }
+    #if os(macOS)
+    public init(title: String, image: Image, action: @escaping () -> Void) {
+        self.title = title; self.image = image; self.action = action
+    }
+    #endif
     public var body: some View {
         #if os(macOS)
-        Button(action: action) { ByoIconLabel(symbol: symbol) }
+        Button(action: action) { ByoIconLabel(image: image) }
             .buttonStyle(.plain).foregroundStyle(ByoColor.text)
             .accessibilityLabel(AppStrings.text(title)).help(AppStrings.text(title)).modifier(ByoFocusRing())
         #else
-        Button(action: action) { Image(systemName: symbol).font(.system(size: 20)).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
+        Button(action: action) { image.font(.system(size: 20)).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
             .buttonStyle(.plain).foregroundStyle(ByoColor.text)
             .accessibilityLabel(AppStrings.text(title)).modifier(ByoFocusRing())
         #endif
@@ -87,10 +92,12 @@ public struct ByoIconButton: View {
 
 #if os(macOS)
 struct ByoIconLabel: View {
-    let symbol: String
+    let image: Image
     @State private var hovered = false
+    init(symbol: String) { image = Image(systemName: symbol) }
+    init(image: Image) { self.image = image }
     var body: some View {
-        Image(systemName: symbol).font(.system(size: 20)).frame(width: 44, height: 44)
+        image.font(.system(size: 20)).frame(width: 44, height: 44)
             .contentShape(RoundedRectangle(cornerRadius: ByoRadius.control))
             .background(hovered ? ByoColor.accentTint : .clear, in: RoundedRectangle(cornerRadius: ByoRadius.control))
             .onHover { hovered = $0 }

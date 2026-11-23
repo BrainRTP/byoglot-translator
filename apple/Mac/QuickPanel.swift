@@ -147,9 +147,9 @@ private struct QuickPanelContent: View {
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }.frame(minHeight: 100, maxHeight: .infinity)
             HStack(spacing: ByoSpace.small) {
-                ByoButton("main.copy", action: coordinator.copyResult).fixedSize(horizontal: true, vertical: false).disabled(!hasResult)
+                ByoIconButton(title: "main.copy", image: Image("fa-copy"), action: coordinator.copyResult).disabled(!hasResult)
                 Spacer(minLength: 0)
-                ByoButton("mac.openInTranslator", action: coordinator.openInTranslator).lineLimit(1).minimumScaleFactor(0.8).disabled(coordinator.source == nil)
+                ByoIconButton(title: "mac.openInTranslator", image: Image("fa-arrow-up-right-from-square"), action: coordinator.openInTranslator).disabled(coordinator.source == nil)
             }
         }
         .padding(ByoSpace.screen)

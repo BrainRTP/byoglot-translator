@@ -67,6 +67,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.brainrtp.byoglot.desktop
         PRODUCT_NAME: ByoGlot
+        ASSETCATALOG_COMPILER_APPICON_NAME: ''
         ARCHS: arm64
         CODE_SIGN_ENTITLEMENTS: Mac/Mac.entitlements
         INFOPLIST_FILE: $(DERIVED_FILE_DIR)/ByoGlot-Info.plist

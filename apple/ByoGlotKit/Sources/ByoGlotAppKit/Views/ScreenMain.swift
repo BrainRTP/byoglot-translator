@@ -126,7 +126,15 @@ public struct LangBar: View {
             if typeSize.isAccessibilitySize {
                 VStack(spacing: 2) { sourceMenu; swapButton; targetMenu }
             } else {
+                #if os(macOS)
+                HStack(spacing: 2) {
+                    sourceMenu.frame(minWidth: 0, maxWidth: .infinity)
+                    swapButton
+                    targetMenu.frame(minWidth: 0, maxWidth: .infinity)
+                }
+                #else
                 HStack(spacing: 2) { sourceMenu; swapButton; targetMenu }
+                #endif
             }
         }.padding(2).frame(minHeight: 48)
             .overlay { RoundedRectangle(cornerRadius: ByoRadius.panel).stroke(ByoColor.border).allowsHitTesting(false) }

@@ -108,7 +108,7 @@ private struct QuickPanelContent: View {
                 .accessibilityLabel(AppStrings.text("main.template"))
                 .disabled(coordinator.source == nil)
                 Spacer(minLength: ByoSpace.small)
-                ByoIconButton(title: coordinator.pinned ? "mac.unpin" : "mac.pin", symbol: coordinator.pinned ? "pin.fill" : "pin") { coordinator.pinned.toggle() }
+                ByoIconButton(title: coordinator.pinned ? "mac.unpin" : "mac.pin", image: Image(coordinator.pinned ? "fa-thumbtack-slash" : "fa-thumbtack")) { coordinator.pinned.toggle() }
                     .accessibilityValue(AppStrings.text(coordinator.pinned ? "mac.pinned" : "mac.unpinned"))
             }.frame(height: 44)
             Text(coordinator.source ?? " ").modifier(ByoTypography(15, relativeTo: .caption))

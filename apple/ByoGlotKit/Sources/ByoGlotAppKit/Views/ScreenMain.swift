@@ -30,7 +30,7 @@ public struct ScreenMain: View {
             ToolbarItem(placement: .primaryAction) {
                 #if os(macOS)
                 Button(action: openSettings) {
-                    Label(AppStrings.text("settings.title"), systemImage: "slider.horizontal.3")
+                    Label(AppStrings.text("settings.title"), image: "fa-sliders")
                         .labelStyle(.iconOnly).frame(width: 36, height: 36)
                         .background(ByoColor.muted.opacity(settingsHovered ? 0.3 : 0.18), in: Circle())
                         .contentShape(Circle())
@@ -163,7 +163,11 @@ public struct LangBar: View {
         #endif
     }
     private var swapButton: some View {
+        #if os(macOS)
+        ByoIconButton(title: "main.swap", image: Image("fa-arrow-right-arrow-left"), action: swap).disabled(!model.canSwap)
+        #else
         ByoIconButton(title: "main.swap", symbol: "arrow.left.arrow.right", action: swap).disabled(!model.canSwap)
+        #endif
     }
     private var targetMenu: some View {
         #if os(macOS)
@@ -300,7 +304,11 @@ public struct TranslatorBlock: View {
         if text.isEmpty {
             ByoPasteButton { value in text = value; model.edit(value, pasted: true) }
         } else {
+            #if os(macOS)
+            ByoIconButton(title: "main.clear", image: Image("fa-x")) { text = ""; model.edit("") }
+            #else
             ByoIconButton(title: "main.clear", symbol: "xmark") { text = ""; model.edit("") }
+            #endif
         }
     }
     private var output: some View {
@@ -316,15 +324,22 @@ public struct TranslatorBlock: View {
             }.accessibilityLabel(AppStrings.text("main.title")).accessibilityElement(children: .contain)
             HStack(spacing: outputActionSpacing) {
                 Spacer(minLength: 0)
-                if model.running { ByoButton("main.stop", icon: "stop", action: model.stop) }
-                else {
-                    ByoIconButton(title: "main.copy", symbol: "doc.on.doc", action: copy).disabled(model.result.isEmpty)
+                if model.running {
                     #if os(macOS)
+                    ByoIconButton(title: "main.stop", image: Image("fa-stop"), action: model.stop)
+                    #else
+                    ByoButton("main.stop", icon: "stop", action: model.stop)
+                    #endif
+                }
+                else {
+                    #if os(macOS)
+                    ByoIconButton(title: "main.copy", image: Image("fa-copy"), action: copy).disabled(model.result.isEmpty)
                     ShareLink(item: model.result) { ByoIconLabel(symbol: "square.and.arrow.up") }
                         .buttonStyle(.plain).foregroundStyle(ByoColor.text)
                         .accessibilityLabel(AppStrings.text("main.share")).help(AppStrings.text("main.share"))
                         .disabled(model.result.isEmpty).modifier(ByoFocusRing())
                     #else
+                    ByoIconButton(title: "main.copy", symbol: "doc.on.doc", action: copy).disabled(model.result.isEmpty)
                     ShareLink(item: model.result) { Image(systemName: "square.and.arrow.up").font(.system(size: 20)).frame(minWidth: 44, minHeight: 44) }
                         .foregroundStyle(model.result.isEmpty ? ByoColor.strongBorder : ByoColor.text)
                         .accessibilityLabel(AppStrings.text("main.share")).disabled(model.result.isEmpty).modifier(ByoFocusRing())

@@ -205,7 +205,9 @@ private struct ProviderKeyScreen: View {
                     else { SecureField(AppStrings.text("key.label"), text: $key) }
                 }.labelsHidden().textFieldStyle(.roundedBorder).font(.system(.body, design: .monospaced)).focused($keyFocused)
                     .onSubmit { if canCheck { check() } }
-                Button { showKey.toggle() } label: { Image(systemName: showKey ? "eye.slash" : "eye") }
+                Button { showKey.toggle() } label: {
+                    Image(showKey ? "fa-eye-slash" : "fa-eye").resizable().scaledToFit().frame(width: 14, height: 14)
+                }
                     .accessibilityLabel(AppStrings.text(showKey ? "key.hide" : "key.show"))
                 ByoPasteButton(iconOnly: true, label: "key.paste") { key = $0 }
             }.disabled(checking)

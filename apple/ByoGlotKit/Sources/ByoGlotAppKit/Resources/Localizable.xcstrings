@@ -7,13 +7,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Icons copy and arrow-up-right-from-square: Font Awesome Free 7.3.1 by Fonticons, Inc. SVG converted to PDF; geometry unchanged, color applied at render time."
+            "value": "Icons: Font Awesome Free 7.3.1 by Fonticons, Inc. SVG converted to PDF; geometry unchanged, color applied at render time."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Иконки copy и arrow-up-right-from-square: Font Awesome Free 7.3.1, Fonticons, Inc. SVG преобразованы в PDF; геометрия не изменена, цвет задается при отрисовке."
+            "value": "Иконки: Font Awesome Free 7.3.1, Fonticons, Inc. SVG преобразованы в PDF; геометрия не изменена, цвет задается при отрисовке."
           }
         }
       }

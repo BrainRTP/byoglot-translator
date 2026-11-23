@@ -1,8 +1,10 @@
 Font Awesome Free 7.3.1 by Fonticons, Inc.
 https://fontawesome.com
 
-Icons: copy, arrow-up-right-from-square (Classic Solid).
+Classic Solid icons: copy, arrow-up-right-from-square, sliders, arrow-right-arrow-left, x, stop, thumbtack, thumbtack-slash, eye, eye-slash, server, circle-info.
+Classic Regular icons: paste, pen-to-square.
 Source: https://github.com/FortAwesome/Font-Awesome/tree/7.3.1/svgs/solid
+Source: https://github.com/FortAwesome/Font-Awesome/tree/7.3.1/svgs/regular
 Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).
 https://creativecommons.org/licenses/by/4.0/
 https://fontawesome.com/license/free

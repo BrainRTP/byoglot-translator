@@ -14,6 +14,9 @@ public struct ScreenTemplateSettings: View {
     public var body: some View {
         SettingsPage(title: "settings.templates") {
             #if os(macOS)
+            Section {
+                NavigationLink(AppStrings.text("settings.prompt")) { ScreenLanguagePrompt(model: model) }
+            }
             Section { ByoTextField("template.search", text: $query) }
             ForEach([true, false], id: \.self) { builtin in
                 Section(AppStrings.text(builtin ? "template.builtins" : "template.own")) {

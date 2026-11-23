@@ -59,7 +59,6 @@ private struct MacGeneralSettings: View {
             }
             Section {
                 NavigationLink(AppStrings.text("settings.language")) { ScreenLanguageSettings(model: model).modifier(MacSettingsNavigation()) }
-                NavigationLink(AppStrings.text("settings.prompt")) { ScreenLanguagePrompt(model: model) }
             }
         }
         .formStyle(.grouped)

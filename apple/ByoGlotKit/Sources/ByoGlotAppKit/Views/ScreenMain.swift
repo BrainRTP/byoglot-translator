@@ -12,6 +12,9 @@ public struct ScreenMain: View {
     @State private var text = ""
     @SceneStorage("main.sheet") private var sheet = ""
     @State private var afterSheet: (() -> Void)?
+    #if os(macOS)
+    @State private var settingsHovered = false
+    #endif
     @Environment(\.dynamicTypeSize) private var typeSize
     public init(model: AppModel, openProviders: @escaping () -> Void, openSettings: (() -> Void)? = nil, openTemplates: (() -> Void)? = nil) {
         self.model = model; self.openProviders = openProviders; self.openSettings = openSettings ?? openProviders; self.openTemplates = openTemplates
@@ -26,12 +29,20 @@ public struct ScreenMain: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 #if os(macOS)
-                Button(action: openSettings) { Label(AppStrings.text("settings.title"), systemImage: "slider.horizontal.3") }
-                    .labelStyle(.iconOnly).controlSize(.regular).help(AppStrings.text("settings.title"))
+                Button(action: openSettings) {
+                    Label(AppStrings.text("settings.title"), systemImage: "slider.horizontal.3")
+                        .labelStyle(.iconOnly).frame(width: 36, height: 36)
+                        .background(ByoColor.muted.opacity(settingsHovered ? 0.3 : 0.18), in: Circle())
+                        .contentShape(Circle())
+                }.buttonStyle(.plain).foregroundStyle(ByoColor.text)
+                    .onHover { settingsHovered = $0 }.help(AppStrings.text("settings.title"))
                 #else
                 ByoIconButton(title: "settings.title", symbol: "slider.horizontal.3", action: openSettings)
                 #endif
             }
+            #if os(macOS)
+            .sharedBackgroundVisibility(.hidden)
+            #endif
         }
         .sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } }), onDismiss: {
             let action = afterSheet
@@ -53,7 +64,7 @@ public struct ScreenMain: View {
         VStack(spacing: 0) {
             #if os(macOS)
             HStack(spacing: ByoSpace.small) { templateButton; changedChip; Spacer(minLength: 0); modelButton }
-                .padding(.horizontal, ByoSpace.screen).padding(.bottom, ByoSpace.tiny)
+                .padding(.horizontal, ByoSpace.screen).padding(.vertical, ByoSpace.inset)
             #else
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: ByoSpace.small) { templateButton; changedChip; Spacer(minLength: 0); modelButton }
@@ -145,6 +156,7 @@ public struct LangBar: View {
         Menu {
             MacLanguagePicker(label: "lang.srcTitle", selection: Binding(get: { model.sourceLang }, set: { code in Task { await model.chooseSource(code) } }), source: true).pickerStyle(.inline)
         } label: { languageLabel(sourceLabel) }
+            .menuIndicator(.hidden)
             .accessibilityLabel(AppStrings.text("lang.srcTitle") + ": " + sourceLabel)
         #else
         Button { openLanguage(true) } label: { languageLabel(sourceLabel) }.buttonStyle(.plain)
@@ -159,6 +171,7 @@ public struct LangBar: View {
         Menu {
             MacLanguagePicker(label: "lang.dstTitle", selection: Binding(get: { model.targetLang }, set: { code in Task { await model.chooseTarget(code) } })).pickerStyle(.inline)
         } label: { languageLabel(AppStrings.language(model.targetLang)) }
+            .menuIndicator(.hidden)
             .accessibilityLabel(AppStrings.text("lang.dstTitle") + ": " + AppStrings.language(model.targetLang))
         #else
         Button { openLanguage(false) } label: { languageLabel(AppStrings.language(model.targetLang)) }.buttonStyle(.plain)
@@ -185,23 +198,28 @@ public struct TranslatorBlock: View {
         self.model = model; _text = text; self.openProviders = openProviders; self.openModels = openModels; self.openLanguage = openLanguage
     }
     public var body: some View {
+        #if os(macOS)
+        let blockSpacing = ByoSpace.screen
+        #else
+        let blockSpacing = ByoSpace.small
+        #endif
         Group {
             if typeSize.isAccessibilitySize {
-                VStack(spacing: ByoSpace.small) {
+                VStack(spacing: blockSpacing) {
                     languages
                     source.frame(height: 340)
                     output.frame(minHeight: 420)
                 }
             } else {
                 GeometryReader { geometry in
-                    let available = max(260, geometry.size.height - 68)
+                    let available = max(260, geometry.size.height - 52 - blockSpacing * 2)
                     #if os(macOS)
                     let fraction = 0.5
                     #else
                     let fraction = editing ? 0.4 : 0.5
                     #endif
                     ScrollView {
-                        VStack(spacing: ByoSpace.small) {
+                        VStack(spacing: blockSpacing) {
                             languages
                             source.frame(height: max(120, available * fraction))
                             output.frame(height: max(180, available * (1 - fraction)))

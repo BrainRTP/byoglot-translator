@@ -26,6 +26,7 @@ public struct ScreenMain: View {
         }
         .background(ByoColor.background).foregroundStyle(ByoColor.text)
         .navigationTitle(AppStrings.text("main.title"))
+        #if os(macOS)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 #if os(macOS)
@@ -45,6 +46,9 @@ public struct ScreenMain: View {
             .sharedBackgroundVisibility(.hidden)
             #endif
         }
+        #else
+        .toolbar(.hidden, for: .navigationBar)
+        #endif
         .sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } }), onDismiss: {
             let action = afterSheet
             afterSheet = nil
@@ -63,6 +67,13 @@ public struct ScreenMain: View {
     }
     private var mainContent: some View {
         VStack(spacing: 0) {
+            #if os(iOS)
+            HStack {
+                Text(AppStrings.text("main.title")).modifier(ByoTypography(34, relativeTo: .largeTitle, weight: .bold)).accessibilityAddTraits(.isHeader)
+                Spacer()
+                ByoIconButton(title: "settings.title", symbol: "slider.horizontal.3", action: openSettings)
+            }.padding(.horizontal, ByoSpace.screen).padding(.vertical, ByoSpace.tiny)
+            #endif
             #if os(macOS)
             HStack(spacing: ByoSpace.small) { templateButton; changedChip; Spacer(minLength: 0); modelButton }
                 .padding(.horizontal, ByoSpace.screen).padding(.vertical, ByoSpace.inset)

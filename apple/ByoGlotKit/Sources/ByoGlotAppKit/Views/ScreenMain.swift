@@ -52,10 +52,8 @@ public struct ScreenMain: View {
     private var mainContent: some View {
         VStack(spacing: 0) {
             #if os(macOS)
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: ByoSpace.small) { templateButton; changedChip; Spacer(minLength: 0) }
-                modelButton.frame(maxWidth: .infinity, alignment: .leading)
-            }.padding(.horizontal, ByoSpace.screen).padding(.bottom, ByoSpace.tiny)
+            HStack(spacing: ByoSpace.small) { templateButton; changedChip; Spacer(minLength: 0); modelButton }
+                .padding(.horizontal, ByoSpace.screen).padding(.bottom, ByoSpace.tiny)
             #else
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: ByoSpace.small) { templateButton; changedChip; Spacer(minLength: 0); modelButton }
@@ -94,9 +92,7 @@ public struct ScreenMain: View {
     private var modelButton: some View {
         #if os(macOS)
         Menu {
-            Menu(AppStrings.text("model.effort")) {
-                EffortSegment(model: model, ref: model.model, choose: model.chooseModel)
-            }
+            EffortSegment(model: model, ref: model.model, choose: model.chooseModel)
             Divider()
             MacModelMenuItems(model: model, connections: model.settings.connections, selected: model.model) { model.chooseModel($0) }
             Divider()

@@ -156,7 +156,6 @@ public struct LangBar: View {
         Menu {
             MacLanguagePicker(label: "lang.srcTitle", selection: Binding(get: { model.sourceLang }, set: { code in Task { await model.chooseSource(code) } }), source: true).pickerStyle(.inline)
         } label: { languageLabel(sourceLabel) }
-            .menuIndicator(.hidden)
             .accessibilityLabel(AppStrings.text("lang.srcTitle") + ": " + sourceLabel)
         #else
         Button { openLanguage(true) } label: { languageLabel(sourceLabel) }.buttonStyle(.plain)
@@ -171,7 +170,6 @@ public struct LangBar: View {
         Menu {
             MacLanguagePicker(label: "lang.dstTitle", selection: Binding(get: { model.targetLang }, set: { code in Task { await model.chooseTarget(code) } })).pickerStyle(.inline)
         } label: { languageLabel(AppStrings.language(model.targetLang)) }
-            .menuIndicator(.hidden)
             .accessibilityLabel(AppStrings.text("lang.dstTitle") + ": " + AppStrings.language(model.targetLang))
         #else
         Button { openLanguage(false) } label: { languageLabel(AppStrings.language(model.targetLang)) }.buttonStyle(.plain)
@@ -179,8 +177,12 @@ public struct LangBar: View {
         #endif
     }
     private func languageLabel(_ label: String) -> some View {
+        #if os(macOS)
+        Text(label).lineLimit(typeSize.isAccessibilitySize ? 2 : 1).modifier(ByoTypography(15))
+        #else
         HStack(spacing: ByoSpace.tiny) { Text(label).lineLimit(typeSize.isAccessibilitySize ? 2 : 1); Image(systemName: "chevron.down").font(.caption2).accessibilityHidden(true) }
             .modifier(ByoTypography(15)).frame(maxWidth: .infinity, minHeight: 44).padding(.horizontal, ByoSpace.tiny).contentShape(Rectangle())
+        #endif
     }
 }
 

@@ -21,7 +21,7 @@ public struct ScreenLanguageSheet: View {
         }.sorted { AppStrings.language($0).localizedStandardCompare(AppStrings.language($1)) == .orderedAscending }
     }
     public var body: some View {
-        ByoBottomSheet(source ? "lang.srcTitle" : "lang.dstTitle", close: close) {
+        ByoBottomSheet(source ? "lang.srcTitle" : "lang.dstTitle", close: close, allowsExpansion: true) {
             VStack(alignment: .leading, spacing: 16) {
                 ByoTextField("lang.search", text: $query)
                 if inherit { row("", title: AppStrings.text("template.inherit")) }
@@ -62,7 +62,7 @@ public struct ScreenModelSheet: View {
         self.model = model; self.selected = selected; self.choose = choose; self.close = close; self.providers = providers
     }
     public var body: some View {
-        ByoBottomSheet("model.title", close: close) {
+        ByoBottomSheet("model.title", close: close, allowsExpansion: true) {
             #if os(macOS)
             Form {
                 Section {
@@ -163,7 +163,7 @@ public struct ScreenParamsSheet: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     public init(model: AppModel, close: @escaping () -> Void, providers: @escaping () -> Void, manageTemplates: (() -> Void)? = nil) { self.model = model; self.close = close; self.providers = providers; self.manageTemplates = manageTemplates }
     public var body: some View {
-        ByoBottomSheet("params.title", close: finish, canClose: !confirming) {
+        ByoBottomSheet("params.title", close: finish, canClose: !confirming, allowsExpansion: true) {
             #if os(macOS)
             Form {
                 Section {

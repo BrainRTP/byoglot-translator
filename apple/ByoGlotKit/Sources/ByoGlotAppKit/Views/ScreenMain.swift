@@ -25,11 +25,10 @@ public struct ScreenMain: View {
             else { mainContent }
         }
         .background(ByoColor.background).foregroundStyle(ByoColor.text)
-        .navigationTitle(AppStrings.text("main.title"))
         #if os(macOS)
+        .navigationTitle(AppStrings.text("main.title"))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                #if os(macOS)
                 Button(action: openSettings) {
                     Label(AppStrings.text("settings.title"), image: "fa-sliders")
                         .labelStyle(.iconOnly).frame(width: 36, height: 36)
@@ -38,13 +37,8 @@ public struct ScreenMain: View {
                 }.buttonStyle(.plain).foregroundStyle(ByoColor.text)
                     .modifier(ByoFocusRing())
                     .onHover { settingsHovered = $0 }.help(AppStrings.text("settings.title"))
-                #else
-                ByoIconButton(title: "settings.title", symbol: "slider.horizontal.3", action: openSettings)
-                #endif
             }
-            #if os(macOS)
             .sharedBackgroundVisibility(.hidden)
-            #endif
         }
         #else
         .toolbar(.hidden, for: .navigationBar)
@@ -340,7 +334,7 @@ public struct TranslatorBlock: View {
                     #if os(macOS)
                     ByoIconButton(title: "main.stop", image: Image("fa-stop"), action: model.stop)
                     #else
-                    ByoButton("main.stop", icon: "stop", action: model.stop)
+                    ByoButton("main.stop", icon: "stop", action: model.stop).fixedSize()
                     #endif
                 }
                 else {

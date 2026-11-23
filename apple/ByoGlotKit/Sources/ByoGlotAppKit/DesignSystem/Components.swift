@@ -48,7 +48,7 @@ public struct ByoButton: View {
             #if os(macOS)
             .frame(maxWidth: kind == .primary ? .infinity : nil, minHeight: 48)
             #else
-            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 48)
+            .frame(minWidth: 0, maxWidth: kind == .text ? nil : .infinity, minHeight: 48, alignment: kind == .text ? .leading : .center)
             #endif
             .padding(.horizontal, kind == .text ? 8 : 18)
             .contentShape(Rectangle())
@@ -71,6 +71,9 @@ public struct ByoButton: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay { RoundedRectangle(cornerRadius: 6).stroke(kind == .text ? .clear : !enabled ? ByoColor.border : kind == .primary ? ByoColor.accent : ByoColor.strongBorder) }
                 .opacity(configuration.isPressed ? 0.75 : 1)
+                #if os(iOS)
+                .opacity(!enabled && kind == .ordinary ? 0.5 : 1)
+                #endif
                 .modifier(ByoFocusRing())
         }
     }
@@ -250,6 +253,7 @@ public struct ByoBottomSheet<Content: View>: View {
     let title: String
     let close: () -> Void
     let canClose: Bool
+    let allowsExpansion: Bool
     let content: Content
     #if os(iOS)
     @State private var headerHeight: CGFloat?
@@ -261,8 +265,8 @@ public struct ByoBottomSheet<Content: View>: View {
         return .height(min(headerHeight + contentHeight, available * 0.5))
     }
     #endif
-    public init(_ title: String, close: @escaping () -> Void, canClose: Bool = true, @ViewBuilder content: () -> Content) {
-        self.title = title; self.close = close; self.canClose = canClose; self.content = content()
+    public init(_ title: String, close: @escaping () -> Void, canClose: Bool = true, allowsExpansion: Bool = false, @ViewBuilder content: () -> Content) {
+        self.title = title; self.close = close; self.canClose = canClose; self.allowsExpansion = allowsExpansion; self.content = content()
     }
     public var body: some View {
         #if os(macOS)
@@ -288,12 +292,15 @@ public struct ByoBottomSheet<Content: View>: View {
             }.onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { headerHeight = $0 }
             ScrollView {
                 content.padding(ByoSpace.screen).frame(maxWidth: .infinity, alignment: .leading)
-                    .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { contentHeight = $0 }
+                    .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) {
+                        if !allowsExpansion || contentHeight == nil { contentHeight = $0 }
+                    }
             }
         }.background(ByoColor.background).foregroundStyle(ByoColor.text)
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16))
             .shadow(color: ByoColor.shadow, radius: 10, y: 6)
-            .presentationDetents([fittedDetent]).presentationDragIndicator(.hidden).presentationCornerRadius(ByoRadius.sheet)
+            .presentationSizing(.fitted)
+            .presentationDetents(allowsExpansion ? [fittedDetent, .large] : [fittedDetent]).presentationDragIndicator(.hidden).presentationCornerRadius(ByoRadius.sheet)
             .accessibilityAddTraits(.isModal)
         #endif
     }

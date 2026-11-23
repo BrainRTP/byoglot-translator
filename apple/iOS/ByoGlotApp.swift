@@ -58,7 +58,7 @@ private struct RootView: View {
                                         Button { showingSettings = false } label: {
                                             HStack(spacing: ByoSpace.tiny) {
                                                 Image(systemName: "chevron.left").accessibilityHidden(true)
-                                                Text(AppStrings.text("mac.back"))
+                                                Text(AppStrings.text("common.back"))
                                             }
                                         }
                                     }

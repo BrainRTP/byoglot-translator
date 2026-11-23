@@ -185,15 +185,21 @@ private struct ProviderKeyScreen: View {
                             .keyboardShortcut(.defaultAction)
                         ByoButton("common.cancel") { consentOrigin = nil }
                         #else
-                        HStack(spacing: ByoSpace.small) {
-                            ByoButton("common.cancel") { consentOrigin = nil }
-                            ByoButton("consent.allowShort", kind: .primary) { consentOrigin = nil; save(consent: true) }
+                        ViewThatFits {
+                            HStack(spacing: ByoSpace.small) { consentActions }
+                            VStack(spacing: ByoSpace.small) { consentActions }
                         }
                         #endif
                     }
                 }
             }
     }
+    #if os(iOS)
+    @ViewBuilder private var consentActions: some View {
+        ByoButton("common.cancel") { consentOrigin = nil }
+        ByoButton("consent.allowShort", kind: .primary) { consentOrigin = nil; save(consent: true) }
+    }
+    #endif
     private func keyFailure(_ failure: RunnerError) -> some View {
         let network = failure == .backend(BackendError(kind: .offline))
         return Banner(title: authError ? AppStrings.text("key.bad") : network ? AppStrings.text("err.net.t") : failureTitle, message: authError ? AppStrings.text("providers.badBody") : network ? AppStrings.text("providers.netBody") : AppStrings.error(failure), actionTitle: "err.retry", action: check)
@@ -293,7 +299,10 @@ private struct ProviderKeyScreen: View {
             #if os(macOS)
             keyActions(connection)
             #else
-            HStack(spacing: ByoSpace.small) { keyActions(connection) }
+            ViewThatFits {
+                HStack(spacing: ByoSpace.small) { keyActions(connection) }
+                VStack(spacing: ByoSpace.small) { keyActions(connection) }
+            }
             #endif
         }
     }

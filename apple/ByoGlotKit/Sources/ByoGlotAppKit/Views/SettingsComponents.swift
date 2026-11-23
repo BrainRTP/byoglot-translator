@@ -216,15 +216,15 @@ public struct MacSettingsNavigation: ViewModifier {
     let cancelAction: Bool
     public init(busy: Bool = false, cancelAction: Bool = true, back: (() -> Void)? = nil) { self.busy = busy; self.cancelAction = cancelAction; self.back = back }
     public func body(content: Content) -> some View {
-        content.navigationBarBackButtonHidden()
-            .safeAreaInset(edge: .top, spacing: 0) {
-                HStack {
-                    Button { if let back { back() } else { dismiss() } } label: {
-                        Label(AppStrings.text("mac.back"), systemImage: "chevron.left")
-                    }.keyboardShortcut(cancelAction ? .cancelAction : nil).disabled(busy)
-                    Spacer()
-                }.padding(.horizontal, 20).padding(.top, 12)
-            }
+        VStack(spacing: 0) {
+            HStack {
+                Button { if let back { back() } else { dismiss() } } label: {
+                    Label(AppStrings.text("mac.back"), systemImage: "chevron.left")
+                }.keyboardShortcut(cancelAction ? .cancelAction : nil).disabled(busy)
+                Spacer()
+            }.padding(.horizontal, 20).padding(.top, ByoSpace.inset)
+            content
+        }.background(.background).navigationBarBackButtonHidden()
     }
 }
 
@@ -254,7 +254,7 @@ struct MacModelMenuItems: View {
         ForEach(connections) { connection in
             Section(connection.name) {
                 ForEach((model.models[connection.id] ?? []).filter { query.isEmpty || $0.id.localizedCaseInsensitiveContains(query) }, id: \.id) { info in
-                    Button(info.id) { choose(ModelRef(providerID: info.providerID, id: info.id, variant: "none", connectionId: connection.id)) }
+                    Button(info.id) { choose(ModelRef(providerID: info.providerID, id: info.id, variant: selected?.variant ?? "none", connectionId: connection.id)) }
                         .disabled(selected?.connectionId == connection.id && selected?.providerID == info.providerID && selected?.id == info.id)
                 }
             }

@@ -67,18 +67,23 @@ public struct ByoButton: View {
 
 public struct ByoIconButton: View {
     let title: String
-    let symbol: String
+    let image: Image
     let action: () -> Void
     public init(title: String, symbol: String, action: @escaping () -> Void) {
-        self.title = title; self.symbol = symbol; self.action = action
+        self.title = title; self.image = Image(systemName: symbol); self.action = action
     }
+    #if os(macOS)
+    public init(title: String, image: Image, action: @escaping () -> Void) {
+        self.title = title; self.image = image; self.action = action
+    }
+    #endif
     public var body: some View {
         #if os(macOS)
-        Button(action: action) { ByoIconLabel(symbol: symbol) }
+        Button(action: action) { ByoIconLabel(image: image) }
             .buttonStyle(.plain).foregroundStyle(ByoColor.text)
             .accessibilityLabel(AppStrings.text(title)).help(AppStrings.text(title)).modifier(ByoFocusRing())
         #else
-        Button(action: action) { Image(systemName: symbol).font(.system(size: 20)).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
+        Button(action: action) { image.font(.system(size: 20)).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
             .buttonStyle(.plain).foregroundStyle(ByoColor.text)
             .accessibilityLabel(AppStrings.text(title)).modifier(ByoFocusRing())
         #endif
@@ -87,10 +92,11 @@ public struct ByoIconButton: View {
 
 #if os(macOS)
 struct ByoIconLabel: View {
-    let symbol: String
+    let image: Image
     @State private var hovered = false
+    init(image: Image) { self.image = image }
     var body: some View {
-        Image(systemName: symbol).font(.system(size: 20)).frame(width: 44, height: 44)
+        image.accessibilityHidden(true).font(.system(size: 20)).frame(width: 44, height: 44)
             .contentShape(RoundedRectangle(cornerRadius: ByoRadius.control))
             .background(hovered ? ByoColor.accentTint : .clear, in: RoundedRectangle(cornerRadius: ByoRadius.control))
             .onHover { hovered = $0 }
@@ -176,7 +182,14 @@ public struct Banner: View {
     }
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(title, systemImage: warning ? "exclamationmark.triangle" : "exclamationmark.circle")
+            Label { Text(title) } icon: {
+                #if os(macOS)
+                if warning { Image("fa-triangle-exclamation").resizable().scaledToFit().frame(width: 16, height: 16).accessibilityHidden(true) }
+                else { Image(systemName: "exclamationmark.circle") }
+                #else
+                Image(systemName: warning ? "exclamationmark.triangle" : "exclamationmark.circle")
+                #endif
+            }
                 .modifier(ByoTypography(15, weight: .semibold)).foregroundStyle(warning ? ByoColor.warning : ByoColor.error)
             Text(message).modifier(ByoTypography(15)).fixedSize(horizontal: false, vertical: true)
                 #if os(macOS)

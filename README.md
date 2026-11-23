@@ -194,3 +194,5 @@ Native platform folders are reserved for the platform plans. Extension releases 
 ## License
 
 [MIT](LICENSE)
+
+Mac app icons are Font Awesome Free, CC BY 4.0, see [apple/Mac/FontAwesome/NOTICE.txt](apple/Mac/FontAwesome/NOTICE.txt).

@@ -36,6 +36,10 @@ public struct ScreenAbout: View {
                 Link(AppStrings.text("about.privacy"), destination: URL(string: "https://github.com/BrainRTP/byoglot-translator/blob/main/PRIVACY.md")!)
                 Link(AppStrings.text("about.source"), destination: URL(string: "https://github.com/BrainRTP/byoglot-translator")!)
             }
+            Section {
+                Text(AppStrings.text("mac.fontAwesomeAttribution")).foregroundStyle(ByoColor.muted)
+                Link(AppStrings.text("mac.fontAwesomeLicense"), destination: URL(string: "https://fontawesome.com/license/free")!)
+            }
             #else
             Text("ByoGlot").modifier(ByoTypography(22, weight: .semibold))
             Text(AppStrings.format("about.version", ["version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "", "build": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""])).modifier(ByoTypography())

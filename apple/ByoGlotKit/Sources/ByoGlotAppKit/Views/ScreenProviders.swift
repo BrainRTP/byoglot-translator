@@ -205,7 +205,9 @@ private struct ProviderKeyScreen: View {
                     else { SecureField(AppStrings.text("key.label"), text: $key) }
                 }.labelsHidden().textFieldStyle(.roundedBorder).font(.system(.body, design: .monospaced)).focused($keyFocused)
                     .onSubmit { if canCheck { check() } }
-                Button { showKey.toggle() } label: { Image(systemName: showKey ? "eye.slash" : "eye") }
+                Button { showKey.toggle() } label: {
+                    Image(showKey ? "fa-eye-slash" : "fa-eye").resizable().scaledToFit().frame(width: 14, height: 14).accessibilityHidden(true)
+                }
                     .accessibilityLabel(AppStrings.text(showKey ? "key.hide" : "key.show"))
                 ByoPasteButton(iconOnly: true, label: "key.paste") { key = $0 }
             }.disabled(checking)
@@ -233,11 +235,16 @@ private struct ProviderKeyScreen: View {
             if let failure {
                 Banner(title: failureTitle, message: AppStrings.error(failure), actionTitle: "err.retry", action: check)
             }
+            #if os(macOS)
+            Label { Text(model.keyStatus(connection)) } icon: {
+                Image(keyMissing ? "fa-triangle-exclamation" : "fa-circle-check").resizable().scaledToFit().frame(width: 14, height: 14).accessibilityHidden(true)
+            }
+                .foregroundStyle(keyMissing ? ByoColor.error : ByoColor.success)
+                .textSelection(.enabled)
+            #else
             Label(model.keyStatus(connection), systemImage: keyMissing ? "exclamationmark.circle" : "checkmark.circle.fill")
                 .foregroundStyle(keyMissing ? ByoColor.error : ByoColor.success)
-                #if os(macOS)
-                .textSelection(.enabled)
-                #endif
+            #endif
             if hasKey {
                 Text("••••••••").modifier(ByoTypography(14, mono: true))
                     #if os(macOS)

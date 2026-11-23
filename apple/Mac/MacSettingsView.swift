@@ -11,16 +11,16 @@ struct MacSettingsView: View {
     @AppStorage("mac.settingsTab") private var tab: MacSettingsTab = .general
     var body: some View {
         TabView(selection: $tab) {
-            Tab(AppStrings.text("mac.general"), systemImage: "gearshape", value: .general) {
+            Tab(AppStrings.text("mac.general"), image: "fa-sliders", value: .general) {
                 NavigationStack { MacGeneralSettings(model: model, quick: quick) }
             }
-            Tab(AppStrings.text("mac.connections"), systemImage: "network", value: .connections) {
+            Tab(AppStrings.text("mac.connections"), image: "fa-server", value: .connections) {
                 NavigationStack { ScreenProviders(model: model) }
             }
-            Tab(AppStrings.text("settings.templates"), systemImage: "text.badge.star", value: .templates) {
+            Tab(AppStrings.text("settings.templates"), image: "fa-regular-pen-to-square", value: .templates) {
                 NavigationStack { ScreenTemplateSettings(model: model) }
             }
-            Tab(AppStrings.text("settings.about"), systemImage: "info.circle", value: .about) {
+            Tab(AppStrings.text("settings.about"), image: "fa-circle-info", value: .about) {
                 NavigationStack { ScreenAbout(model: model) }
             }
         }.environment(\.byoSettingsControls, true)
@@ -59,7 +59,6 @@ private struct MacGeneralSettings: View {
             }
             Section {
                 NavigationLink(AppStrings.text("settings.language")) { ScreenLanguageSettings(model: model).modifier(MacSettingsNavigation()) }
-                NavigationLink(AppStrings.text("settings.prompt")) { ScreenLanguagePrompt(model: model) }
             }
         }
         .formStyle(.grouped)

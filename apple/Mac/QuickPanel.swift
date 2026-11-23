@@ -108,7 +108,7 @@ private struct QuickPanelContent: View {
                 .accessibilityLabel(AppStrings.text("main.template"))
                 .disabled(coordinator.source == nil)
                 Spacer(minLength: ByoSpace.small)
-                ByoIconButton(title: coordinator.pinned ? "mac.unpin" : "mac.pin", symbol: coordinator.pinned ? "pin.fill" : "pin") { coordinator.pinned.toggle() }
+                ByoIconButton(title: coordinator.pinned ? "mac.unpin" : "mac.pin", image: Image(coordinator.pinned ? "fa-thumbtack-slash" : "fa-thumbtack")) { coordinator.pinned.toggle() }
                     .accessibilityValue(AppStrings.text(coordinator.pinned ? "mac.pinned" : "mac.unpinned"))
             }.frame(height: 44)
             Text(coordinator.source ?? " ").modifier(ByoTypography(15, relativeTo: .caption))
@@ -147,9 +147,9 @@ private struct QuickPanelContent: View {
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }.frame(minHeight: 100, maxHeight: .infinity)
             HStack(spacing: ByoSpace.small) {
-                ByoButton("main.copy", action: coordinator.copyResult).fixedSize(horizontal: true, vertical: false).disabled(!hasResult)
+                ByoIconButton(title: "main.copy", image: Image("fa-copy"), action: coordinator.copyResult).disabled(!hasResult)
                 Spacer(minLength: 0)
-                ByoButton("mac.openInTranslator", action: coordinator.openInTranslator).lineLimit(1).minimumScaleFactor(0.8).disabled(coordinator.source == nil)
+                ByoIconButton(title: "mac.openInTranslator", image: Image("fa-arrow-up-right-from-square"), action: coordinator.openInTranslator).disabled(coordinator.source == nil)
             }
         }
         .padding(ByoSpace.screen)

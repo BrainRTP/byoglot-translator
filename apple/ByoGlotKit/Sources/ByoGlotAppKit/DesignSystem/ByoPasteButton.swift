@@ -14,8 +14,7 @@ public struct ByoPasteButton: View {
         #if canImport(UIKit)
         NativePasteControl(iconOnly: iconOnly, label: label, action: action).fixedSize()
         #else
-        if iconOnly { paste.labelStyle(.iconOnly) }
-        else { paste.labelStyle(.titleAndIcon) }
+        paste.labelStyle(MacPasteLabelStyle(iconOnly: iconOnly))
         #endif
     }
     #if os(macOS)
@@ -25,6 +24,18 @@ public struct ByoPasteButton: View {
     }
     #endif
 }
+
+#if os(macOS)
+private struct MacPasteLabelStyle: LabelStyle {
+    let iconOnly: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        HStack {
+            Image("fa-regular-paste").resizable().scaledToFit().frame(width: 16, height: 16).accessibilityHidden(true)
+            if !iconOnly { configuration.title }
+        }
+    }
+}
+#endif
 
 #if canImport(UIKit)
 private struct NativePasteControl: UIViewRepresentable {

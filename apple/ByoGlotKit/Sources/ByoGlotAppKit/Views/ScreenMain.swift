@@ -12,6 +12,9 @@ public struct ScreenMain: View {
     @State private var text = ""
     @SceneStorage("main.sheet") private var sheet = ""
     @State private var afterSheet: (() -> Void)?
+    #if os(macOS)
+    @State private var settingsHovered = false
+    #endif
     @Environment(\.dynamicTypeSize) private var typeSize
     public init(model: AppModel, openProviders: @escaping () -> Void, openSettings: (() -> Void)? = nil, openTemplates: (() -> Void)? = nil) {
         self.model = model; self.openProviders = openProviders; self.openSettings = openSettings ?? openProviders; self.openTemplates = openTemplates
@@ -26,12 +29,21 @@ public struct ScreenMain: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 #if os(macOS)
-                Button(action: openSettings) { Label(AppStrings.text("settings.title"), systemImage: "slider.horizontal.3") }
-                    .labelStyle(.iconOnly).controlSize(.regular).help(AppStrings.text("settings.title"))
+                Button(action: openSettings) {
+                    Label(AppStrings.text("settings.title"), image: "fa-sliders")
+                        .labelStyle(.iconOnly).frame(width: 36, height: 36)
+                        .background(ByoColor.muted.opacity(settingsHovered ? 0.18 : 0.1), in: RoundedRectangle(cornerRadius: ByoRadius.group))
+                        .contentShape(RoundedRectangle(cornerRadius: ByoRadius.group))
+                }.buttonStyle(.plain).foregroundStyle(ByoColor.text)
+                    .modifier(ByoFocusRing())
+                    .onHover { settingsHovered = $0 }.help(AppStrings.text("settings.title"))
                 #else
                 ByoIconButton(title: "settings.title", symbol: "slider.horizontal.3", action: openSettings)
                 #endif
             }
+            #if os(macOS)
+            .sharedBackgroundVisibility(.hidden)
+            #endif
         }
         .sheet(isPresented: Binding(get: { !sheet.isEmpty }, set: { if !$0 { sheet = "" } }), onDismiss: {
             let action = afterSheet
@@ -52,10 +64,8 @@ public struct ScreenMain: View {
     private var mainContent: some View {
         VStack(spacing: 0) {
             #if os(macOS)
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: ByoSpace.small) { templateButton; changedChip; Spacer(minLength: 0) }
-                modelButton.frame(maxWidth: .infinity, alignment: .leading)
-            }.padding(.horizontal, ByoSpace.screen).padding(.bottom, ByoSpace.tiny)
+            HStack(spacing: ByoSpace.small) { templateButton; changedChip; Spacer(minLength: 0); modelButton }
+                .padding(.horizontal, ByoSpace.screen).padding(.vertical, ByoSpace.inset)
             #else
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: ByoSpace.small) { templateButton; changedChip; Spacer(minLength: 0); modelButton }
@@ -94,11 +104,14 @@ public struct ScreenMain: View {
     private var modelButton: some View {
         #if os(macOS)
         Menu {
+            EffortSegment(model: model, ref: model.model, choose: model.chooseModel)
+            Divider()
             MacModelMenuItems(model: model, connections: model.settings.connections, selected: model.model) { model.chooseModel($0) }
             Divider()
             Button(AppStrings.text("mac.searchModels")) { sheet = "model" }
         } label: { Text(model.model.map { "\($0.id) · \(AppStrings.effort($0.variant))" } ?? AppStrings.text("main.chooseModel")).lineLimit(1) }
             .accessibilityLabel(AppStrings.text("model.title"))
+            .task { for connection in model.settings.connections { await model.warmMissingModels(connectionId: connection.id) } }
         #else
         Button { sheet = "model" } label: {
             Text(model.model.map { "\($0.id) · \(AppStrings.effort($0.variant))" } ?? AppStrings.text("main.chooseModel"))
@@ -125,7 +138,15 @@ public struct LangBar: View {
             if typeSize.isAccessibilitySize {
                 VStack(spacing: 2) { sourceMenu; swapButton; targetMenu }
             } else {
+                #if os(macOS)
+                HStack(spacing: 2) {
+                    sourceMenu.frame(minWidth: 0, maxWidth: .infinity)
+                    swapButton
+                    targetMenu.frame(minWidth: 0, maxWidth: .infinity)
+                }
+                #else
                 HStack(spacing: 2) { sourceMenu; swapButton; targetMenu }
+                #endif
             }
         }.padding(2).frame(minHeight: 48)
             .overlay { RoundedRectangle(cornerRadius: ByoRadius.panel).stroke(ByoColor.border).allowsHitTesting(false) }
@@ -143,7 +164,11 @@ public struct LangBar: View {
         #endif
     }
     private var swapButton: some View {
+        #if os(macOS)
+        ByoIconButton(title: "main.swap", image: Image("fa-arrow-right-arrow-left"), action: swap).disabled(!model.canSwap)
+        #else
         ByoIconButton(title: "main.swap", symbol: "arrow.left.arrow.right", action: swap).disabled(!model.canSwap)
+        #endif
     }
     private var targetMenu: some View {
         #if os(macOS)
@@ -157,8 +182,12 @@ public struct LangBar: View {
         #endif
     }
     private func languageLabel(_ label: String) -> some View {
+        #if os(macOS)
+        Text(label).lineLimit(typeSize.isAccessibilitySize ? 2 : 1).modifier(ByoTypography(15))
+        #else
         HStack(spacing: ByoSpace.tiny) { Text(label).lineLimit(typeSize.isAccessibilitySize ? 2 : 1); Image(systemName: "chevron.down").font(.caption2).accessibilityHidden(true) }
             .modifier(ByoTypography(15)).frame(maxWidth: .infinity, minHeight: 44).padding(.horizontal, ByoSpace.tiny).contentShape(Rectangle())
+        #endif
     }
 }
 
@@ -176,23 +205,28 @@ public struct TranslatorBlock: View {
         self.model = model; _text = text; self.openProviders = openProviders; self.openModels = openModels; self.openLanguage = openLanguage
     }
     public var body: some View {
+        #if os(macOS)
+        let blockSpacing = ByoSpace.screen
+        #else
+        let blockSpacing = ByoSpace.small
+        #endif
         Group {
             if typeSize.isAccessibilitySize {
-                VStack(spacing: ByoSpace.small) {
+                VStack(spacing: blockSpacing) {
                     languages
                     source.frame(height: 340)
                     output.frame(minHeight: 420)
                 }
             } else {
                 GeometryReader { geometry in
-                    let available = max(260, geometry.size.height - 68)
+                    let available = max(260, geometry.size.height - 52 - blockSpacing * 2)
                     #if os(macOS)
                     let fraction = 0.5
                     #else
                     let fraction = editing ? 0.4 : 0.5
                     #endif
                     ScrollView {
-                        VStack(spacing: ByoSpace.small) {
+                        VStack(spacing: blockSpacing) {
                             languages
                             source.frame(height: max(120, available * fraction))
                             output.frame(height: max(180, available * (1 - fraction)))
@@ -271,7 +305,11 @@ public struct TranslatorBlock: View {
         if text.isEmpty {
             ByoPasteButton { value in text = value; model.edit(value, pasted: true) }
         } else {
+            #if os(macOS)
+            ByoIconButton(title: "main.clear", image: Image("fa-x")) { text = ""; model.edit("") }
+            #else
             ByoIconButton(title: "main.clear", symbol: "xmark") { text = ""; model.edit("") }
+            #endif
         }
     }
     private var output: some View {
@@ -287,21 +325,30 @@ public struct TranslatorBlock: View {
             }.accessibilityLabel(AppStrings.text("main.title")).accessibilityElement(children: .contain)
             HStack(spacing: outputActionSpacing) {
                 Spacer(minLength: 0)
-                if model.running { ByoButton("main.stop", icon: "stop", action: model.stop) }
-                else {
-                    ByoIconButton(title: "main.copy", symbol: "doc.on.doc", action: copy).disabled(model.result.isEmpty)
+                if model.running {
                     #if os(macOS)
-                    ShareLink(item: model.result) { ByoIconLabel(symbol: "square.and.arrow.up") }
+                    ByoIconButton(title: "main.stop", image: Image("fa-stop"), action: model.stop)
+                    #else
+                    ByoButton("main.stop", icon: "stop", action: model.stop)
+                    #endif
+                }
+                else {
+                    #if os(macOS)
+                    ByoIconButton(title: "main.copy", image: Image("fa-copy"), action: copy).disabled(model.result.isEmpty)
+                    ShareLink(item: model.result) { ByoIconLabel(image: Image("fa-arrow-up-from-bracket")) }
                         .buttonStyle(.plain).foregroundStyle(ByoColor.text)
                         .accessibilityLabel(AppStrings.text("main.share")).help(AppStrings.text("main.share"))
                         .disabled(model.result.isEmpty).modifier(ByoFocusRing())
+                    ByoIconButton(title: "main.retranslate", image: Image("fa-rotate-right"), action: model.translateAgain).disabled(!model.canTranslate)
+                        .keyboardShortcut(.return, modifiers: .command)
                     #else
+                    ByoIconButton(title: "main.copy", symbol: "doc.on.doc", action: copy).disabled(model.result.isEmpty)
                     ShareLink(item: model.result) { Image(systemName: "square.and.arrow.up").font(.system(size: 20)).frame(minWidth: 44, minHeight: 44) }
                         .foregroundStyle(model.result.isEmpty ? ByoColor.strongBorder : ByoColor.text)
                         .accessibilityLabel(AppStrings.text("main.share")).disabled(model.result.isEmpty).modifier(ByoFocusRing())
-                    #endif
                     ByoIconButton(title: "main.retranslate", symbol: "arrow.clockwise", action: model.translateAgain).disabled(!model.canTranslate)
                         .keyboardShortcut(.return, modifiers: .command)
+                    #endif
                 }
             }.padding(.horizontal, ByoSpace.tiny).padding(.bottom, ByoSpace.tiny)
         }.background(ByoColor.surface, in: RoundedRectangle(cornerRadius: ByoRadius.panel))

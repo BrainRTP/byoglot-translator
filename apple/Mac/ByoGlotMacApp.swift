@@ -56,6 +56,10 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
         let isDefaultLaunch = notification.userInfo?[NSApplication.launchIsDefaultUserInfoKey] as? Bool == true
         let launchEvent = NSAppleEventManager.shared().currentAppleEvent
         let backgroundLaunch = launchEvent?.paramDescriptor(forKeyword: AEKeyword(keyAELaunchedAsLogInItem)) != nil || launchEvent?.paramDescriptor(forKeyword: AEKeyword(keyAELaunchedAsServiceItem)) != nil
+        if isDefaultLaunch && !backgroundLaunch {
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate()
+        }
         Task {
             await model.refresh()
             if isDefaultLaunch && !backgroundLaunch { showPrimaryWindow() }
@@ -142,6 +146,7 @@ final class ByoGlotMacApp: NSObject, NSApplicationDelegate {
             window.setFrameAutosaveName("ByoGlotTranslator")
             translatorWindow = window
         }
+        translatorWindow?.deminiaturize(nil)
         translatorWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate()
     }

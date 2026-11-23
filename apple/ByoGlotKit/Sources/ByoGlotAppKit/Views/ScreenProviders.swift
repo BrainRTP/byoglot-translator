@@ -180,15 +180,26 @@ private struct ProviderKeyScreen: View {
                 ByoBottomSheet("consent.title", close: { consentOrigin = nil }) {
                     VStack(alignment: .leading, spacing: 16) {
                         Text(AppStrings.format("consent.body", ["origin": consentOrigin ?? ""]))
+                        #if os(macOS)
                         ByoButton("consent.allow", kind: .primary) { consentOrigin = nil; save(consent: true) }
-                            #if os(macOS)
                             .keyboardShortcut(.defaultAction)
-                            #endif
                         ByoButton("common.cancel") { consentOrigin = nil }
+                        #else
+                        ViewThatFits {
+                            HStack(spacing: ByoSpace.small) { consentActions }
+                            VStack(spacing: ByoSpace.small) { consentActions }
+                        }
+                        #endif
                     }
                 }
             }
     }
+    #if os(iOS)
+    @ViewBuilder private var consentActions: some View {
+        ByoButton("common.cancel") { consentOrigin = nil }
+        ByoButton("consent.allowShort", kind: .primary) { consentOrigin = nil; save(consent: true) }
+    }
+    #endif
     private func keyFailure(_ failure: RunnerError) -> some View {
         let network = failure == .backend(BackendError(kind: .offline))
         return Banner(title: authError ? AppStrings.text("key.bad") : network ? AppStrings.text("err.net.t") : failureTitle, message: authError ? AppStrings.text("providers.badBody") : network ? AppStrings.text("providers.netBody") : AppStrings.error(failure), actionTitle: "err.retry", action: check)
@@ -285,9 +296,19 @@ private struct ProviderKeyScreen: View {
                     Banner(title: AppStrings.text("providers.modelsError"), message: AppStrings.error(error), actionTitle: "err.retry") { Task { await model.warmModels(connectionId: connection.id) } }
                 }
             }
-            ByoButton("key.replace") { replacing = true; key = ""; showKey = false }
-            ByoButton("key.recheck") { Task { await model.warmModels(connectionId: connection.id) } }
+            #if os(macOS)
+            keyActions(connection)
+            #else
+            ViewThatFits {
+                HStack(spacing: ByoSpace.small) { keyActions(connection) }
+                VStack(spacing: ByoSpace.small) { keyActions(connection) }
+            }
+            #endif
         }
+    }
+    @ViewBuilder private func keyActions(_ connection: Connection) -> some View {
+        ByoButton("key.replace") { replacing = true; key = ""; showKey = false }
+        ByoButton("key.recheck") { Task { await model.warmModels(connectionId: connection.id) } }
     }
     private var deleteSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -300,8 +321,7 @@ private struct ProviderKeyScreen: View {
             } else { ByoButton("key.delete", kind: .danger) { deleteConfirm = true } }
         }
             #if !os(macOS)
-            .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-            .overlay { RoundedRectangle(cornerRadius: 6).stroke(ByoColor.strongBorder) }
+            .frame(maxWidth: .infinity, alignment: .leading)
             #endif
             .accessibilityElement(children: .contain)
     }

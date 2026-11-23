@@ -27,13 +27,21 @@ private struct ResultTextPresentation: View {
     let playback: ResultAnimationPlayback?
     @State private var elapsed = 0.0
     @State private var advanceWidth: Double?
+    #if os(iOS)
+    @State private var finished = false
+    #endif
     @ScaledMetric private var fontSize: CGFloat = 17
 
     var body: some View {
-        Text(text.isEmpty ? " " : text)
-            .font(.system(size: fontSize))
-            .textSelection(.enabled).lineSpacing(5)
-            .textRenderer(ResultEffectRenderer(effect: playback?.effect ?? .none, elapsed: elapsed, utf16Count: text.utf16.count, glyphs: text.utf16.prefix(ResultEffectRenderer.glyphLimit).map { ResultAnimationGlyph($0, effect: playback?.effect ?? .none) }, fontSize: fontSize, advanceWidth: advanceWidth))
+        Group {
+            #if os(iOS)
+            // Selection bypasses the text renderer on iOS.
+            if playback != nil && !finished { renderedText }
+            else { renderedText.textSelection(.enabled) }
+            #else
+            renderedText
+            #endif
+        }
             .onPreferenceChange(Text.LayoutKey.self) { layouts in
                 guard advanceWidth == nil, playback != nil, let layout = layouts.first?.layout else { return }
                 advanceWidth = layout.reduce(0) { $0 + $1.typographicBounds.rect.width }
@@ -44,7 +52,22 @@ private struct ResultTextPresentation: View {
                 await Task.yield()
                 guard !Task.isCancelled else { return }
                 withAnimation(.linear(duration: duration)) { elapsed = duration }
+                #if os(iOS)
+                try? await Task.sleep(for: .seconds(duration))
+                guard !Task.isCancelled else { return }
+                finished = true
+                #endif
             }
+    }
+
+    private var renderedText: some View {
+        Text(text.isEmpty ? " " : text)
+            .font(.system(size: fontSize))
+            #if os(macOS)
+            .textSelection(.enabled)
+            #endif
+            .lineSpacing(5)
+            .textRenderer(ResultEffectRenderer(effect: playback?.effect ?? .none, elapsed: elapsed, utf16Count: text.utf16.count, glyphs: text.utf16.prefix(ResultEffectRenderer.glyphLimit).map { ResultAnimationGlyph($0, effect: playback?.effect ?? .none) }, fontSize: fontSize, advanceWidth: advanceWidth))
     }
 }
 

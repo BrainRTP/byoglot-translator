@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 #if os(macOS)
 public extension EnvironmentValues {
@@ -42,7 +45,11 @@ public struct ByoButton: View {
                 Text(AppStrings.text(title)).multilineTextAlignment(.center)
             }
             .modifier(ByoTypography(16, weight: .semibold))
+            #if os(macOS)
             .frame(maxWidth: kind == .primary ? .infinity : nil, minHeight: 48)
+            #else
+            .frame(minWidth: 0, maxWidth: kind == .text ? nil : .infinity, minHeight: 48, alignment: kind == .text ? .leading : .center)
+            #endif
             .padding(.horizontal, kind == .text ? 8 : 18)
             .contentShape(Rectangle())
         }
@@ -56,10 +63,17 @@ public struct ByoButton: View {
         func makeBody(configuration: Configuration) -> some View {
             configuration.label
                 .foregroundStyle(!enabled ? ByoColor.muted : kind == .primary ? ByoColor.accentForeground : kind == .danger ? ByoColor.error : kind == .text ? ByoColor.accent : ByoColor.text)
+                #if os(macOS)
                 .background(kind == .text ? .clear : !enabled ? ByoColor.surface : kind == .primary ? ByoColor.accent : ByoColor.background)
+                #else
+                .background(kind == .text ? .clear : !enabled || kind == .ordinary ? ByoColor.surface : kind == .primary ? ByoColor.accent : ByoColor.background)
+                #endif
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay { RoundedRectangle(cornerRadius: 6).stroke(kind == .text ? .clear : !enabled ? ByoColor.border : kind == .primary ? ByoColor.accent : ByoColor.strongBorder) }
                 .opacity(configuration.isPressed ? 0.75 : 1)
+                #if os(iOS)
+                .opacity(!enabled && kind == .ordinary ? 0.5 : 1)
+                #endif
                 .modifier(ByoFocusRing())
         }
     }
@@ -239,9 +253,20 @@ public struct ByoBottomSheet<Content: View>: View {
     let title: String
     let close: () -> Void
     let canClose: Bool
+    let allowsExpansion: Bool
     let content: Content
-    public init(_ title: String, close: @escaping () -> Void, canClose: Bool = true, @ViewBuilder content: () -> Content) {
-        self.title = title; self.close = close; self.canClose = canClose; self.content = content()
+    #if os(iOS)
+    @State private var headerHeight: CGFloat?
+    @State private var contentHeight: CGFloat?
+    private var fittedDetent: PresentationDetent {
+        guard let headerHeight, let contentHeight else { return .fraction(0.5) }
+        let window = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first(where: \.isKeyWindow)
+        let available = window.map { $0.bounds.height - $0.safeAreaInsets.top - $0.safeAreaInsets.bottom } ?? .infinity
+        return .height(min(headerHeight + contentHeight, available * 0.5))
+    }
+    #endif
+    public init(_ title: String, close: @escaping () -> Void, canClose: Bool = true, allowsExpansion: Bool = false, @ViewBuilder content: () -> Content) {
+        self.title = title; self.close = close; self.canClose = canClose; self.allowsExpansion = allowsExpansion; self.content = content()
     }
     public var body: some View {
         #if os(macOS)
@@ -258,16 +283,24 @@ public struct ByoBottomSheet<Content: View>: View {
         }.frame(minWidth: 480, idealWidth: 560, minHeight: 320, idealHeight: 480)
         #else
         VStack(spacing: 0) {
-            Capsule().fill(ByoColor.strongBorder).frame(width: 36, height: 5).padding(.top, 6).padding(.bottom, 2).accessibilityHidden(true)
-            HStack {
-                Text(AppStrings.text(title)).modifier(ByoTypography(17, weight: .semibold)).frame(maxWidth: .infinity, alignment: .leading).accessibilityAddTraits(.isHeader)
-                ByoIconButton(title: "common.close", symbol: "xmark", action: close)
-            }.padding(.leading, 16).padding(.trailing, 4).frame(minHeight: 52)
-            ScrollView { content.padding(16).frame(maxWidth: .infinity, alignment: .leading) }
+            VStack(spacing: 0) {
+                Capsule().fill(ByoColor.strongBorder).frame(width: 36, height: 5).padding(.top, 6).padding(.bottom, 2).accessibilityHidden(true)
+                HStack {
+                    Text(AppStrings.text(title)).modifier(ByoTypography(17, weight: .semibold)).frame(maxWidth: .infinity, alignment: .leading).accessibilityAddTraits(.isHeader)
+                    ByoIconButton(title: "common.close", symbol: "xmark", action: close)
+                }.padding(.leading, 16).padding(.trailing, 4).frame(minHeight: 52)
+            }.onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { headerHeight = $0 }
+            ScrollView {
+                content.padding(ByoSpace.screen).frame(maxWidth: .infinity, alignment: .leading)
+                    .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) {
+                        if !allowsExpansion || contentHeight == nil { contentHeight = $0 }
+                    }
+            }
         }.background(ByoColor.background).foregroundStyle(ByoColor.text)
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16))
             .shadow(color: ByoColor.shadow, radius: 10, y: 6)
-            .presentationDetents([.medium, .fraction(0.9)]).presentationDragIndicator(.hidden).presentationCornerRadius(16)
+            .presentationSizing(.fitted)
+            .presentationDetents(allowsExpansion ? [fittedDetent, .large] : [fittedDetent]).presentationDragIndicator(.hidden).presentationCornerRadius(ByoRadius.sheet)
             .accessibilityAddTraits(.isModal)
         #endif
     }

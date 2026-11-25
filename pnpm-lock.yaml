@@ -169,8 +169,8 @@ importers:
   .:
     dependencies:
       '@webext-core/messaging':
-        specifier: 4.0.1
-        version: 4.0.1
+        specifier: 4.0.2
+        version: 4.0.2
       idb:
         specifier: 8.0.4
         version: 8.0.4
@@ -739,8 +739,8 @@ packages:
   '@webext-core/match-patterns@2.0.0':
     resolution: {integrity: sha512-EsyMMKfQuSE4rWCjP/TifwvUWlhC/OhiGn5OK3p9F0d57UmtLib0nzguzPKyxM1/kZV7SkE+jYXkE8gsdPRLmw==}
 
-  '@webext-core/messaging@4.0.1':
-    resolution: {integrity: sha512-sgsj3r42zfgC16Uaz6wXb0KvbkCQvlmOqyMIDbdx4ErRVCP98jpJjkVRoACldV7/oKHY9ITl20ld2pwKvAHSsQ==}
+  '@webext-core/messaging@4.0.2':
+    resolution: {integrity: sha512-pnAPo5DyInzFyHNDPxsB+6Bg9/WSOJXb8EDL3b7f0x+QVxoh1TbCj0pi2ONxxsenaxlOPEMHQoquAlk2/T1GNQ==}
     peerDependencies:
       '@types/chrome': '*'
     peerDependenciesMeta:
@@ -2865,7 +2865,7 @@ snapshots:
 
   '@webext-core/match-patterns@2.0.0': {}
 
-  '@webext-core/messaging@4.0.1':
+  '@webext-core/messaging@4.0.2':
     dependencies:
       '@aklinker1/zero-serialize-error': 1.0.2
 
